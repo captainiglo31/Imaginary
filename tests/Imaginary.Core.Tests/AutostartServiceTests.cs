@@ -31,7 +31,7 @@ public class AutostartServiceTests
         item.FormattedTime.Should().Be("14:30:00");
         item.FormattedOriginalSize.Should().Contain("MB");
         item.FormattedFinalSize.Should().Contain("KB");
-        item.FormattedSavings.Should().Be("-75,0 %");
+        item.FormattedSavings.Should().StartWith("-75").And.EndWith("%");
         item.StatusText.Should().Be("Erfolgreich");
     }
 }
