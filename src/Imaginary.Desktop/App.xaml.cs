@@ -13,8 +13,10 @@ public partial class App : Application
     public static string[] StartupArgs { get; private set; } = Array.Empty<string>();
     public static event Action<string[]>? FilesReceivedViaIpc;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
+        base.OnStartup(e);
+
         // Global Exception Handlers for robust crash diagnosis
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
         {
@@ -89,7 +91,33 @@ public partial class App : Application
             catch { }
         });
 
-        base.OnStartup(e);
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+        Views.SplashScreenWindow? splash = null;
+        try
+        {
+            splash = new Views.SplashScreenWindow();
+            splash.Show();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("App", "Splash Screen konnte nicht angezeigt werden", ex);
+        }
+
+        // Zeige Splash Screen für ca. 1.1s für einen flüssigen, coolen Start
+        if (splash != null)
+        {
+            await Task.Delay(1100);
+        }
+
+        var mainWindow = new MainWindow();
+        MainWindow = mainWindow;
+        mainWindow.Show();
+
+        if (splash != null)
+        {
+            await splash.FadeOutAndCloseAsync();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

@@ -88,8 +88,13 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Width="42" Height="42" CornerRadius="10" Margin="0,0,12,0"
                                 Background="#0A0E1A" BorderBrush="{DynamicResource BorderFocusBrush}"
-                                BorderThickness="1.5" ClipToBounds="True">
-                            <Image Source="pack://application:,,,/Assets/logo.png" Stretch="Uniform" Margin="2"/>
+                                BorderThickness="1.5" ClipToBounds="True"
+                                RenderOptions.BitmapScalingMode="HighQuality">
+                            <Image Source="pack://application:,,,/Assets/logo.png" Stretch="Uniform" Margin="2"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   RenderOptions.EdgeMode="Aliased"
+                                   SnapsToDevicePixels="True"
+                                   UseLayoutRounding="True"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="IMAGINARY" FontSize="20" FontWeight="ExtraBold"
@@ -419,8 +424,7 @@
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
                                   IsReadOnly="True"
-                                  GridLinesVisibility="Horizontal"
-                                  HorizontalGridLinesBrush="{DynamicResource DataGridLinesBrush}"
+                                  GridLinesVisibility="None"
                                   HeadersVisibility="Column"
                                   RowHeight="36"
                                   Background="{DynamicResource SurfaceBackgroundBrush}"

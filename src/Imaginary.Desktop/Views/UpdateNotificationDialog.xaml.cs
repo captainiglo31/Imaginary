@@ -5,6 +5,8 @@ using Imaginary.Core.Logging;
 using Imaginary.Core.Models;
 using Imaginary.Core.Services;
 
+using System.Windows.Controls;
+
 namespace Imaginary.Desktop.Views;
 
 public partial class UpdateNotificationDialog : Window
@@ -28,17 +30,162 @@ public partial class UpdateNotificationDialog : Window
         TextCurrentVersion.Text = $"v{updateInfo.CurrentVersion}";
         TextLatestVersion.Text = updateInfo.LatestVersion != null ? $"v{updateInfo.LatestVersion}" : (updateInfo.TagName ?? "Neu");
 
-        if (!string.IsNullOrWhiteSpace(updateInfo.ReleaseNotes))
+        PopulateReleaseNotes(updateInfo);
+    }
+
+    private void PopulateReleaseNotes(UpdateInfo updateInfo)
+    {
+        PanelReleaseNotes.Children.Clear();
+
+        var notes = updateInfo.ReleaseNotes;
+        if (string.IsNullOrWhiteSpace(notes))
         {
-            TextReleaseNotes.Text = updateInfo.ReleaseNotes;
+            notes = updateInfo.ReleaseTitle;
         }
-        else if (!string.IsNullOrWhiteSpace(updateInfo.ReleaseTitle))
+
+        if (string.IsNullOrWhiteSpace(notes))
         {
-            TextReleaseNotes.Text = updateInfo.ReleaseTitle;
+            AddNoteItem("✨", "Allgemeine Leistungs- und Stabilitätsoptimierungen");
+            AddNoteItem("🐛", "Fehlerbehebungen und Verbesserungen der Benutzeroberfläche");
+            return;
         }
-        else
+
+        var lines = notes.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+        bool addedAny = false;
+
+        foreach (var rawLine in lines)
         {
-            TextReleaseNotes.Text = "Keine Versionshinweise hinterlegt.";
+            var line = rawLine.Trim();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            // Skip GitHub comparison link noise
+            if (line.StartsWith("**Full Changelog**", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("Full Changelog:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Headers like "## What's Changed"
+            if (line.StartsWith('#'))
+            {
+                var headerText = line.TrimStart('#', ' ').Trim();
+                if (headerText.Equals("What's Changed", StringComparison.OrdinalIgnoreCase))
+                {
+                    headerText = "Was ist neu:";
+                }
+                var tbHeader = new TextBlock
+                {
+                    Text = headerText,
+                    FontWeight = FontWeights.Bold,
+                    FontSize = 12,
+                    Margin = new Thickness(0, addedAny ? 10 : 0, 0, 4)
+                };
+                tbHeader.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+                PanelReleaseNotes.Children.Add(tbHeader);
+                addedAny = true;
+                continue;
+            }
+
+            // Bullet items
+            if (line.StartsWith('*') || line.StartsWith('-'))
+            {
+                var content = line.Substring(1).Trim();
+
+                // Remove "... by @user in https://github.com/..."
+                var inIndex = content.LastIndexOf(" in https://", StringComparison.OrdinalIgnoreCase);
+                if (inIndex > 0)
+                {
+                    content = content.Substring(0, inIndex).Trim();
+                }
+
+                var icon = "•";
+                if (content.Contains("fix", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("bug", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("fehler", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("behob", StringComparison.OrdinalIgnoreCase))
+                {
+                    icon = "🐛";
+                }
+                else if (content.Contains("add", StringComparison.OrdinalIgnoreCase) ||
+                         content.Contains("neu", StringComparison.OrdinalIgnoreCase) ||
+                         content.Contains("feature", StringComparison.OrdinalIgnoreCase) ||
+                         content.Contains("splash", StringComparison.OrdinalIgnoreCase))
+                {
+                    icon = "✨";
+                }
+                else if (content.Contains("perf", StringComparison.OrdinalIgnoreCase) ||
+                         content.Contains("speed", StringComparison.OrdinalIgnoreCase) ||
+                         content.Contains("optim", StringComparison.OrdinalIgnoreCase))
+                {
+                    icon = "⚡";
+                }
+
+                AddNoteItem(icon, content);
+                addedAny = true;
+                continue;
+            }
+
+            // Regular paragraph line
+            AddNoteItem("•", line);
+            addedAny = true;
+        }
+
+        if (!addedAny)
+        {
+            AddNoteItem("✨", "Allgemeine Verbesserungen und Stabilitätsoptimierungen");
+        }
+    }
+
+    private void AddNoteItem(string icon, string text)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var tbIcon = new TextBlock
+        {
+            Text = icon,
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, 1, 0, 0)
+        };
+
+        var tbText = new TextBlock
+        {
+            Text = text,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 18,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        tbText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+
+        Grid.SetColumn(tbIcon, 0);
+        Grid.SetColumn(tbText, 1);
+
+        grid.Children.Add(tbIcon);
+        grid.Children.Add(tbText);
+
+        PanelReleaseNotes.Children.Add(grid);
+    }
+
+    private void OnOpenGithubReleaseClicked(object sender, RoutedEventArgs e)
+    {
+        var url = !string.IsNullOrWhiteSpace(_updateInfo.HtmlUrl)
+            ? _updateInfo.HtmlUrl
+            : "https://github.com/captainiglo31/Imaginary/releases";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Update", "Konnte Browser für Release-Notes nicht öffnen", ex);
         }
     }
 
