@@ -11,6 +11,7 @@ public static class SingleInstanceService
     private const string MutexName = @"Global\Imaginary_App_SingleInstance_Mutex";
     private const string PipeName = "Imaginary_App_SingleInstance_IPC_Pipe";
     private static Mutex? _mutex;
+    private static bool _ownsMutex;
     private static CancellationTokenSource? _pipeCts;
 
     [DllImport("user32.dll")]
@@ -35,6 +36,7 @@ public static class SingleInstanceService
 
         if (createdNew)
         {
+            _ownsMutex = true;
             AppLogger.Debug("SingleInstance", "Primäre Instanz erfolgreich registriert (Mutex akquiriert).");
             // First/primary instance: start pipe server in background
             _pipeCts = new CancellationTokenSource();
@@ -43,6 +45,10 @@ public static class SingleInstanceService
         }
         else
         {
+            _ownsMutex = false;
+            try { _mutex?.Dispose(); } catch { }
+            _mutex = null;
+
             AppLogger.Info("SingleInstance", $"Folgeinstanz erkannt: Sende {startupArgs?.Length ?? 0} Argument(e) an primäre Instanz...");
             // Secondary instance: send args to primary instance via named pipe and exit
             SendArgsToPrimaryInstance(startupArgs ?? Array.Empty<string>());
@@ -134,9 +140,29 @@ public static class SingleInstanceService
 
     public static void Cleanup()
     {
-        _pipeCts?.Cancel();
-        _pipeCts?.Dispose();
-        _mutex?.ReleaseMutex();
-        _mutex?.Dispose();
+        try
+        {
+            _pipeCts?.Cancel();
+            _pipeCts?.Dispose();
+        }
+        catch { }
+
+        if (_ownsMutex && _mutex != null)
+        {
+            try
+            {
+                _mutex.ReleaseMutex();
+            }
+            catch { }
+        }
+
+        try
+        {
+            _mutex?.Dispose();
+        }
+        catch { }
+
+        _mutex = null;
+        _ownsMutex = false;
     }
 }
