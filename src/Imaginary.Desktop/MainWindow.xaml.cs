@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using Imaginary.Core;
+using Imaginary.Desktop.Services;
 using Imaginary.Desktop.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +11,7 @@ namespace Imaginary.Desktop;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly ITrayService _trayService;
 
     public MainWindow()
     {
@@ -16,10 +19,20 @@ public partial class MainWindow : Window
 
         var services = new ServiceCollection();
         services.AddImaginaryCore();
+        services.AddSingleton<ITrayService, TrayService>();
         services.AddSingleton<MainViewModel>();
         var serviceProvider = services.BuildServiceProvider();
 
         _viewModel = serviceProvider.GetRequiredService<MainViewModel>();
+        _trayService = serviceProvider.GetRequiredService<ITrayService>();
+
+        _trayService.Initialize(
+            mainWindow: this,
+            toggleHotfolder: () => _viewModel.ToggleHotfolderCommand.Execute(null),
+            isHotfolderRunning: () => _viewModel.IsHotfolderActive,
+            openSettings: () => _viewModel.SelectTabCommand.Execute(2));
+
+        _viewModel.AttachTrayService(_trayService);
         DataContext = _viewModel;
 
         if (App.StartupArgs.Length > 0)
@@ -31,6 +44,28 @@ public partial class MainWindow : Window
         {
             _viewModel.AddFilePaths(files);
         };
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (_viewModel.MinimizeToTrayOnClose)
+        {
+            e.Cancel = true;
+            Hide();
+
+            if (!_viewModel.HasShownTrayIntroBalloon)
+            {
+                _trayService.ShowNotification(
+                    "Imaginary läuft im Hintergrund",
+                    "Imaginary überwacht weiterhin deine Ordner im Hintergrund. Klicke auf das Symbol in der Taskleiste, um das Fenster zu öffnen.",
+                    System.Windows.Forms.ToolTipIcon.Info);
+                _viewModel.MarkTrayIntroBalloonShown();
+            }
+            return;
+        }
+
+        _trayService.Dispose();
+        base.OnClosing(e);
     }
 
     private void OnGridDragOver(object sender, DragEventArgs e)

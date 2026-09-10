@@ -85,3 +85,31 @@ public class IntToVisibilityConverter : IValueConverter
         throw new NotSupportedException();
     }
 }
+
+public class IntToBooleanConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int intValue && parameter != null)
+        {
+            if (int.TryParse(parameter.ToString(), out int targetVal))
+            {
+                return intValue == targetVal;
+            }
+        }
+        return false;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool b && b && parameter != null)
+        {
+            if (int.TryParse(parameter.ToString(), out int targetVal))
+            {
+                return targetVal;
+            }
+        }
+        return Binding.DoNothing;
+    }
+}
+

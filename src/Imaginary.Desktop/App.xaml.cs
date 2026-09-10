@@ -93,6 +93,18 @@ public partial class App : Application
 
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
+        bool startInTray = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase) ||
+                                           string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase));
+
+        if (startInTray)
+        {
+            AppLogger.Info("App", "Startparameter --tray / --minimized erkannt – Starte lautlos im Hintergrund.");
+            var mainWindow = new MainWindow();
+            MainWindow = mainWindow;
+            // Fenster bleibt unsichtbar, TrayService läuft im Infobereich
+            return;
+        }
+
         Views.SplashScreenWindow? splash = null;
         try
         {
@@ -110,9 +122,9 @@ public partial class App : Application
             await Task.Delay(1100);
         }
 
-        var mainWindow = new MainWindow();
-        MainWindow = mainWindow;
-        mainWindow.Show();
+        var mainWindowNormal = new MainWindow();
+        MainWindow = mainWindowNormal;
+        mainWindowNormal.Show();
 
         if (splash != null)
         {

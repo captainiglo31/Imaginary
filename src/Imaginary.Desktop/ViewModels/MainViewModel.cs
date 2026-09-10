@@ -11,6 +11,8 @@ using Imaginary.Desktop.Views;
 using Microsoft.Win32;
 using CoreResizeMode = Imaginary.Core.Models.ResizeMode;
 
+using Imaginary.Desktop.Services;
+
 namespace Imaginary.Desktop.ViewModels;
 
 public partial class MainViewModel : ObservableObject
@@ -20,9 +22,11 @@ public partial class MainViewModel : ObservableObject
     private readonly IPresetManager _presetManager;
     private readonly ISettingsService _settingsService;
     private readonly IExplorerIntegration _explorerIntegration;
+    private readonly IAutostartService _autostartService;
     private readonly IHotfolderWatcher _hotfolderWatcher;
     private readonly IWatermarkService _watermarkService;
     private readonly IUpdateService _updateService;
+    private ITrayService? _trayService;
 
     private UpdateInfo? _latestUpdateInfo;
     private CancellationTokenSource? _cts;
@@ -149,6 +153,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private Preset? _selectedPreset;
 
+    // Active Tab Navigation
+    [ObservableProperty]
+    private int _selectedTabIndex = 0; // 0 = Studio, 1 = Hotfolder, 2 = Einstellungen
+
     // Dark Mode & Settings
     [ObservableProperty]
     private bool _isDarkMode;
@@ -156,7 +164,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isExplorerIntegrationEnabled;
 
-    // Hotfolder
+    // Hotfolder Settings & State
     [ObservableProperty]
     private string _hotfolderPath = string.Empty;
 
@@ -168,6 +176,62 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _hotfolderStatusText = "Hotfolder nicht aktiv";
+
+    [ObservableProperty]
+    private bool _hotfolderIncludeSubdirectories;
+
+    [ObservableProperty]
+    private int _hotfolderOriginalActionIndex = 1; // 0 = Keep, 1 = Move to subfolder, 2 = Delete
+
+    [ObservableProperty]
+    private string _hotfolderOriginalSubfolder = "Originale";
+
+    [ObservableProperty]
+    private Preset? _hotfolderSelectedPreset;
+
+    [ObservableProperty]
+    private int _hotfolderTodayProcessedCount = 0;
+
+    [ObservableProperty]
+    private long _hotfolderTodaySavedBytes = 0;
+
+    public string HotfolderSavedBytesFormatted
+    {
+        get
+        {
+            if (HotfolderTodaySavedBytes < 1024) return $"{HotfolderTodaySavedBytes} B";
+            if (HotfolderTodaySavedBytes < 1024 * 1024) return $"{HotfolderTodaySavedBytes / 1024.0:F1} KB";
+            return $"{HotfolderTodaySavedBytes / (1024.0 * 1024.0):F2} MB";
+        }
+    }
+
+    public ObservableCollection<HotfolderHistoryItem> HotfolderHistory { get; } = new();
+
+    // System & Autostart Settings
+    [ObservableProperty]
+    private bool _isAutostartEnabled;
+
+    [ObservableProperty]
+    private bool _minimizeToTrayOnClose = true;
+
+    [ObservableProperty]
+    private bool _startMinimizedInTray = false;
+
+    [ObservableProperty]
+    private bool _showTrayNotifications = true;
+
+    [ObservableProperty]
+    private bool _checkForUpdatesOnStartup = true;
+
+    public bool HasShownTrayIntroBalloon => _settingsService.Settings.HasShownTrayIntroBalloon;
+
+    public void MarkTrayIntroBalloonShown()
+    {
+        _settingsService.Settings.HasShownTrayIntroBalloon = true;
+        _settingsService.Save();
+    }
+
+    public string AppVersionString => "v1.1.0";
 
     // Output & Execution
     [ObservableProperty]
@@ -206,6 +270,7 @@ public partial class MainViewModel : ObservableObject
         IPresetManager presetManager,
         ISettingsService settingsService,
         IExplorerIntegration explorerIntegration,
+        IAutostartService autostartService,
         IHotfolderWatcher hotfolderWatcher,
         IWatermarkService watermarkService,
         IUpdateService updateService)
@@ -215,6 +280,7 @@ public partial class MainViewModel : ObservableObject
         _presetManager = presetManager ?? throw new ArgumentNullException(nameof(presetManager));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _explorerIntegration = explorerIntegration ?? throw new ArgumentNullException(nameof(explorerIntegration));
+        _autostartService = autostartService ?? throw new ArgumentNullException(nameof(autostartService));
         _hotfolderWatcher = hotfolderWatcher ?? throw new ArgumentNullException(nameof(hotfolderWatcher));
         _watermarkService = watermarkService ?? throw new ArgumentNullException(nameof(watermarkService));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
@@ -232,11 +298,48 @@ public partial class MainViewModel : ObservableObject
 
         _isExplorerIntegrationEnabled = _explorerIntegration.IsRegistered();
         _outputDirectory = settings.LastOutputDirectory ?? string.Empty;
+
+        // Hotfolder settings
         _hotfolderPath = settings.HotfolderPath ?? string.Empty;
         _hotfolderOutputPath = settings.HotfolderOutputDir ?? string.Empty;
+        _hotfolderIncludeSubdirectories = settings.HotfolderIncludeSubdirectories;
+        _hotfolderOriginalActionIndex = (int)settings.HotfolderOriginalAction;
+        _hotfolderOriginalSubfolder = string.IsNullOrWhiteSpace(settings.HotfolderOriginalSubfolder) ? "Originale" : settings.HotfolderOriginalSubfolder;
+
+        // Daily stats
+        if (settings.HotfolderStatsDate?.Date == DateTime.Today)
+        {
+            _hotfolderTodayProcessedCount = settings.HotfolderTodayProcessedCount;
+            _hotfolderTodaySavedBytes = settings.HotfolderTodaySavedBytes;
+        }
+        else
+        {
+            settings.HotfolderStatsDate = DateTime.Today;
+            settings.HotfolderTodayProcessedCount = 0;
+            settings.HotfolderTodaySavedBytes = 0;
+            _settingsService.Save();
+        }
+
+        // System & Autostart settings
+        _isAutostartEnabled = _autostartService.IsAutostartEnabled();
+        _minimizeToTrayOnClose = settings.MinimizeToTrayOnClose;
+        _startMinimizedInTray = settings.StartMinimizedInTray;
+        _showTrayNotifications = settings.ShowTrayNotifications;
+        _checkForUpdatesOnStartup = settings.CheckForUpdatesOnStartup;
+
+        // Auto-heal autostart path if enabled
+        if (_isAutostartEnabled)
+        {
+            _autostartService.SynchronizeAutostart(true);
+        }
 
         // Load Presets
         ReloadPresets();
+
+        if (!string.IsNullOrWhiteSpace(settings.HotfolderSelectedPresetId))
+        {
+            _hotfolderSelectedPreset = Presets.FirstOrDefault(p => p.Id == settings.HotfolderSelectedPresetId);
+        }
 
         // Hotfolder events
         _hotfolderWatcher.FileProcessed += OnHotfolderFileProcessed;
@@ -248,12 +351,18 @@ public partial class MainViewModel : ObservableObject
             });
         };
 
+        // Autostart Hotfolder if configured
+        if (settings.HotfolderAutoStart && !string.IsNullOrWhiteSpace(_hotfolderPath) && Directory.Exists(_hotfolderPath))
+        {
+            ToggleHotfolder();
+        }
+
         // Automatischer Update-Check im Hintergrund (falls aktiviert)
-        if (_settingsService.Settings.CheckForUpdatesOnStartup)
+        if (_checkForUpdatesOnStartup)
         {
             _ = Task.Run(async () =>
             {
-                await Task.Delay(2000);
+                await Task.Delay(2500);
                 await Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
                     await CheckForUpdatesInternalAsync(showFeedbackWhenNoUpdate: false);
@@ -476,14 +585,106 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public void AttachTrayService(ITrayService trayService)
+    {
+        _trayService = trayService;
+        _trayService.UpdateHotfolderStatus(IsHotfolderActive);
+    }
+
+    partial void OnIsAutostartEnabledChanged(bool value)
+    {
+        if (value)
+        {
+            _autostartService.EnableAutostart();
+        }
+        else
+        {
+            _autostartService.DisableAutostart();
+        }
+        _settingsService.Settings.IsAutostartEnabled = value;
+        _settingsService.Save();
+    }
+
+    partial void OnMinimizeToTrayOnCloseChanged(bool value)
+    {
+        _settingsService.Settings.MinimizeToTrayOnClose = value;
+        _settingsService.Save();
+    }
+
+    partial void OnStartMinimizedInTrayChanged(bool value)
+    {
+        _settingsService.Settings.StartMinimizedInTray = value;
+        _settingsService.Save();
+    }
+
+    partial void OnShowTrayNotificationsChanged(bool value)
+    {
+        _settingsService.Settings.ShowTrayNotifications = value;
+        _settingsService.Save();
+    }
+
+    partial void OnCheckForUpdatesOnStartupChanged(bool value)
+    {
+        _settingsService.Settings.CheckForUpdatesOnStartup = value;
+        _settingsService.Save();
+    }
+
+    partial void OnHotfolderSelectedPresetChanged(Preset? value)
+    {
+        _settingsService.Settings.HotfolderSelectedPresetId = value?.Id;
+        _settingsService.Save();
+    }
+
+    partial void OnHotfolderIncludeSubdirectoriesChanged(bool value)
+    {
+        _settingsService.Settings.HotfolderIncludeSubdirectories = value;
+        _settingsService.Save();
+    }
+
+    partial void OnHotfolderOriginalActionIndexChanged(int value)
+    {
+        _settingsService.Settings.HotfolderOriginalAction = (HotfolderOriginalAction)value;
+        _settingsService.Save();
+    }
+
+    partial void OnHotfolderOriginalSubfolderChanged(string value)
+    {
+        _settingsService.Settings.HotfolderOriginalSubfolder = value;
+        _settingsService.Save();
+    }
+
     [RelayCommand]
-    private void ToggleHotfolder()
+    public void SelectTab(int tabIndex)
+    {
+        SelectedTabIndex = tabIndex;
+    }
+
+    [RelayCommand]
+    private void ClearHotfolderHistory()
+    {
+        HotfolderHistory.Clear();
+    }
+
+    [RelayCommand]
+    private void ResetHotfolderStats()
+    {
+        HotfolderTodayProcessedCount = 0;
+        HotfolderTodaySavedBytes = 0;
+        OnPropertyChanged(nameof(HotfolderSavedBytesFormatted));
+        _settingsService.Settings.HotfolderTodayProcessedCount = 0;
+        _settingsService.Settings.HotfolderTodaySavedBytes = 0;
+        _settingsService.Save();
+    }
+
+    [RelayCommand]
+    public void ToggleHotfolder()
     {
         if (IsHotfolderActive)
         {
             _hotfolderWatcher.Stop();
             IsHotfolderActive = false;
             HotfolderStatusText = "Hotfolder gestoppt";
+            _trayService?.UpdateHotfolderStatus(false);
         }
         else
         {
@@ -494,14 +695,20 @@ public partial class MainViewModel : ObservableObject
             }
 
             var outDir = string.IsNullOrWhiteSpace(HotfolderOutputPath) ? Path.Combine(HotfolderPath, "converted") : HotfolderOutputPath;
-            var options = BuildConversionOptions();
+            var options = HotfolderSelectedPreset != null ? HotfolderSelectedPreset.Options : BuildConversionOptions();
 
-            _hotfolderWatcher.Start(HotfolderPath, outDir, options);
+            var action = (HotfolderOriginalAction)HotfolderOriginalActionIndex;
+            _hotfolderWatcher.Start(HotfolderPath, outDir, options, HotfolderIncludeSubdirectories, action, HotfolderOriginalSubfolder);
             IsHotfolderActive = true;
             HotfolderStatusText = $"Überwache: {HotfolderPath}";
+            _trayService?.UpdateHotfolderStatus(true);
 
             _settingsService.Settings.HotfolderPath = HotfolderPath;
             _settingsService.Settings.HotfolderOutputDir = HotfolderOutputPath;
+            _settingsService.Settings.HotfolderIncludeSubdirectories = HotfolderIncludeSubdirectories;
+            _settingsService.Settings.HotfolderOriginalAction = action;
+            _settingsService.Settings.HotfolderOriginalSubfolder = HotfolderOriginalSubfolder;
+            _settingsService.Settings.HotfolderSelectedPresetId = HotfolderSelectedPreset?.Id;
             _settingsService.Save();
         }
     }
@@ -510,20 +717,51 @@ public partial class MainViewModel : ObservableObject
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            var itemVm = Files.FirstOrDefault(f => string.Equals(f.FilePath, e.SourceFile, StringComparison.OrdinalIgnoreCase));
-            if (itemVm == null)
+            var item = new HotfolderHistoryItem
             {
-                var fi = new FileInfo(e.SourceFile);
-                itemVm = new FileItemViewModel
-                {
-                    FilePath = e.SourceFile,
-                    FileName = fi.Name,
-                    OriginalSizeBytes = fi.Exists ? fi.Length : 0
-                };
-                Files.Insert(0, itemVm);
+                Timestamp = DateTime.Now,
+                FileName = Path.GetFileName(e.SourceFile),
+                TargetFileName = e.Result.TargetPath != null ? Path.GetFileName(e.Result.TargetPath) : string.Empty,
+                OriginalSizeBytes = e.Result.OriginalSizeBytes,
+                FinalSizeBytes = e.Result.FinalSizeBytes,
+                SavingsPercent = e.Result.SavingsPercentage,
+                Success = e.Result.Success,
+                ErrorMessage = e.Result.ErrorMessage
+            };
+
+            HotfolderHistory.Insert(0, item);
+            while (HotfolderHistory.Count > 100)
+            {
+                HotfolderHistory.RemoveAt(HotfolderHistory.Count - 1);
             }
 
-            itemVm.UpdateFromJobResult(e.Result);
+            if (e.Result.Success)
+            {
+                HotfolderTodayProcessedCount++;
+                var saved = Math.Max(0, e.Result.OriginalSizeBytes - e.Result.FinalSizeBytes);
+                HotfolderTodaySavedBytes += saved;
+                OnPropertyChanged(nameof(HotfolderSavedBytesFormatted));
+
+                _settingsService.Settings.HotfolderTodayProcessedCount = HotfolderTodayProcessedCount;
+                _settingsService.Settings.HotfolderTodaySavedBytes = HotfolderTodaySavedBytes;
+                _settingsService.Save();
+
+                if (ShowTrayNotifications && _trayService != null)
+                {
+                    _trayService.ShowNotification(
+                        "Hotfolder: Bild optimiert",
+                        $"{item.FileName} -> {item.TargetFileName} ({item.FormattedSavings})",
+                        System.Windows.Forms.ToolTipIcon.Info);
+                }
+            }
+            else if (ShowTrayNotifications && _trayService != null)
+            {
+                _trayService.ShowNotification(
+                    "Hotfolder: Fehler",
+                    $"{item.FileName}: {e.Result.ErrorMessage}",
+                    System.Windows.Forms.ToolTipIcon.Warning);
+            }
+
             StatusSummary = $"Hotfolder: {e.SourceFile} verarbeitet.";
         });
     }

@@ -19,6 +19,7 @@
         <conv:InverseBooleanConverter x:Key="InverseBool"/>
         <conv:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
         <conv:IntToVisibilityConverter x:Key="IntToVis"/>
+        <conv:IntToBooleanConverter x:Key="IntToBool"/>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
         <Style TargetType="TextBlock">
@@ -35,6 +36,36 @@
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <Style x:Key="TabNavigationRadioButtonStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SecondaryButtonBackgroundBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ActionButtonGradientBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -54,6 +85,7 @@
                 </Grid.RowDefinitions>
 
                 <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,12">
+                    <!-- Right Actions (Updates & Protokoll) -->
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                         <!-- Update Available Banner Button -->
                         <Button Content="{Binding UpdateBadgeText}" Command="{Binding ShowUpdateDialogCommand}"
@@ -64,29 +96,17 @@
 
                         <!-- Protokoll / Log Viewer Button -->
                         <Button Content="📋 Protokoll" Command="{Binding OpenLogViewerCommand}"
-                                Padding="12,6" Margin="0,0,10,0"
+                                Padding="12,6" Margin="0,0,2,0"
                                 Background="{DynamicResource SecondaryButtonBackgroundBrush}"
                                 Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                                 Cursor="Hand" ToolTip="Echtzeit-System- &amp; Fehler-Protokoll anzeigen"/>
-
-                        <!-- Explorer Integration Toggle -->
-                        <Button Content="⚡ Explorer-Menü" Command="{Binding ToggleExplorerIntegrationCommand}"
-                                Padding="12,6" Margin="0,0,14,0"
-                                Background="{DynamicResource SecondaryButtonBackgroundBrush}"
-                                Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                Cursor="Hand" ToolTip="Rechtsklick-Menü im Windows Explorer aktivieren/deaktivieren"/>
-
-                        <!-- Dark Mode Toggle -->
-                        <CheckBox IsChecked="{Binding IsDarkMode, Mode=TwoWay}"
-                                  Content="🌙 Dark Mode" Foreground="{DynamicResource HeaderForegroundBrush}"
-                                  VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,8,0"/>
                     </StackPanel>
 
-                    <!-- Logo & Brand Header -->
+                    <!-- Left Brand & Center Tab Bar -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="42" Height="42" CornerRadius="10" Margin="0,0,12,0"
+                        <!-- Logo & Brand Header -->
+                        <Border Width="42" Height="42" CornerRadius="10" Margin="0,0,14,0"
                                 Background="#0A0E1A" BorderBrush="{DynamicResource BorderFocusBrush}"
                                 BorderThickness="1.5" ClipToBounds="True"
                                 RenderOptions.BitmapScalingMode="HighQuality">
@@ -96,12 +116,29 @@
                                    SnapsToDevicePixels="True"
                                    UseLayoutRounding="True"/>
                         </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="IMAGINARY" FontSize="20" FontWeight="ExtraBold"
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,22,0">
+                            <TextBlock Text="IMAGINARY" FontSize="19" FontWeight="ExtraBold"
                                        Foreground="{DynamicResource HeaderForegroundBrush}"/>
-                            <TextBlock Text="Professionelle Bild-Konvertierung, Größenbegrenzung &amp; Icon-Builder"
-                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,1,0,0"/>
+                            <TextBlock Text="Next-Gen Image &amp; Automation Studio"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,1,0,0"/>
                         </StackPanel>
+
+                        <!-- Modern Segmented Tab Bar -->
+                        <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="8"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="3"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Content="⚡ Studio &amp; Batch"
+                                             IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=0, Mode=TwoWay}"
+                                             Style="{StaticResource TabNavigationRadioButtonStyle}"/>
+                                <RadioButton Content="📁 Hotfolder &amp; Automation"
+                                             IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=1, Mode=TwoWay}"
+                                             Style="{StaticResource TabNavigationRadioButtonStyle}"/>
+                                <RadioButton Content="⚙️ Einstellungen"
+                                             IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=2, Mode=TwoWay}"
+                                             Style="{StaticResource TabNavigationRadioButtonStyle}"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </DockPanel>
 
@@ -110,13 +147,23 @@
             </Grid>
         </Border>
 
-        <!-- Main Content -->
-        <Grid Grid.Row="1" Margin="16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="380"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- Main Content Area with 3 Tabs -->
+        <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                    BorderThickness="0" Background="Transparent" Margin="16,12,16,12">
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </Style>
+            </TabControl.ItemContainerStyle>
+
+            <!-- Tab 0: ⚡ Studio & Batch -->
+            <TabItem>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="380"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
             <!-- Left Panel: Settings -->
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
@@ -329,27 +376,6 @@
                         </StackPanel>
                     </GroupBox>
 
-                    <!-- 6. Hotfolder -->
-                    <GroupBox Header="6. Hotfolder (Ordnerüberwachung)">
-                        <StackPanel Margin="0,4,0,0">
-                            <TextBlock Text="Bilder werden automatisch verarbeitet:" FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <DockPanel Margin="0,0,0,6">
-                                <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectHotfolderCommand}"
-                                        Padding="8,4" Margin="6,0,0,0"/>
-                                <TextBox Text="{Binding HotfolderPath, Mode=TwoWay}" Padding="6,4" FontSize="12"/>
-                            </DockPanel>
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right"
-                                        Content="{Binding IsHotfolderActive, Converter={StaticResource InverseBool}, StringFormat={}{0:Starten;Stoppen}}"
-                                        Command="{Binding ToggleHotfolderCommand}"
-                                        Padding="10,4" Margin="6,0,0,0" FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding HotfolderStatusText}" FontSize="11" VerticalAlignment="Center"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            </DockPanel>
-                        </StackPanel>
-                    </GroupBox>
-
                     <!-- Action Buttons -->
                     <StackPanel Margin="0,8,0,0">
                         <Button Content="🚀 Konvertierung starten"
@@ -451,8 +477,281 @@
                         </DataGrid>
                     </Grid>
                 </Border>
-            </Grid>
-        </Grid>
+                </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 1: 📁 Hotfolder & Automation -->
+            <TabItem>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="450"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left Column: Rules & Master Control -->
+                    <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- 1. Master Control Card -->
+                            <GroupBox Header="⚡ Hotfolder Status &amp; Steuerung">
+                                <StackPanel Margin="0,4,0,0">
+                                    <DockPanel Margin="0,0,0,12">
+                                        <Ellipse DockPanel.Dock="Left" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,10,0">
+                                            <Ellipse.Style>
+                                                <Style TargetType="Ellipse">
+                                                    <Setter Property="Fill" Value="#EF4444"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsHotfolderActive}" Value="True">
+                                                            <Setter Property="Fill" Value="#10B981"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Ellipse.Style>
+                                        </Ellipse>
+                                        <TextBlock Text="{Binding HotfolderStatusText}" FontSize="12.5" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                    </DockPanel>
+
+                                    <Button Command="{Binding ToggleHotfolderCommand}" Height="42" Cursor="Hand" BorderThickness="0">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+                                                <Setter Property="Background" Value="{DynamicResource ActionButtonGradientBrush}"/>
+                                                <Setter Property="Content" Value="▶️ Überwachung starten"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsHotfolderActive}" Value="True">
+                                                        <Setter Property="Background" Value="#DC2626"/>
+                                                        <Setter Property="Content" Value="⏹️ Überwachung anhalten"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- 2. Directories Card -->
+                            <GroupBox Header="📂 Ordner-Pfade">
+                                <StackPanel Margin="0,4,0,0">
+                                    <TextBlock Text="Überwachter Eingangsordner (Hotfolder):" FontSize="11.5"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <DockPanel Margin="0,0,0,10">
+                                        <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectHotfolderCommand}"
+                                                Padding="8,4" Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}"/>
+                                        <TextBox Text="{Binding HotfolderPath, Mode=TwoWay}" Padding="6,4" FontSize="12"/>
+                                    </DockPanel>
+
+                                    <TextBlock Text="Zielordner für optimierte Bilder:" FontSize="11.5"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <DockPanel Margin="0,0,0,10">
+                                        <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectHotfolderOutputCommand}"
+                                                Padding="8,4" Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}"/>
+                                        <TextBox Text="{Binding HotfolderOutputPath, Mode=TwoWay}" Padding="6,4" FontSize="12"/>
+                                    </DockPanel>
+
+                                    <CheckBox IsChecked="{Binding HotfolderIncludeSubdirectories, Mode=TwoWay}"
+                                              Content="Auch alle Unterordner überwachen (rekursiv)"
+                                              FontWeight="Normal" Margin="0,0,0,4"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- 3. Original File Actions -->
+                            <GroupBox Header="🛡️ Verhalten für Originaldateien">
+                                <StackPanel Margin="0,4,0,0">
+                                    <TextBlock Text="Was soll nach erfolgreicher Konvertierung mit dem Original geschehen?"
+                                               FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+
+                                    <RadioButton Content="Original unverändert im Eingangsordner belassen"
+                                                 IsChecked="{Binding HotfolderOriginalActionIndex, Converter={StaticResource IntToBool}, ConverterParameter=0, Mode=TwoWay}"
+                                                 Margin="0,0,0,8"/>
+
+                                    <RadioButton Content="In Unterordner 'Originale/' verschieben (Empfohlen)"
+                                                 IsChecked="{Binding HotfolderOriginalActionIndex, Converter={StaticResource IntToBool}, ConverterParameter=1, Mode=TwoWay}"
+                                                 Margin="0,0,0,4"/>
+                                    <TextBlock Text="Verhindert erneute Verarbeitung und hält den Eingangsordner sauber."
+                                               FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="20,0,0,8"/>
+
+                                    <RadioButton Content="Original nach erfolgreicher Konvertierung löschen"
+                                                 IsChecked="{Binding HotfolderOriginalActionIndex, Converter={StaticResource IntToBool}, ConverterParameter=2, Mode=TwoWay}"
+                                                 Margin="0,0,0,8"/>
+                                </StackPanel>
+                            </GroupBox>
+
+                            <!-- 4. Preset Selection for Hotfolder -->
+                            <GroupBox Header="⚡ Konvertierungs-Regeln / Profil">
+                                <StackPanel Margin="0,4,0,0">
+                                    <TextBlock Text="Konvertierungs-Profil für diesen Hotfolder:" FontSize="11.5"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <ComboBox ItemsSource="{Binding Presets}"
+                                              SelectedItem="{Binding HotfolderSelectedPreset, Mode=TwoWay}"
+                                              DisplayMemberPath="Name"
+                                              Padding="6,4" FontSize="13" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Dieses Profil wird auf alle neu erkannten Bilder im Hotfolder angewendet."
+                                               FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,6,0,2"/>
+                                </StackPanel>
+                            </GroupBox>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Right Column: Live Statistics & History Feed -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Stats Bar -->
+                        <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="8"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="14" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Stat Card 1 -->
+                                <Border Grid.Column="0" Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10">
+                                    <StackPanel>
+                                        <TextBlock Text="HEUTE VERARBEITET" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding HotfolderTodayProcessedCount, StringFormat='{}{0} Bilder'}"
+                                                   FontSize="22" FontWeight="ExtraBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Stat Card 2 -->
+                                <Border Grid.Column="2" Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10">
+                                    <StackPanel>
+                                        <TextBlock Text="SPEICHERPLATZ GESPART" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding HotfolderSavedBytesFormatted}"
+                                                   FontSize="22" FontWeight="ExtraBold" Foreground="#10B981" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Button Grid.Column="3" Content="Statistik zurücksetzen" Command="{Binding ResetHotfolderStatsCommand}"
+                                        VerticalAlignment="Center" Margin="14,0,0,0" Padding="8,5" FontSize="11"
+                                        Style="{StaticResource ToolbarButtonStyle}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- History Feed -->
+                        <Border Grid.Row="1" Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="8"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="14">
+                            <DockPanel LastChildFill="True">
+                                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                                    <TextBlock Text="📋 Automatisch verarbeitete Dateien:" FontWeight="Bold" FontSize="13"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                    <Button DockPanel.Dock="Right" Content="Verlauf leeren" Command="{Binding ClearHotfolderHistoryCommand}"
+                                            Padding="8,3" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0"/>
+                                </DockPanel>
+
+                                <DataGrid ItemsSource="{Binding HotfolderHistory}"
+                                          AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                                          GridLinesVisibility="None" HeadersVisibility="Column" RowHeight="34"
+                                          Background="{DynamicResource SurfaceBackgroundBrush}" BorderThickness="0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Uhrzeit" Binding="{Binding FormattedTime}" Width="75"/>
+                                        <DataGridTextColumn Header="Eingangsdatei" Binding="{Binding FileName}" Width="200"/>
+                                        <DataGridTextColumn Header="Ziel" Binding="{Binding TargetFileName}" Width="200"/>
+                                        <DataGridTextColumn Header="Vorher" Binding="{Binding FormattedOriginalSize}" Width="95"/>
+                                        <DataGridTextColumn Header="Nachher" Binding="{Binding FormattedFinalSize}" Width="95"/>
+                                        <DataGridTextColumn Header="Ersparnis" Binding="{Binding FormattedSavings}" Width="85"/>
+                                        <DataGridTextColumn Header="Status" Binding="{Binding StatusText}" Width="*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 2: ⚙️ Einstellungen -->
+            <TabItem>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxWidth="820" HorizontalAlignment="Left">
+                    <StackPanel Margin="8,0,0,16">
+                        <!-- System & Autostart -->
+                        <GroupBox Header="🖥️ System &amp; Hintergrundbetrieb">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding IsAutostartEnabled, Mode=TwoWay}"
+                                          Content="Mit Windows starten (Autostart)"
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                                <TextBlock Text="Imaginary startet beim Windows-Login automatisch lautlos im Hintergrund (Infobereich). Keine Administratorrechte erforderlich."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,14" TextWrapping="Wrap"/>
+
+                                <CheckBox IsChecked="{Binding MinimizeToTrayOnClose, Mode=TwoWay}"
+                                          Content="Beim Schließen (X) in den Windows-Infobereich (System-Tray) minimieren"
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                                <TextBlock Text="Lässt die Ordnerüberwachung und Hotfolder zuverlässig im Hintergrund aktiv, wenn das Hauptfenster geschlossen wird."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,14" TextWrapping="Wrap"/>
+
+                                <DockPanel Margin="0,0,0,4">
+                                    <Button DockPanel.Dock="Right"
+                                            Content="{Binding IsExplorerIntegrationEnabled, Converter={StaticResource InverseBool}, StringFormat={}{0:Aktivieren;Deaktivieren}}"
+                                            Command="{Binding ToggleExplorerIntegrationCommand}"
+                                            Padding="12,5" FontWeight="SemiBold" Style="{StaticResource ToolbarButtonStyle}" Margin="10,0,0,0"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Windows-Explorer Rechtsklick-Menü" FontWeight="SemiBold" FontSize="13"/>
+                                        <TextBlock Text="Bilder oder Ordner direkt per Rechtsklick im Windows Explorer mit Imaginary öffnen."
+                                                   FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </DockPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Benachrichtigungen -->
+                        <GroupBox Header="🔔 Benachrichtigungen">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding ShowTrayNotifications, Mode=TwoWay}"
+                                          Content="Windows-Benachrichtigungen anzeigen, wenn Hotfolder Dateien optimiert"
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                                <TextBlock Text="Zeigt eine dezente Windows-Toastmeldung bei abgeschlossenen Hintergrund-Konvertierungen an."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,4" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Erscheinungsbild & Design -->
+                        <GroupBox Header="🎨 Erscheinungsbild">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding IsDarkMode, Mode=TwoWay}"
+                                          Content="🌙 Dunkles Design (Dark Mode)"
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                                <TextBlock Text="Schaltet die Benutzeroberfläche in das stylische, augenschonende dunkle Design."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,4"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- Updates & Info -->
+                        <GroupBox Header="🔄 Updates &amp; Info">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding CheckForUpdatesOnStartup, Mode=TwoWay}"
+                                          Content="Beim Programmstart automatisch nach neuen Versionen suchen"
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+
+                                <DockPanel Margin="0,4,0,12">
+                                    <Button DockPanel.Dock="Left" Content="🔄 Jetzt nach Updates suchen" Command="{Binding CheckForUpdatesManualCommand}"
+                                            Padding="12,6" Style="{StaticResource ToolbarButtonStyle}" Margin="0,0,14,0"/>
+                                    <TextBlock Text="{Binding AppVersionString, StringFormat='Aktuelle Version: {0}'}"
+                                               FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                </DockPanel>
+
+                                <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,4,0,0">
+                                    <DockPanel>
+                                        <TextBlock Text="IMAGINARY" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource AccentBrush}"/>
+                                        <TextBlock Text="• Entwickelt von Pino Wackers • 100% Native C# &amp; SkiaSharp Bild-Engine"
+                                                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="8,0,0,0"/>
+                                    </DockPanel>
+                                </Border>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
 
         <!-- Bottom Status Bar -->
         <Border Grid.Row="2" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="16,8">
@@ -465,8 +764,21 @@
 
                 <TextBlock Grid.Column="0" Text="{Binding StatusSummary}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
 
-                <!-- Attribution to Pino Wackers, Updates & Quick Log Link -->
+                <!-- Hotfolder Status Badge & Attribution & Updates Link -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0">
+                    <!-- Live Hotfolder Badge -->
+                    <Border Background="#10B981" CornerRadius="4" Padding="8,3" Margin="0,0,12,0"
+                            Visibility="{Binding IsHotfolderActive, Converter={StaticResource BoolToVis}}"
+                            Cursor="Hand" ToolTip="Hotfolder ist aktiv. Klicken zum Öffnen des Hotfolder-Tabs.">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick" Command="{Binding SelectTabCommand}" CommandParameter="1"/>
+                        </Border.InputBindings>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Hotfolder aktiv" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+
                     <TextBlock Text="Entwickelt von Pino Wackers" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <Button Content="🔄 Updates" Command="{Binding CheckForUpdatesManualCommand}"
                             Padding="8,3" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0,0,6,0"

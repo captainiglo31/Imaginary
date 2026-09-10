@@ -9,6 +9,8 @@ public class HotfolderWatcher : IHotfolderWatcher
     private readonly IImageFormatDetector _formatDetector;
     private FileSystemWatcher? _watcher;
     private ConversionOptions? _options;
+    private HotfolderOriginalAction _originalAction = HotfolderOriginalAction.Keep;
+    private string _originalSubfolder = "Originale";
     private readonly ConcurrentDictionary<string, byte> _processingFiles = new(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _cts;
 
@@ -25,7 +27,7 @@ public class HotfolderWatcher : IHotfolderWatcher
         _formatDetector = formatDetector ?? throw new ArgumentNullException(nameof(formatDetector));
     }
 
-    public void Start(string watchPath, string outputPath, ConversionOptions options)
+    public void Start(string watchPath, string outputPath, ConversionOptions options, bool includeSubdirectories = false, HotfolderOriginalAction originalAction = HotfolderOriginalAction.Keep, string originalSubfolder = "Originale")
     {
         Stop();
 
@@ -41,12 +43,14 @@ public class HotfolderWatcher : IHotfolderWatcher
         CurrentWatchPath = watchPath;
         CurrentOutputPath = outputPath;
         _options = options;
+        _originalAction = originalAction;
+        _originalSubfolder = string.IsNullOrWhiteSpace(originalSubfolder) ? "Originale" : originalSubfolder;
         _cts = new CancellationTokenSource();
 
         _watcher = new FileSystemWatcher(watchPath)
         {
             NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-            IncludeSubdirectories = false,
+            IncludeSubdirectories = includeSubdirectories,
             EnableRaisingEvents = true
         };
 
@@ -56,7 +60,7 @@ public class HotfolderWatcher : IHotfolderWatcher
         StatusMessage?.Invoke(this, $"Hotfolder gestartet: Überwache '{watchPath}' -> Ziel '{outputPath}'");
 
         // Scan for existing files already placed in folder
-        _ = Task.Run(() => ScanExistingFiles(watchPath, _cts.Token));
+        _ = Task.Run(() => ScanExistingFiles(watchPath, includeSubdirectories, _cts.Token));
     }
 
     public void Stop()
@@ -88,15 +92,42 @@ public class HotfolderWatcher : IHotfolderWatcher
         QueueFileProcessing(e.FullPath);
     }
 
-    private void ScanExistingFiles(string directory, CancellationToken ct)
+    private bool ShouldIgnorePath(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(CurrentWatchPath) || string.IsNullOrWhiteSpace(filePath)) return true;
+
+        // Ignore files in target output path
+        if (!string.IsNullOrWhiteSpace(CurrentOutputPath) && filePath.StartsWith(CurrentOutputPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // Ignore files inside originalSubfolder
+        if (_originalAction == HotfolderOriginalAction.MoveToSubfolder)
+        {
+            var originalDir = Path.Combine(CurrentWatchPath, _originalSubfolder);
+            if (filePath.StartsWith(originalDir, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ScanExistingFiles(string directory, bool includeSubdirs, CancellationToken ct)
     {
         try
         {
-            var files = Directory.GetFiles(directory, "*.*");
+            var option = includeSubdirs ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            var files = Directory.GetFiles(directory, "*.*", option);
             foreach (var f in files)
             {
                 if (ct.IsCancellationRequested) break;
-                QueueFileProcessing(f);
+                if (!ShouldIgnorePath(f))
+                {
+                    QueueFileProcessing(f);
+                }
             }
         }
         catch
@@ -107,6 +138,11 @@ public class HotfolderWatcher : IHotfolderWatcher
 
     private void QueueFileProcessing(string filePath)
     {
+        if (ShouldIgnorePath(filePath))
+        {
+            return;
+        }
+
         if (!_processingFiles.TryAdd(filePath, 0))
         {
             return; // Already being processed
@@ -145,6 +181,32 @@ public class HotfolderWatcher : IHotfolderWatcher
                 if (result.Success)
                 {
                     StatusMessage?.Invoke(this, $"Konvertiert: {result.FileName} -> {Path.GetFileName(result.TargetPath)}");
+
+                    // Nachbehandlung des Originals
+                    try
+                    {
+                        if (_originalAction == HotfolderOriginalAction.MoveToSubfolder && !string.IsNullOrWhiteSpace(CurrentWatchPath))
+                        {
+                            var targetDir = Path.Combine(CurrentWatchPath, _originalSubfolder);
+                            if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
+                            var destFile = Path.Combine(targetDir, Path.GetFileName(filePath));
+                            if (File.Exists(destFile))
+                            {
+                                var nameWithoutExt = Path.GetFileNameWithoutExtension(filePath);
+                                var ext = Path.GetExtension(filePath);
+                                destFile = Path.Combine(targetDir, $"{nameWithoutExt}_{DateTime.Now:yyyyMMdd_HHmmss}{ext}");
+                            }
+                            File.Move(filePath, destFile, overwrite: true);
+                        }
+                        else if (_originalAction == HotfolderOriginalAction.Delete)
+                        {
+                            File.Delete(filePath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusMessage?.Invoke(this, $"Original-Aktion fehlgeschlagen für {result.FileName}: {ex.Message}");
+                    }
                 }
                 else
                 {

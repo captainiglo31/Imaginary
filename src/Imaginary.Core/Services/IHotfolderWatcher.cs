@@ -17,6 +17,6 @@ public interface IHotfolderWatcher : IDisposable
     event EventHandler<HotfolderFileEventArgs>? FileProcessed;
     event EventHandler<string>? StatusMessage;
 
-    void Start(string watchPath, string outputPath, ConversionOptions options);
+    void Start(string watchPath, string outputPath, ConversionOptions options, bool includeSubdirectories = false, HotfolderOriginalAction originalAction = HotfolderOriginalAction.Keep, string originalSubfolder = "Originale");
     void Stop();
 }
