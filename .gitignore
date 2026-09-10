@@ -1,0 +1,39 @@
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+dist/
+publish/
+
+## Visual Studio & IDEs
+.vs/
+.idea/
+.junie/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## Compiled binaries & artifacts
+*.exe
+*.dll
+*.pdb
+*.zip
+*.log
+host.log
+
+## OS Files
+.DS_Store
+Thumbs.db
+desktop.ini

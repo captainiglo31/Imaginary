@@ -1,0 +1,50 @@
+name: Build & Release Portable
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore Imaginary.sln
+
+      - name: Run Unit Tests
+        run: dotnet test tests/Imaginary.Core.Tests/Imaginary.Core.Tests.csproj --configuration Release --no-restore
+
+      - name: Build Portable Package
+        shell: pwsh
+        run: .\build-portable.ps1 -Configuration Release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: Imaginary ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist/Imaginary-Portable/Imaginary.exe
+            dist/Imaginary-Portable-win-x64.zip
+            dist/Imaginary-Portable/README-PORTABLE.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,631 @@
+@page "/"
+@using Imaginary.Core.Models
+@using Imaginary.Core.Services
+@using Imaginary.Web.Services
+@rendermode InteractiveServer
+@inject IBatchProcessor BatchProcessor
+@inject IImageFormatDetector FormatDetector
+@inject TempFileStorageService TempStorage
+@inject IPresetManager PresetManager
+
+<PageTitle>Imaginary – Bild-Konvertierung &amp; Verkleinerung</PageTitle>
+
+<div class="container-fluid py-3">
+    <!-- Header -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card shadow-sm border-0 bg-dark text-white p-4" style="background: linear-gradient(135deg, #070A14 0%, #0F172A 100%) !important; border-bottom: 2px solid #38bdf8 !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <img src="images/logo.png" alt="Imaginary Logo" class="rounded-3 me-3 shadow" style="width: 54px; height: 54px; object-fit: contain; padding: 2px; background: #0A0E1A; border: 1.5px solid #38bdf8;" />
+                        <div>
+                            <h2 class="h3 mb-0 fw-bold text-white">IMAGINARY</h2>
+                            <p class="mb-0 text-white-50 small mt-1">Web-Tool zur Konvertierung, Größenbegrenzung, Skalierung &amp; Icon-Generierung</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary px-3 py-2 fs-6">Blazor + SkiaSharp</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Settings Column -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-white fw-bold py-3 border-bottom">
+                    ⚙️ Konvertierungs-Optionen
+                </div>
+                <div class="card-body">
+                    <!-- Presets -->
+                    <div class="mb-3 p-3 bg-light rounded border">
+                        <label class="form-label fw-semibold mb-1">⚡ Schnellauswahl (Profile)</label>
+                        <select class="form-select form-select-sm" @onchange="OnPresetChanged">
+                            <option value="">-- Profil wählen --</option>
+                            @foreach (var preset in AvailablePresets)
+                            {
+                                <option value="@preset.Id">@preset.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- 1. Zielformat & Metadaten -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">1. Zielformat &amp; Metadaten</label>
+                        <select class="form-select mb-2" @bind="SelectedFormatString">
+                            <option value="">Original beibehalten</option>
+                            <option value="Jpeg">JPEG (.jpg)</option>
+                            <option value="Png">PNG (.png)</option>
+                            <option value="Webp">WebP (.webp)</option>
+                            <option value="Avif">AVIF (.avif)</option>
+                            <option value="Ico">Windows Icon (.ico)</option>
+                            <option value="Gif">GIF (.gif)</option>
+                            <option value="Bmp">BMP (.bmp)</option>
+                        </select>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="stripMetaCheck" @bind="StripMetadata">
+                            <label class="form-check-label small" for="stripMetaCheck">EXIF &amp; GPS Metadaten entfernen</label>
+                        </div>
+                    </div>
+
+                    <!-- 2. Dateigröße begrenzen -->
+                    <div class="mb-3 p-3 bg-light rounded border">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="sizeLimitSwitch" @bind="EnableSizeLimit">
+                            <label class="form-check-label fw-semibold" for="sizeLimitSwitch">2. Dateigröße begrenzen</label>
+                        </div>
+
+                        @if (EnableSizeLimit)
+                        {
+                            <div class="input-group mb-2">
+                                <input type="number" class="form-control" @bind="SizeLimitValue" min="1" step="any" placeholder="z. B. 500" />
+                                <select class="form-select" style="max-width: 90px;" @bind="SizeLimitUnit">
+                                    <option value="KB">KB</option>
+                                    <option value="MB">MB</option>
+                                </select>
+                            </div>
+
+                            <label class="form-label text-muted small mb-1">Fallback-Strategie bei verlustfreien Formaten (PNG):</label>
+                            <select class="form-select form-select-sm" @bind="SelectedFallbackStrategy">
+                                <option value="@FallbackStrategy.ResizeDown">Auflösung reduzieren (Resize)</option>
+                                <option value="@FallbackStrategy.Quantize">Farbreduktion (Quantisierung)</option>
+                                <option value="@FallbackStrategy.WarnOnly">Nur warnen (kein Eingriff)</option>
+                            </select>
+                        }
+                    </div>
+
+                    <!-- 3. Skalierung (Resize) -->
+                    <div class="mb-3 p-3 bg-light rounded border">
+                        <label class="form-label fw-semibold mb-2">3. Auflösung &amp; Skalierung</label>
+                        <select class="form-select mb-2" @bind="SelectedResizeMode">
+                            <option value="@ResizeMode.None">Keine Skalierung</option>
+                            <option value="@ResizeMode.Percentage">Prozentual skalieren (z. B. 50%)</option>
+                            <option value="@ResizeMode.AbsolutePixels">Pixelmaße (Breite / Höhe)</option>
+                            <option value="@ResizeMode.Pad">Einpassen mit Rand (Pad)</option>
+                            <option value="@ResizeMode.FillCrop">Füllen &amp; Beschneiden (FillCrop)</option>
+                            <option value="@ResizeMode.MaxEdge">Maximale Kantenlänge (MaxEdge)</option>
+                        </select>
+
+                        @if (SelectedResizeMode == ResizeMode.Percentage)
+                        {
+                            <div class="mt-2">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small text-muted">Skalierung:</span>
+                                    <span class="fw-bold">@ResizePercentage%</span>
+                                </div>
+                                <input type="range" class="form-range" min="5" max="150" step="5" @bind="ResizePercentage" @bind:event="oninput" />
+                            </div>
+                        }
+                        else if (SelectedResizeMode == ResizeMode.AbsolutePixels || SelectedResizeMode == ResizeMode.Pad || SelectedResizeMode == ResizeMode.FillCrop)
+                        {
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">Breite (px):</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="TargetWidth" placeholder="z. B. 1920" />
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">Höhe (px):</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="TargetHeight" placeholder="z. B. 1080" />
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="aspectRatioCheck" @bind="MaintainAspectRatio">
+                                        <label class="form-check-label small" for="aspectRatioCheck">Seitenverhältnis beibehalten</label>
+                                    </div>
+                                </div>
+                                @if (SelectedResizeMode == ResizeMode.Pad)
+                                {
+                                    <div class="col-12 mt-2">
+                                        <label class="form-label small mb-1">Randfarbe (Hex):</label>
+                                        <input type="text" class="form-control form-control-sm" @bind="PadColor" placeholder="#FFFFFF" style="max-width: 120px;" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (SelectedResizeMode == ResizeMode.MaxEdge)
+                        {
+                            <div class="mt-2">
+                                <label class="form-label small mb-1">Längste Kante (px):</label>
+                                <input type="number" class="form-control form-control-sm" @bind="MaxEdgeLength" placeholder="z. B. 1200" />
+                            </div>
+                        }
+                    </div>
+
+                    <!-- 4. Wasserzeichen -->
+                    <div class="mb-3 p-3 bg-light rounded border">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="watermarkSwitch" @bind="EnableWatermark">
+                            <label class="form-check-label fw-semibold" for="watermarkSwitch">4. Wasserzeichen</label>
+                        </div>
+
+                        @if (EnableWatermark)
+                        {
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Text:</label>
+                                <input type="text" class="form-control form-control-sm" @bind="WatermarkText" placeholder="© Imaginary" />
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">Position:</label>
+                                    <select class="form-select form-select-sm" @bind="SelectedWatermarkPosition">
+                                        <option value="@WatermarkPosition.BottomRight">Unten rechts</option>
+                                        <option value="@WatermarkPosition.BottomLeft">Unten links</option>
+                                        <option value="@WatermarkPosition.Center">Zentriert</option>
+                                        <option value="@WatermarkPosition.TopRight">Oben rechts</option>
+                                        <option value="@WatermarkPosition.TopLeft">Oben links</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">Transparenz:</label>
+                                    <select class="form-select form-select-sm" @bind="WatermarkOpacityString">
+                                        <option value="0.25">25%</option>
+                                        <option value="0.5">50%</option>
+                                        <option value="0.75">75%</option>
+                                        <option value="1.0">100%</option>
+                                    </select>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary py-2 fw-semibold"
+                                @onclick="StartConversionAsync"
+                                disabled="@(Files.Count == 0 || IsBusy)">
+                            @(IsBusy ? "Konvertierung läuft..." : "🚀 Konvertierung starten")
+                        </button>
+
+                        @if (!string.IsNullOrEmpty(ZipDownloadUrl))
+                        {
+                            <a class="btn btn-success py-2 fw-semibold" href="@ZipDownloadUrl" download="imaginary_all_images.zip">
+                                📦 Alle als ZIP herunterladen
+                            </a>
+                        }
+
+                        @if (Files.Count > 0 && !IsBusy)
+                        {
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="ResetList">
+                                🔄 Liste leeren &amp; neu starten
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Area: Upload & Results -->
+        <div class="col-lg-8">
+            <!-- Upload Box -->
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body p-4 text-center border rounded-3 bg-white">
+                    <div class="mb-3">
+                        <span style="font-size: 3rem;">📸</span>
+                    </div>
+                    <h5 class="fw-bold mb-1">Bilder hier auswählen</h5>
+                    <p class="text-muted small mb-3">Unterstützt JPEG, PNG, GIF, BMP, WebP und TIFF (Mehrfachauswahl möglich)</p>
+
+                    <div class="d-flex justify-content-center">
+                        <div style="max-width: 400px; width: 100%;">
+                            <InputFile OnChange="HandleFileSelected" multiple class="form-control" accept="image/*,.tiff,.tif,.bmp" disabled="@IsBusy" />
+                        </div>
+                    </div>
+
+                    @if (UploadMessage != null)
+                    {
+                        <div class="alert alert-info mt-3 py-2 small mb-0">@UploadMessage</div>
+                    }
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            @if (IsBusy || ProgressValue > 0)
+            {
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>@StatusText</span>
+                            <span>@ProgressValue%</span>
+                        </div>
+                        <div class="progress" style="height: 12px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                                 role="progressbar"
+                                 style="width: @ProgressValue%"></div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Results Table -->
+            @if (Files.Count > 0)
+            {
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
+                        <span>Dateien (@Files.Count)</span>
+                        @if (!string.IsNullOrEmpty(SummaryStats))
+                        {
+                            <span class="badge bg-light text-dark fw-normal">@SummaryStats</span>
+                        }
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Dateiname</th>
+                                    <th>Original</th>
+                                    <th>Ergebnis</th>
+                                    <th>Ersparnis</th>
+                                    <th>Auflösung</th>
+                                    <th class="text-end">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var file in Files)
+                                {
+                                    <tr>
+                                        <td>
+                                            @if (file.IsProcessing)
+                                            {
+                                                <span class="badge bg-warning text-dark">In Arbeit...</span>
+                                            }
+                                            else if (file.IsDone)
+                                            {
+                                                <span class="badge bg-success">Fertig</span>
+                                            }
+                                            else if (file.IsFailed)
+                                            {
+                                                <span class="badge bg-danger">Fehler</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Bereit</span>
+                                            }
+                                        </td>
+                                        <td class="fw-semibold">
+                                            @file.FileName
+                                            @if (file.Warnings.Count > 0)
+                                            {
+                                                <div class="small text-warning" title="@string.Join("; ", file.Warnings)">
+                                                    ⚠️ @string.Join("; ", file.Warnings)
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(file.ErrorMessage))
+                                            {
+                                                <div class="small text-danger">@file.ErrorMessage</div>
+                                            }
+                                        </td>
+                                        <td class="small text-muted">@FormatBytes(file.OriginalSizeBytes)</td>
+                                        <td class="small fw-semibold">
+                                            @(file.FinalSizeBytes > 0 ? FormatBytes(file.FinalSizeBytes) : "-")
+                                        </td>
+                                        <td>
+                                            @if (file.SavingsPercentage > 0)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">
+                                                    -@file.SavingsPercentage.ToString("N1") %
+                                                </span>
+                                            }
+                                            else if (file.IsDone)
+                                            {
+                                                <span class="text-muted small">0 %</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">-</span>
+                                            }
+                                        </td>
+                                        <td class="small text-muted">@(file.Dimensions ?? "-")</td>
+                                        <td class="text-end">
+                                            @if (!string.IsNullOrEmpty(file.DownloadUrl))
+                                            {
+                                                <a href="@file.DownloadUrl" class="btn btn-sm btn-outline-primary" download="@file.OutputFileName">
+                                                    💾 Download
+                                                </a>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <footer class="mt-4 py-3 text-center text-muted border-top">
+        <small><strong>Imaginary</strong> – Professionelle Bildkonvertierung &amp; Größenbegrenzung • Entwickelt von <strong>Pino Wackers</strong></small>
+    </footer>
+</div>
+
+@code {
+    private List<WebFileItem> Files { get; } = new();
+
+    private IReadOnlyList<Preset> AvailablePresets => PresetManager.GetAllPresets();
+    private string SelectedFormatString { get; set; } = "";
+    private bool StripMetadata { get; set; } = true;
+    private bool EnableSizeLimit { get; set; }
+    private double SizeLimitValue { get; set; } = 500;
+    private string SizeLimitUnit { get; set; } = "KB";
+    private FallbackStrategy SelectedFallbackStrategy { get; set; } = FallbackStrategy.ResizeDown;
+
+    private ResizeMode SelectedResizeMode { get; set; } = ResizeMode.None;
+    private double ResizePercentage { get; set; } = 50.0;
+    private int? TargetWidth { get; set; }
+    private int? TargetHeight { get; set; }
+    private int? MaxEdgeLength { get; set; } = 1200;
+    private string PadColor { get; set; } = "#FFFFFF";
+    private bool MaintainAspectRatio { get; set; } = true;
+
+    private bool EnableWatermark { get; set; }
+    private string WatermarkText { get; set; } = "© Imaginary";
+    private WatermarkPosition SelectedWatermarkPosition { get; set; } = WatermarkPosition.BottomRight;
+    private string WatermarkOpacityString { get; set; } = "0.5";
+
+    private bool IsBusy { get; set; }
+    private int ProgressValue { get; set; }
+    private string StatusText { get; set; } = "Bereit";
+    private string? UploadMessage { get; set; }
+    private string? SummaryStats { get; set; }
+    private string? ZipDownloadUrl { get; set; }
+
+    private void OnPresetChanged(ChangeEventArgs e)
+    {
+        var id = e.Value?.ToString();
+        if (string.IsNullOrEmpty(id)) return;
+        var preset = PresetManager.GetPreset(id);
+        if (preset == null) return;
+        var opts = preset.Options;
+        SelectedFormatString = opts.TargetFormat?.ToString() ?? "";
+        StripMetadata = opts.StripMetadata;
+        if (opts.MaxFileSizeInBytes.HasValue)
+        {
+            EnableSizeLimit = true;
+            if (opts.MaxFileSizeInBytes.Value >= 1024 * 1024)
+            {
+                SizeLimitUnit = "MB";
+                SizeLimitValue = opts.MaxFileSizeInBytes.Value / (1024.0 * 1024.0);
+            }
+            else
+            {
+                SizeLimitUnit = "KB";
+                SizeLimitValue = opts.MaxFileSizeInBytes.Value / 1024.0;
+            }
+        }
+        else
+        {
+            EnableSizeLimit = false;
+        }
+        SelectedFallbackStrategy = opts.FallbackStrategy;
+        SelectedResizeMode = opts.ResizeMode;
+        ResizePercentage = opts.ResizePercentage;
+        TargetWidth = opts.TargetWidth;
+        TargetHeight = opts.TargetHeight;
+        MaxEdgeLength = opts.MaxEdgeLength ?? 1200;
+        PadColor = opts.PadColor;
+        MaintainAspectRatio = opts.MaintainAspectRatio;
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        UploadMessage = null;
+        var selected = e.GetMultipleFiles(200);
+
+        foreach (var file in selected)
+        {
+            try
+            {
+                // Max 50 MB per file
+                using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+
+                Files.Add(new WebFileItem
+                {
+                    FileName = file.Name,
+                    OriginalSizeBytes = file.Size,
+                    Data = ms.ToArray()
+                });
+            }
+            catch (Exception ex)
+            {
+                UploadMessage = $"Fehler beim Laden von {file.Name}: {ex.Message}";
+            }
+        }
+
+        UploadMessage = $"{Files.Count} Datei(en) für Konvertierung bereit.";
+    }
+
+    private async Task StartConversionAsync()
+    {
+        if (Files.Count == 0 || IsBusy) return;
+
+        IsBusy = true;
+        ProgressValue = 0;
+        StatusText = "Konvertierung gestartet...";
+        ZipDownloadUrl = null;
+        SummaryStats = null;
+
+        foreach (var f in Files)
+        {
+            f.IsProcessing = true;
+            f.IsDone = false;
+            f.IsFailed = false;
+            f.ErrorMessage = null;
+            f.DownloadUrl = null;
+        }
+
+        var options = BuildOptions();
+        var convertedList = new List<(string FileName, byte[] Data)>();
+
+        var inputs = Files.Select(f => ImageJobInput.FromBytes(f.FileName, f.Data)).ToList();
+        var fileLookup = Files.ToDictionary(f => f.FileName, StringComparer.OrdinalIgnoreCase);
+
+        var progress = new Progress<BatchProgress>(bp =>
+        {
+            ProgressValue = (int)Math.Round(bp.Percentage);
+            StatusText = $"{bp.CurrentIndex} von {bp.TotalCount} verarbeitet ({bp.Percentage:N0}%)";
+
+            if (fileLookup.TryGetValue(bp.CurrentFileName, out var item))
+            {
+                item.IsProcessing = false;
+                if (bp.LatestResult != null && bp.LatestResult.Success)
+                {
+                    item.IsDone = true;
+                    item.FinalSizeBytes = bp.LatestResult.FinalSizeBytes;
+                    item.SavingsPercentage = bp.LatestResult.SavingsPercentage;
+                    item.Dimensions = bp.LatestResult.FinalDimensions?.ToString();
+                    item.Warnings.Clear();
+                    item.Warnings.AddRange(bp.LatestResult.Warnings);
+
+                    var ext = FormatDetector.GetDefaultExtension(bp.LatestResult.FinalFormat);
+                    var outputName = $"{Path.GetFileNameWithoutExtension(item.FileName)}{ext}";
+                    item.OutputFileName = outputName;
+
+                    if (bp.LatestResult.OutputData != null)
+                    {
+                        var stored = TempStorage.StoreFile(
+                            outputName,
+                            bp.LatestResult.OutputData,
+                            FormatDetector.GetMimeType(bp.LatestResult.FinalFormat));
+
+                        item.DownloadUrl = $"/api/download/{stored.Id}";
+                        convertedList.Add((outputName, bp.LatestResult.OutputData));
+                    }
+                }
+                else if (bp.LatestResult != null)
+                {
+                    item.IsFailed = true;
+                    item.ErrorMessage = bp.LatestResult.ErrorMessage;
+                }
+            }
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            var batchResult = await BatchProcessor.ProcessBatchAsync(
+                inputs,
+                options,
+                saveToDisk: false,
+                progress: progress);
+
+            var savedMb = (batchResult.TotalOriginalSizeBytes - batchResult.TotalFinalSizeBytes) / (1024.0 * 1024.0);
+            SummaryStats = $"{batchResult.SucceededCount} erfolgreich, Ersparnis: {savedMb:N2} MB ({batchResult.OverallSavingsPercentage:N1}%) in {batchResult.Duration.TotalSeconds:N1}s";
+            StatusText = "Konvertierung abgeschlossen!";
+
+            // If we have successful files, build ZIP archive
+            if (convertedList.Count > 0)
+            {
+                var zipItem = TempStorage.CreateZipArchive($"imaginary_converted_{DateTime.Now:yyyyMMdd_HHmmss}.zip", convertedList);
+                ZipDownloadUrl = $"/api/download/{zipItem.Id}";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Fehler: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ResetList()
+    {
+        Files.Clear();
+        ProgressValue = 0;
+        StatusText = "Bereit";
+        UploadMessage = null;
+        SummaryStats = null;
+        ZipDownloadUrl = null;
+    }
+
+    private ConversionOptions BuildOptions()
+    {
+        var options = new ConversionOptions();
+
+        if (Enum.TryParse<ImageFormat>(SelectedFormatString, out var fmt) && fmt != ImageFormat.Unknown)
+        {
+            options.TargetFormat = fmt;
+        }
+
+        if (EnableSizeLimit && SizeLimitValue > 0)
+        {
+            var mult = SizeLimitUnit == "MB" ? 1024L * 1024L : 1024L;
+            options.MaxFileSizeInBytes = (long)(SizeLimitValue * mult);
+        }
+
+        options.StripMetadata = StripMetadata;
+        options.FallbackStrategy = SelectedFallbackStrategy;
+        options.ResizeMode = SelectedResizeMode;
+        options.ResizePercentage = ResizePercentage;
+        options.TargetWidth = TargetWidth;
+        options.TargetHeight = TargetHeight;
+        options.MaxEdgeLength = MaxEdgeLength;
+        options.PadColor = PadColor;
+        options.MaintainAspectRatio = MaintainAspectRatio;
+
+        if (EnableWatermark)
+        {
+            float.TryParse(WatermarkOpacityString, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var op);
+            options.Watermark = new WatermarkOptions
+            {
+                Enabled = true,
+                Type = WatermarkType.Text,
+                Text = WatermarkText,
+                Position = SelectedWatermarkPosition,
+                Opacity = op > 0 ? op : 0.5f
+            };
+        }
+
+        return options;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:N1} KB";
+        return $"{bytes / (1024.0 * 1024.0):N2} MB";
+    }
+
+    public class WebFileItem
+    {
+        public string FileName { get; set; } = string.Empty;
+        public long OriginalSizeBytes { get; set; }
+        public byte[] Data { get; set; } = Array.Empty<byte>();
+        public bool IsProcessing { get; set; }
+        public bool IsDone { get; set; }
+        public bool IsFailed { get; set; }
+        public string? ErrorMessage { get; set; }
+        public long FinalSizeBytes { get; set; }
+        public string? OutputFileName { get; set; }
+        public string? DownloadUrl { get; set; }
+        public string? Dimensions { get; set; }
+        public double SavingsPercentage { get; set; }
+        public List<string> Warnings { get; } = new();
+    }
+}

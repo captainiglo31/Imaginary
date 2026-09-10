@@ -1,0 +1,130 @@
+<Window x:Class="Imaginary.Desktop.Views.PreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Imaginary – Vorher / Nachher Vergleich"
+        Height="720" Width="1040"
+        MinHeight="500" MinWidth="700"
+        WindowStartupLocation="CenterOwner"
+        Icon="pack://application:,,,/app.ico"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+    
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Header Info -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+            <DockPanel LastChildFill="True">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <RadioButton x:Name="RadioSplit" Content="Split-Slider" IsChecked="True" 
+                                 Checked="OnViewModeChanged" Margin="0,0,14,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    <RadioButton x:Name="RadioSideBySide" Content="Nebeneinander" 
+                                 Checked="OnViewModeChanged" Margin="0,0,16,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                    <Button Content="Schließen" Click="OnCloseClicked" Padding="14,5"
+                            Background="{DynamicResource SecondaryButtonBackgroundBrush}"
+                            Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"/>
+                </StackPanel>
+                
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="TextFileName" Text="Dateiname" FontWeight="Bold" FontSize="15"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock x:Name="TextDetails" Text="Original: - | Konvertiert: -" FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Central Image Comparison Area -->
+        <Border Grid.Row="1" Background="{DynamicResource SurfaceBackgroundBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                CornerRadius="8" ClipToBounds="True" SizeChanged="OnContainerSizeChanged">
+            <Grid>
+                <!-- Split Slider View Mode -->
+                <Grid x:Name="SplitViewGrid" Visibility="Visible" Cursor="SizeWE" Background="#05000000"
+                      MouseDown="OnImageAreaMouseDown" MouseMove="OnImageAreaMouseMove" MouseUp="OnImageAreaMouseUp">
+                    <!-- Layer 1: Original Image (Bottom) -->
+                    <Image x:Name="ImageOriginalSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    
+                    <!-- Layer 2: Processed Image inside a Container matching Grid bounds with Clip -->
+                    <Grid x:Name="ProcessedContainer" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
+                        <Grid.Clip>
+                            <RectangleGeometry x:Name="SplitClipGeometry"/>
+                        </Grid.Clip>
+                        <Image x:Name="ImageProcessedSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Layer 3: Split line and draggable circle handle -->
+                    <Canvas x:Name="SplitOverlayCanvas" IsHitTestVisible="False">
+                        <Line x:Name="SplitLine" Stroke="#38BDF8" StrokeThickness="2.5" Y1="0"/>
+                        <Border x:Name="SplitHandle" Width="36" Height="36" CornerRadius="18"
+                                Background="#38BDF8" BorderBrush="White" BorderThickness="2">
+                            <TextBlock Text="↔" Foreground="White" FontWeight="Bold" FontSize="16"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0"/>
+                        </Border>
+                    </Canvas>
+                    
+                    <!-- Slider Bar at Bottom of Image -->
+                    <Border Background="#B0000000" VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                            CornerRadius="20" Padding="16,6" Margin="0,0,0,16" Cursor="Arrow">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Vorher" Foreground="White" FontSize="11" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <Slider x:Name="SplitSlider" Minimum="0" Maximum="100" Value="50" Width="260"
+                                    ValueChanged="OnSplitSliderValueChanged" VerticalAlignment="Center"/>
+                            <TextBlock Text="Nachher" Foreground="White" FontSize="11" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Side By Side View Mode -->
+                <Grid x:Name="SideBySideGrid" Visibility="Collapsed" Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                        <Grid>
+                            <Image x:Name="ImageOriginalSide" Stretch="Uniform" Margin="4"/>
+                            <Border Background="#B0000000" VerticalAlignment="Top" HorizontalAlignment="Left"
+                                    CornerRadius="4" Padding="8,3" Margin="8">
+                                <TextBlock Text="Original (Vorher)" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="{DynamicResource BorderBrush}"/>
+
+                    <Border Grid.Column="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                        <Grid>
+                            <Image x:Name="ImageProcessedSide" Stretch="Uniform" Margin="4"/>
+                            <Border Background="#B0000000" VerticalAlignment="Top" HorizontalAlignment="Left"
+                                    CornerRadius="4" Padding="8,3" Margin="8">
+                                <TextBlock Text="Konvertiert (Nachher)" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Bottom Status / Size Comparison -->
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceBackgroundBrush}" 
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="14,10" Margin="0,12,0,0">
+            <DockPanel LastChildFill="True">
+                <TextBlock x:Name="TextSavings" Text="Ersparnis: -" FontWeight="Bold" DockPanel.Dock="Right" 
+                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                <TextBlock x:Name="TextHint" Text="Ziehen Sie den Slider oder klicken Sie ins Bild, um Details zu vergleichen." 
+                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

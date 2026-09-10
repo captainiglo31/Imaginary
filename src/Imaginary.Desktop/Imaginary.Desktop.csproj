@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Imaginary.Core\Imaginary.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RollForward>Major</RollForward>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+
+    <!-- Windows PE-Metadaten & Dateieigenschaften -->
+    <AssemblyTitle>Imaginary</AssemblyTitle>
+    <Title>Imaginary</Title>
+    <Product>Imaginary</Product>
+    <Description>Moderner Bild-Konverter, Optimierer &amp; Icon-Studio</Description>
+    <Company>Pino Wackers</Company>
+    <Authors>Pino Wackers</Authors>
+    <Copyright>© 2026 Pino Wackers. Alle Rechte vorbehalten.</Copyright>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    <NeutralLanguage>de-DE</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\**" />
+    <Resource Include="app.ico" />
+  </ItemGroup>
+
+</Project>

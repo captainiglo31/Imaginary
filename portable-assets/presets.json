@@ -1,0 +1,68 @@
+[
+  {
+    "Id": "preset-email",
+    "Name": "E-Mail (kompakt)",
+    "Description": "JPEG, max 500 KB, 1200px lange Kante, Metadaten entfernt",
+    "IsBuiltIn": true,
+    "Options": {
+      "TargetFormat": "Jpeg",
+      "MaxFileSizeInBytes": 512000,
+      "ResizeMode": "MaxEdge",
+      "MaxEdgeLength": 1200,
+      "StripMetadata": true,
+      "FallbackStrategy": "ResizeDown"
+    }
+  },
+  {
+    "Id": "preset-web",
+    "Name": "Web-Shop (WebP)",
+    "Description": "WebP, max 200 KB, 1600px lange Kante, hohe Qualität, Metadaten entfernt",
+    "IsBuiltIn": true,
+    "Options": {
+      "TargetFormat": "Webp",
+      "MaxFileSizeInBytes": 204800,
+      "ResizeMode": "MaxEdge",
+      "MaxEdgeLength": 1600,
+      "StripMetadata": true,
+      "FallbackStrategy": "ResizeDown"
+    }
+  },
+  {
+    "Id": "preset-social",
+    "Name": "Social Media (Quadrat 1080x1080)",
+    "Description": "JPEG 1080x1080px quadratisch gefüllt, max 1 MB",
+    "IsBuiltIn": true,
+    "Options": {
+      "TargetFormat": "Jpeg",
+      "MaxFileSizeInBytes": 1048576,
+      "ResizeMode": "FillCrop",
+      "TargetWidth": 1080,
+      "TargetHeight": 1080,
+      "StripMetadata": true,
+      "FallbackStrategy": "ResizeDown"
+    }
+  },
+  {
+    "Id": "preset-print",
+    "Name": "Archiv & Druck (Verlustfrei)",
+    "Description": "PNG verlustfrei, Originalgröße beibehalten",
+    "IsBuiltIn": true,
+    "Options": {
+      "TargetFormat": "Png",
+      "ResizeMode": "None",
+      "StripMetadata": false,
+      "FallbackStrategy": "WarnOnly"
+    }
+  },
+  {
+    "Id": "preset-ico",
+    "Name": "Windows Icon (.ico)",
+    "Description": "Multi-Resolution ICO (16, 32, 48, 64, 128, 256 px) fuer Windows & Browser",
+    "IsBuiltIn": true,
+    "Options": {
+      "TargetFormat": "Ico",
+      "ResizeMode": "None",
+      "StripMetadata": true
+    }
+  }
+]
