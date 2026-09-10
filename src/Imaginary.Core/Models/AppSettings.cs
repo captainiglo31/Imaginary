@@ -16,6 +16,6 @@ public class AppSettings
     public bool CheckForUpdatesOnStartup { get; set; } = true;
     public DateTime? LastUpdateCheckUtc { get; set; }
     public string? SkippedVersion { get; set; }
-    public string GitHubRepositoryOwner { get; set; } = "PinoWackers";
+    public string GitHubRepositoryOwner { get; set; } = "captainiglo31";
     public string GitHubRepositoryName { get; set; } = "Imaginary";
 }

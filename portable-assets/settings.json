@@ -5,5 +5,8 @@
   "SelectedPresetId": "preset-web",
   "HotfolderPath": null,
   "HotfolderOutputDir": null,
-  "HotfolderAutoStart": false
+  "HotfolderAutoStart": false,
+  "CheckForUpdatesOnStartup": true,
+  "GitHubRepositoryOwner": "captainiglo31",
+  "GitHubRepositoryName": "Imaginary"
 }
