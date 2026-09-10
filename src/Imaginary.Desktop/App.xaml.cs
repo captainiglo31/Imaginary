@@ -67,6 +67,28 @@ public partial class App : Application
             return;
         }
 
+        // Ggf. verbliebene .old-Dateien aus vorherigen Updates im Hintergrund bereinigen
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(2000);
+                var exePath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    var dir = Path.GetDirectoryName(exePath);
+                    if (dir != null && Directory.Exists(dir))
+                    {
+                        foreach (var oldFile in Directory.EnumerateFiles(dir, "*.old"))
+                        {
+                            try { File.Delete(oldFile); } catch { }
+                        }
+                    }
+                }
+            }
+            catch { }
+        });
+
         base.OnStartup(e);
     }
 

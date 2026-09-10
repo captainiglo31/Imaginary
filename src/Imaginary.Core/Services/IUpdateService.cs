@@ -7,5 +7,5 @@ public interface IUpdateService
     Version CurrentVersion { get; }
     Task<UpdateInfo> CheckForUpdateAsync(string owner, string repo, CancellationToken cancellationToken = default);
     Task<string> DownloadUpdateAsync(string downloadUrl, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
-    bool ApplyUpdateAndRestart(string downloadedFilePath, string? targetExecutablePath = null);
+    bool ApplyUpdateAndRestart(string downloadedFilePath, string? targetExecutablePath = null, bool startProcess = true);
 }

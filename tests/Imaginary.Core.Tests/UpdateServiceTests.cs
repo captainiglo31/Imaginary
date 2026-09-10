@@ -115,4 +115,42 @@ public class UpdateServiceTests
         updateInfo.IsUpdateAvailable.Should().BeTrue();
         updateInfo.DownloadUrl.Should().Be("https://github.com/PinoWackers/Imaginary/releases/download/v1.5.0/Imaginary-Portable-win-x64.zip");
     }
+
+    [Fact]
+    public void ApplyUpdateAndRestart_ShouldRenameCurrentExeAndPlaceNewExeWithoutExternalScripts()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"imaginary_test_update_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var currentExe = Path.Combine(tempDir, "Imaginary.exe");
+            var downloadedNewExe = Path.Combine(tempDir, "Imaginary_New.exe");
+
+            File.WriteAllText(currentExe, "Old Version 1.0.0");
+            File.WriteAllText(downloadedNewExe, "New Version 1.0.1");
+
+            var service = new UpdateService();
+
+            var result = service.ApplyUpdateAndRestart(downloadedNewExe, currentExe, startProcess: false);
+
+            result.Should().BeTrue();
+
+            // The target executable path must now contain the NEW content
+            File.Exists(currentExe).Should().BeTrue();
+            File.ReadAllText(currentExe).Should().Be("New Version 1.0.1");
+
+            // The old executable must have been moved to .old
+            var oldExe = Path.Combine(tempDir, "Imaginary.old");
+            File.Exists(oldExe).Should().BeTrue();
+            File.ReadAllText(oldExe).Should().Be("Old Version 1.0.0");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
 }

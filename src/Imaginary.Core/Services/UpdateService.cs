@@ -256,7 +256,7 @@ public class UpdateService : IUpdateService
         return tempFilePath;
     }
 
-    public bool ApplyUpdateAndRestart(string downloadedFilePath, string? targetExecutablePath = null)
+    public bool ApplyUpdateAndRestart(string downloadedFilePath, string? targetExecutablePath = null, bool startProcess = true)
     {
         if (!File.Exists(downloadedFilePath))
             throw new FileNotFoundException("Die heruntergeladene Update-Datei wurde nicht gefunden.", downloadedFilePath);
@@ -267,20 +267,49 @@ public class UpdateService : IUpdateService
             currentExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Imaginary.exe");
         }
 
-        var pid = Environment.ProcessId;
+        var dir = Path.GetDirectoryName(currentExe) ?? AppDomain.CurrentDomain.BaseDirectory;
+        var exeName = Path.GetFileNameWithoutExtension(currentExe);
+        var oldExe = Path.Combine(dir, $"{exeName}.old");
 
-        // PowerShell-Einzeiler zum sicheren Ersetzen nach Beendigung der laufenden PID
-        var script = $"Start-Sleep -Milliseconds 600; Wait-Process -Id {pid} -Timeout 20 -ErrorAction SilentlyContinue; " +
-                     $"Copy-Item -Path '{downloadedFilePath}' -Destination '{currentExe}' -Force; " +
-                     $"Remove-Item -Path '{downloadedFilePath}' -Force -ErrorAction SilentlyContinue; " +
-                     $"Start-Process -FilePath '{currentExe}'";
+        // 1. Zuvor verbliebene .old-Dateien aufräumen
+        if (File.Exists(oldExe))
+        {
+            try
+            {
+                File.Delete(oldExe);
+            }
+            catch
+            {
+                oldExe = Path.Combine(dir, $"{exeName}_{Guid.NewGuid():N}.old");
+            }
+        }
 
+        // 2. Die aktuell laufende Executable umbenennen.
+        // Windows NTFS erlaubt das Umbenennen einer laufenden .exe-Datei im selben Ordner uneingeschränkt!
+        File.Move(currentExe, oldExe);
+
+        // 3. Die neu heruntergeladene Datei an den ursprünglichen Speicherort der .exe bewegen
+        try
+        {
+            File.Move(downloadedFilePath, currentExe, overwrite: true);
+        }
+        catch
+        {
+            File.Copy(downloadedFilePath, currentExe, overwrite: true);
+            try { File.Delete(downloadedFilePath); } catch { }
+        }
+
+        if (!startProcess)
+        {
+            return true;
+        }
+
+        // 4. Die aktualisierte Anwendung direkt und nativ starten (keine Shell, keine PowerShell, kein CMD!)
         var startInfo = new ProcessStartInfo
         {
-            FileName = "powershell.exe",
-            Arguments = $"-NoProfile -WindowStyle Hidden -Command \"{script}\"",
-            UseShellExecute = false,
-            CreateNoWindow = true
+            FileName = currentExe,
+            UseShellExecute = true,
+            WorkingDirectory = dir
         };
 
         var proc = Process.Start(startInfo);
