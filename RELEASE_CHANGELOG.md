@@ -1,4 +1,8 @@
-## 🚀 Was ist neu in Version 2.0.0:
+## 🚀 Was ist neu in Version 2.0.1:
+
+### 🐛 Hotfix
+- **Absturz beim Öffnen des Bearbeiten/Paint-Studios behoben:** Ein XAML-Ressourcen-Ladefehler (`ColorRadioStyle`), der durch die Deklarationsreihenfolge der Styles beim Initialisieren des Editor-Fensters ausgelöst wurde, wurde vollständig korrigiert.
+- **Fehlerabsicherung:** Zusätzlicher `try-catch`-Schutz im ViewModel verhindert Anwendungsabstürze bei unvorhergesehenen Ladefehlern.
 
 ### 🎨 Integriertes Quick-Edit & Paint Studio
 - **DSGVO-Verpixelung & Weichzeichner:** Mosaik-Verpixelung und sanfter Gaußscher Weichzeichner zum zuverlässigen und unumkehrbaren Unkenntlichmachen sensibler Daten (Passwörter, Adressen, Gesichter, Kfz-Kennzeichen).

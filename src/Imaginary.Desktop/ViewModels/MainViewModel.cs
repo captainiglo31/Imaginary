@@ -235,7 +235,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.0.0";
+    public string AppVersionString => "v2.0.1";
 
     // Output & Execution
     [ObservableProperty]
@@ -863,56 +863,68 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void OpenEditor()
     {
-        string? pathToOpen = null;
-        if (SelectedFile != null)
+        try
         {
-            pathToOpen = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
-                ? SelectedFile.TargetPath
-                : SelectedFile.FilePath;
-        }
-
-        if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen))
-        {
-            var dlg = new OpenFileDialog
+            string? pathToOpen = null;
+            if (SelectedFile != null)
             {
-                Filter = "Bilder (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|Alle Dateien (*.*)|*.*",
-                Title = "Bild im Paint / Freistell-Studio öffnen"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                pathToOpen = dlg.FileName;
+                pathToOpen = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+                    ? SelectedFile.TargetPath
+                    : SelectedFile.FilePath;
             }
-        }
 
-        if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen)) return;
-
-        AppLogger.Info("Editor", $"Öffne Paint / Bild-Editor für: {pathToOpen}");
-        var editorWin = new ImageEditorWindow(pathToOpen, _editorService, _bgRemovalService)
-        {
-            Owner = Application.Current.MainWindow
-        };
-
-        if (editorWin.ShowDialog() == true && editorWin.HasChanges)
-        {
-            if (editorWin.ResultFilePath != pathToOpen)
+            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen))
             {
-                AddFilePaths(new[] { editorWin.ResultFilePath });
-                StatusSummary = $"✏️ Bearbeitetes Bild als Kopie gespeichert: {Path.GetFileName(editorWin.ResultFilePath)}";
-            }
-            else
-            {
-                if (SelectedFile != null && SelectedFile.FilePath.Equals(pathToOpen, StringComparison.OrdinalIgnoreCase))
+                var dlg = new OpenFileDialog
                 {
-                    var fi = new FileInfo(pathToOpen);
-                    SelectedFile.OriginalSizeBytes = fi.Length;
-                    SelectedFile.Status = JobStatus.Pending;
-                    SelectedFile.StatusMessage = "Bearbeitet (Original ersetzt)";
-                    SelectedFile.FinalSizeBytes = 0;
-                    SelectedFile.SavingsPercentage = 0;
-                    SelectedFile.TargetPath = null;
+                    Filter = "Bilder (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|Alle Dateien (*.*)|*.*",
+                    Title = "Bild im Paint / Freistell-Studio öffnen"
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    pathToOpen = dlg.FileName;
                 }
-                StatusSummary = $"✏️ Änderungen am Bild gespeichert: {Path.GetFileName(pathToOpen)}";
             }
+
+            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen)) return;
+
+            AppLogger.Info("Editor", $"Öffne Paint / Bild-Editor für: {pathToOpen}");
+            var editorWin = new ImageEditorWindow(pathToOpen, _editorService, _bgRemovalService)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (editorWin.ShowDialog() == true && editorWin.HasChanges)
+            {
+                if (editorWin.ResultFilePath != pathToOpen)
+                {
+                    AddFilePaths(new[] { editorWin.ResultFilePath });
+                    StatusSummary = $"✏️ Bearbeitetes Bild als Kopie gespeichert: {Path.GetFileName(editorWin.ResultFilePath)}";
+                }
+                else
+                {
+                    if (SelectedFile != null && SelectedFile.FilePath.Equals(pathToOpen, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var fi = new FileInfo(pathToOpen);
+                        SelectedFile.OriginalSizeBytes = fi.Length;
+                        SelectedFile.Status = JobStatus.Pending;
+                        SelectedFile.StatusMessage = "Bearbeitet (Original ersetzt)";
+                        SelectedFile.FinalSizeBytes = 0;
+                        SelectedFile.SavingsPercentage = 0;
+                        SelectedFile.TargetPath = null;
+                    }
+                    StatusSummary = $"✏️ Änderungen am Bild gespeichert: {Path.GetFileName(pathToOpen)}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Editor", "Fehler beim Öffnen des Bild-Studios", ex);
+            MessageBox.Show(Application.Current.MainWindow,
+                $"Fehler beim Öffnen des Bild-Studios:\n{ex.Message}",
+                "Fehler",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
