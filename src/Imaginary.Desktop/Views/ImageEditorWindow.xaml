@@ -234,7 +234,7 @@
                         <GroupBox Header="🪄 Hintergrund entfernen">
                             <StackPanel Margin="0,6,0,0">
                                 <TextBlock Text="Methode wählen:" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6"/>
-                                <ComboBox x:Name="ComboBgMode" SelectedIndex="0" SelectionChanged="OnBgModeChanged" Margin="0,0,0,12" Padding="6,4">
+                                <ComboBox x:Name="ComboBgMode" SelectionChanged="OnBgModeChanged" Margin="0,0,0,12" Padding="6,4">
                                     <ComboBoxItem Content="🎨 Klassisch (Farbe / Magic Wand)"/>
                                     <ComboBoxItem Content="🧠 KI-Modell (U-2-Net Deep Learning)"/>
                                 </ComboBox>

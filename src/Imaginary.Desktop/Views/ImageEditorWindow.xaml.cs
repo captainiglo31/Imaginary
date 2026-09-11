@@ -61,11 +61,20 @@ public partial class ImageEditorWindow : Window
             _currentBitmap = SKBitmap.Decode(stream);
         }
 
+        if (_currentBitmap == null)
+        {
+            throw new InvalidOperationException($"Das Bild '{Path.GetFileName(filePath)}' konnte nicht geladen werden (nicht unterstütztes oder beschädigtes Format).");
+        }
+
         UpdateImageDisplay();
         UpdateUndoRedoButtons();
         UpdateAiModelStatus();
 
         ToolPan.IsChecked = true;
+        if (ComboBgMode != null)
+        {
+            ComboBgMode.SelectedIndex = 0;
+        }
     }
 
     private void UpdateImageDisplay()
@@ -146,11 +155,13 @@ public partial class ImageEditorWindow : Window
             _ => EditorTool.Pan
         };
 
-        PanelCropOptions.Visibility = _currentTool == EditorTool.Crop ? Visibility.Visible : Visibility.Collapsed;
-        PanelBlurOptions.Visibility = _currentTool == EditorTool.Pixelate ? Visibility.Visible : Visibility.Collapsed;
-        SidePanel.Visibility = _currentTool == EditorTool.BackgroundRemoval ? Visibility.Visible : Visibility.Collapsed;
+        if (PanelCropOptions != null) PanelCropOptions.Visibility = _currentTool == EditorTool.Crop ? Visibility.Visible : Visibility.Collapsed;
+        if (PanelBlurOptions != null) PanelBlurOptions.Visibility = _currentTool == EditorTool.Pixelate ? Visibility.Visible : Visibility.Collapsed;
+        if (SidePanel != null) SidePanel.Visibility = _currentTool == EditorTool.BackgroundRemoval ? Visibility.Visible : Visibility.Collapsed;
 
-        TextStatusHint.Text = _currentTool switch
+        if (TextStatusHint != null)
+        {
+            TextStatusHint.Text = _currentTool switch
         {
             EditorTool.Pan => "✋ Hand-Modus: Bild mit der Maus verschieben • Mausrad zum Zoomen.",
             EditorTool.Crop => "✂️ Zuschnitt: Bereich mit der Maus aufziehen • Dann 'Zuschnitt anwenden' klicken.",
@@ -167,6 +178,7 @@ public partial class ImageEditorWindow : Window
             EditorTool.BackgroundRemoval => "🪄 Hintergrund: Rechts Farbe oder KI-Modell wählen.",
             _ => "Werkzeug aktiv."
         };
+        }
     }
 
     private void OnColorSelectionChanged(object sender, RoutedEventArgs e)
@@ -431,7 +443,7 @@ public partial class ImageEditorWindow : Window
     // Background Removal
     private void OnBgModeChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ComboBgMode == null) return;
+        if (ComboBgMode == null || PanelColorKeyOptions == null || PanelAiOptions == null) return;
         bool isAi = ComboBgMode.SelectedIndex == 1;
         PanelColorKeyOptions.Visibility = isAi ? Visibility.Collapsed : Visibility.Visible;
         PanelAiOptions.Visibility = isAi ? Visibility.Visible : Visibility.Collapsed;
@@ -440,22 +452,30 @@ public partial class ImageEditorWindow : Window
     private void OnPickColorClicked(object sender, RoutedEventArgs e)
     {
         _isPickingColor = true;
-        TextStatusHint.Text = "🎯 Klicke auf die Hintergrundfarbe im Bild, die transparent werden soll.";
+        if (TextStatusHint != null)
+        {
+            TextStatusHint.Text = "🎯 Klicke auf die Hintergrundfarbe im Bild, die transparent werden soll.";
+        }
     }
 
     private void OnExecuteColorRemovalClicked(object sender, RoutedEventArgs e)
     {
         PushUndoState();
-        float tolerance = (float)(SliderTolerance.Value / 100.0);
+        float tolerance = SliderTolerance != null ? (float)(SliderTolerance.Value / 100.0) : 0.15f;
         var transparent = _editorService.RemoveBackgroundByColor(_currentBitmap, _pickedColor, tolerance);
         _currentBitmap.Dispose();
         _currentBitmap = transparent;
         UpdateImageDisplay();
-        TextStatusHint.Text = "Hintergrund erfolgreich transparent gemacht!";
+        if (TextStatusHint != null)
+        {
+            TextStatusHint.Text = "Hintergrund erfolgreich transparent gemacht!";
+        }
     }
 
     private void UpdateAiModelStatus()
     {
+        if (_bgRemovalService == null || TextAiStatus == null || ButtonDownloadAiModel == null || ButtonExecuteAiRemoval == null) return;
+
         bool downloaded = _bgRemovalService.IsAiModelDownloaded();
         if (downloaded)
         {
