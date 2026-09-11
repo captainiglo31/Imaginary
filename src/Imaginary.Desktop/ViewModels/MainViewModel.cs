@@ -28,6 +28,8 @@ public partial class MainViewModel : ObservableObject
     private readonly IWatermarkService _watermarkService;
     private readonly IUpdateService _updateService;
     private readonly IScreenshotService _screenshotService;
+    private readonly IImageEditorService _editorService;
+    private readonly IBackgroundRemovalService _bgRemovalService;
     private ITrayService? _trayService;
 
     private UpdateInfo? _latestUpdateInfo;
@@ -233,7 +235,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v1.2.0";
+    public string AppVersionString => "v2.0.0";
 
     // Output & Execution
     [ObservableProperty]
@@ -261,10 +263,33 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isCheckingForUpdates;
 
+    // Background Removal & AI Settings
+    public static string[] AvailableBgRemovalModes => new[]
+    {
+        "🪄 Weg A: Magic Wand / Farb-Keying (Sofort verfügbar, 0 MB)",
+        "🧠 Weg B: KI-Modell u2netp (Deep Learning, On-Demand ca. 4.7 MB)"
+    };
+
+    [ObservableProperty]
+    private int _selectedBgRemovalModeIndex = 0;
+
+    [ObservableProperty]
+    private bool _isAiModelDownloaded;
+
+    [ObservableProperty]
+    private string _aiModelStatusText = "Modell nicht heruntergeladen";
+
+    [ObservableProperty]
+    private bool _isAiModelDownloading;
+
+    [ObservableProperty]
+    private double _aiModelDownloadProgress;
+
     public bool HasFiles => Files.Count > 0;
     public bool CanStart => HasFiles && !IsBusy;
     public bool CanCancel => IsBusy;
     public bool CanOpenPreview => SelectedFile != null;
+    public bool CanOpenEditor => SelectedFile != null;
 
     public MainViewModel(
         IBatchProcessor batchProcessor,
@@ -276,7 +301,9 @@ public partial class MainViewModel : ObservableObject
         IHotfolderWatcher hotfolderWatcher,
         IWatermarkService watermarkService,
         IUpdateService updateService,
-        IScreenshotService screenshotService)
+        IScreenshotService screenshotService,
+        IImageEditorService editorService,
+        IBackgroundRemovalService bgRemovalService)
     {
         _batchProcessor = batchProcessor ?? throw new ArgumentNullException(nameof(batchProcessor));
         _formatDetector = formatDetector ?? throw new ArgumentNullException(nameof(formatDetector));
@@ -288,6 +315,8 @@ public partial class MainViewModel : ObservableObject
         _watermarkService = watermarkService ?? throw new ArgumentNullException(nameof(watermarkService));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
         _screenshotService = screenshotService ?? throw new ArgumentNullException(nameof(screenshotService));
+        _editorService = editorService ?? throw new ArgumentNullException(nameof(editorService));
+        _bgRemovalService = bgRemovalService ?? throw new ArgumentNullException(nameof(bgRemovalService));
 
         Files.CollectionChanged += (s, e) =>
         {
@@ -361,6 +390,11 @@ public partial class MainViewModel : ObservableObject
             ToggleHotfolder();
         }
 
+        // AI Background removal settings
+        _selectedBgRemovalModeIndex = (int)settings.PreferredBackgroundRemovalMode;
+        _isAiModelDownloaded = _bgRemovalService.IsAiModelDownloaded();
+        _aiModelStatusText = _isAiModelDownloaded ? "Installiert & Bereit (100% Offline)" : "Nicht heruntergeladen (ca. 4.7 MB)";
+
         // Automatischer Update-Check im Hintergrund (falls aktiviert)
         if (_checkForUpdatesOnStartup)
         {
@@ -404,6 +438,13 @@ public partial class MainViewModel : ObservableObject
     partial void OnSelectedFileChanged(FileItemViewModel? value)
     {
         OnPropertyChanged(nameof(CanOpenPreview));
+        OnPropertyChanged(nameof(CanOpenEditor));
+    }
+
+    partial void OnSelectedBgRemovalModeIndexChanged(int value)
+    {
+        _settingsService.Settings.PreferredBackgroundRemovalMode = (BackgroundRemovalMode)value;
+        _settingsService.Save();
     }
 
     partial void OnIsDarkModeChanged(bool value)
@@ -817,6 +858,143 @@ public partial class MainViewModel : ObservableObject
         };
         previewWin.LoadComparison(SelectedFile);
         previewWin.ShowDialog();
+    }
+
+    [RelayCommand]
+    private void OpenEditor()
+    {
+        string? pathToOpen = null;
+        if (SelectedFile != null)
+        {
+            pathToOpen = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+                ? SelectedFile.TargetPath
+                : SelectedFile.FilePath;
+        }
+
+        if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen))
+        {
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Bilder (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|Alle Dateien (*.*)|*.*",
+                Title = "Bild im Paint / Freistell-Studio öffnen"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                pathToOpen = dlg.FileName;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen)) return;
+
+        AppLogger.Info("Editor", $"Öffne Paint / Bild-Editor für: {pathToOpen}");
+        var editorWin = new ImageEditorWindow(pathToOpen, _editorService, _bgRemovalService)
+        {
+            Owner = Application.Current.MainWindow
+        };
+
+        if (editorWin.ShowDialog() == true && editorWin.HasChanges)
+        {
+            if (editorWin.ResultFilePath != pathToOpen)
+            {
+                AddFilePaths(new[] { editorWin.ResultFilePath });
+                StatusSummary = $"✏️ Bearbeitetes Bild als Kopie gespeichert: {Path.GetFileName(editorWin.ResultFilePath)}";
+            }
+            else
+            {
+                if (SelectedFile != null && SelectedFile.FilePath.Equals(pathToOpen, StringComparison.OrdinalIgnoreCase))
+                {
+                    var fi = new FileInfo(pathToOpen);
+                    SelectedFile.OriginalSizeBytes = fi.Length;
+                    SelectedFile.Status = JobStatus.Pending;
+                    SelectedFile.StatusMessage = "Bearbeitet (Original ersetzt)";
+                    SelectedFile.FinalSizeBytes = 0;
+                    SelectedFile.SavingsPercentage = 0;
+                    SelectedFile.TargetPath = null;
+                }
+                StatusSummary = $"✏️ Änderungen am Bild gespeichert: {Path.GetFileName(pathToOpen)}";
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task DownloadAiModelAsync()
+    {
+        if (IsAiModelDownloading) return;
+
+        IsAiModelDownloading = true;
+        AiModelDownloadProgress = 0;
+        AiModelStatusText = "Download gestartet...";
+        try
+        {
+            var progress = new Progress<double>(p =>
+            {
+                AiModelDownloadProgress = p;
+                AiModelStatusText = $"Lade herunter... {p:F0} %";
+            });
+
+            var success = await _bgRemovalService.DownloadModelAsync(progress);
+            if (success)
+            {
+                IsAiModelDownloaded = true;
+                AiModelStatusText = "Installiert & Bereit (100% Offline)";
+                _settingsService.Settings.AiModelDownloaded = true;
+                _settingsService.Save();
+                MessageBox.Show(Application.Current.MainWindow,
+                    "Das KI-Modell (u2netp) wurde erfolgreich heruntergeladen!\n\nSie können Bilder ab sofort vollautomatisch per Deep Learning freistellen (100% offline).",
+                    "KI-Modell bereit",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            else
+            {
+                AiModelStatusText = "Download fehlgeschlagen";
+                MessageBox.Show(Application.Current.MainWindow,
+                    "Das KI-Modell konnte nicht heruntergeladen werden. Bitte Internetverbindung prüfen.",
+                    "Download fehlgeschlagen",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AI", "Fehler beim Herunterladen des KI-Modells", ex);
+            AiModelStatusText = "Fehler beim Download";
+            MessageBox.Show(Application.Current.MainWindow,
+                $"Fehler beim Download: {ex.Message}",
+                "Fehler",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsAiModelDownloading = false;
+        }
+    }
+
+    [RelayCommand]
+    private void DeleteAiModel()
+    {
+        try
+        {
+            var res = MessageBox.Show(Application.Current.MainWindow,
+                "Möchten Sie das KI-Modell (ca. 4,7 MB) wirklich von der Festplatte entfernen?\nSie können es bei Bedarf jederzeit erneut herunterladen.",
+                "KI-Modell entfernen",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res != MessageBoxResult.Yes) return;
+
+            _bgRemovalService.DeleteModel();
+            IsAiModelDownloaded = false;
+            AiModelStatusText = "Nicht heruntergeladen (ca. 4.7 MB)";
+            _settingsService.Settings.AiModelDownloaded = false;
+            _settingsService.Save();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AI", "Fehler beim Löschen des KI-Modells", ex);
+            MessageBox.Show(Application.Current.MainWindow, $"Fehler beim Löschen: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     [RelayCommand]

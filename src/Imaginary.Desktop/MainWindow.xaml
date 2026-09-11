@@ -428,7 +428,12 @@
                             <Button Content="🔍 Vorher / Nachher" Command="{Binding OpenPreviewCommand}"
                                     IsEnabled="{Binding CanOpenPreview}"
                                     Style="{StaticResource ToolbarButtonStyle}"
-                                    FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
+                                    FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
+                                    ToolTip="Vorher/Nachher-Vergleich mit synchronisiertem Zoom bis 800%"/>
+                            <Button Content="✏️ Bearbeiten / Paint" Command="{Binding OpenEditorCommand}"
+                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    FontWeight="SemiBold" Foreground="#10B981"
+                                    ToolTip="Öffnet das Bild im integrierten Quick-Edit &amp; Paint Studio (Zuschneiden, DSGVO-Blur, Pfeile, Freistellen)"/>
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
@@ -469,10 +474,22 @@
                                   HeadersVisibility="Column"
                                   RowHeight="36"
                                   Background="{DynamicResource SurfaceBackgroundBrush}"
-                                  BorderThickness="0"
-                                  ToolTip="Fertige Zeilen können direkt per Drag &amp; Drop herausgezogen werden!"
+                                  ToolTip="Doppelklick zum Bearbeiten • Fertige Zeilen per Drag &amp; Drop herausziehen!"
+                                  MouseDoubleClick="OnDataGridMouseDoubleClick"
                                   PreviewMouseLeftButtonDown="OnDataGridPreviewMouseLeftButtonDown"
                                   PreviewMouseMove="OnDataGridPreviewMouseMove">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="✏️ In Paint / Quick-Edit bearbeiten" Command="{Binding OpenEditorCommand}"/>
+                                    <MenuItem Header="🔍 Vorher / Nachher Vergleich" Command="{Binding OpenPreviewCommand}" IsEnabled="{Binding CanOpenPreview}"/>
+                                    <Separator/>
+                                    <MenuItem Header="📋 Aus Zwischenablage einfügen (Strg+V)" Command="{Binding PasteClipboardCommand}"/>
+                                    <MenuItem Header="📸 Screenshot aufnehmen (F10)" Command="{Binding CaptureScreenshotCommand}"/>
+                                    <Separator/>
+                                    <MenuItem Header="🗑️ Aus Liste entfernen" Command="{Binding RemoveSelectedCommand}"/>
+                                    <MenuItem Header="🧹 Liste leeren" Command="{Binding ClearFilesCommand}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="Status" Width="130">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -731,6 +748,51 @@
                                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
                                 <TextBlock Text="Zeigt eine dezente Windows-Toastmeldung bei abgeschlossenen Hintergrund-Konvertierungen an."
                                            FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,4" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <!-- KI & Freistell-Studio (Hintergrund entfernen) -->
+                        <GroupBox Header="🧠 KI &amp; Freistell-Studio (Hintergrund entfernen)">
+                            <StackPanel Margin="0,4,0,0">
+                                <TextBlock Text="Standard-Methode zum Freistellen von Bildern:" FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4"/>
+                                <ComboBox ItemsSource="{Binding AvailableBgRemovalModes}"
+                                          SelectedIndex="{Binding SelectedBgRemovalModeIndex, Mode=TwoWay}"
+                                          Height="30" Margin="0,0,0,10"/>
+
+                                <!-- Model Status & Download Box -->
+                                <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                                <TextBlock Text="KI-Modell u2netp (Deep Learning, ONNX):" FontWeight="SemiBold" FontSize="12"/>
+                                                <TextBlock Text="{Binding AiModelStatusText}" FontWeight="Bold" FontSize="12"
+                                                           Foreground="{DynamicResource AccentBrush}" Margin="8,0,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Text="Das neuronale Netz segmentiert Personen, Produkte und Objekte vollautomatisch ohne Farbauswahl. Dateigröße ca. 4,7 MB. 100% lokale Offline-Berechnung."
+                                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                                            <Button Content="⬇️ KI-Modell herunterladen" Command="{Binding DownloadAiModelCommand}"
+                                                    Visibility="{Binding IsAiModelDownloaded, Converter={StaticResource InverseBoolToVis}}"
+                                                    IsEnabled="{Binding IsAiModelDownloading, Converter={StaticResource InverseBool}}"
+                                                    Style="{StaticResource ToolbarButtonStyle}" Padding="12,6" FontWeight="SemiBold"/>
+                                            <Button Content="🗑️ Modell löschen" Command="{Binding DeleteAiModelCommand}"
+                                                    Visibility="{Binding IsAiModelDownloaded, Converter={StaticResource BoolToVis}}"
+                                                    Style="{StaticResource ToolbarButtonStyle}" Padding="10,6" Foreground="#EF4444"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                
+                                <!-- Download Progress Bar if downloading -->
+                                <ProgressBar Value="{Binding AiModelDownloadProgress}" Minimum="0" Maximum="100" Height="6" Margin="0,4,0,0"
+                                             Visibility="{Binding IsAiModelDownloading, Converter={StaticResource BoolToVis}}"/>
                             </StackPanel>
                         </GroupBox>
 

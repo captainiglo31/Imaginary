@@ -23,6 +23,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAutostartService, AutostartService>();
         services.AddSingleton<IHotfolderWatcher, HotfolderWatcher>();
         services.AddSingleton<IUpdateService, UpdateService>();
+        services.AddSingleton<IImageEditorService, ImageEditorService>();
+        services.AddSingleton<IBackgroundRemovalService, BackgroundRemovalService>();
         services.AddTransient<IBatchProcessor, BatchProcessor>();
         return services;
     }

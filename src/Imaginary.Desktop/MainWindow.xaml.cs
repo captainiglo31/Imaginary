@@ -174,4 +174,13 @@ public partial class MainWindow : Window
         if (parentObject is T parent) return parent;
         return FindVisualParent<T>(parentObject);
     }
+
+    private void OnDataGridMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is DataGrid dg && dg.SelectedItem is FileItemViewModel)
+        {
+            _viewModel.OpenEditorCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
 }

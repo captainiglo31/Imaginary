@@ -44,7 +44,11 @@
         <!-- Central Image Comparison Area -->
         <Border Grid.Row="1" Background="{DynamicResource SurfaceBackgroundBrush}" 
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                CornerRadius="8" ClipToBounds="True" SizeChanged="OnContainerSizeChanged">
+                CornerRadius="8" ClipToBounds="True" SizeChanged="OnContainerSizeChanged"
+                MouseWheel="OnContainerMouseWheel"
+                MouseDown="OnContainerMouseDown"
+                MouseMove="OnContainerMouseMove"
+                MouseUp="OnContainerMouseUp">
             <Grid>
                 <!-- Split Slider View Mode -->
                 <Grid x:Name="SplitViewGrid" Visibility="Visible" Cursor="SizeWE" Background="#05000000"
@@ -112,6 +116,18 @@
                         </Grid>
                     </Border>
                 </Grid>
+
+                <!-- Floating Zoom Pill (Top Right) -->
+                <Border x:Name="BadgeZoom" Background="#CC0A0E1A" BorderBrush="#38BDF8" BorderThickness="1"
+                        CornerRadius="14" Padding="10,4" Margin="14" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Cursor="Hand" MouseLeftButtonDown="OnResetZoomClicked"
+                        ToolTip="Mausrad zum Zoomen • Rechte Maustaste zum Verschieben • Klick zum Zurücksetzen">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="🔍 " FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TextZoomLevel" Text="100%" FontWeight="Bold" FontSize="11.5" Foreground="#38BDF8" VerticalAlignment="Center"/>
+                        <TextBlock Text=" (Reset)" FontSize="10" Foreground="#94A3B8" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 

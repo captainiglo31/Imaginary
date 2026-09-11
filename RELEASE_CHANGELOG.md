@@ -1,19 +1,26 @@
-## 🚀 Was ist neu in Version 1.2.0:
+## 🚀 Was ist neu in Version 2.0.0:
 
-### 📤 Drag-Out (Direktes Herausziehen per Drag & Drop)
-- **Konvertierte Bilder sofort weiterverwenden:** Ziehe fertige Zeilen direkt mit der Maus aus dem Studio oder dem Hotfolder-Verlauf auf den Desktop, in den Windows-Explorer, in Outlook, Teams, Discord oder Browser.
-- **Multi-Selection:** Markiere mehrere Bilder und ziehe sie alle gleichzeitig an ihren Bestimmungsort.
+### 🎨 Integriertes Quick-Edit & Paint Studio
+- **DSGVO-Verpixelung & Weichzeichner:** Mosaik-Verpixelung und sanfter Gaußscher Weichzeichner zum zuverlässigen und unumkehrbaren Unkenntlichmachen sensibler Daten (Passwörter, Adressen, Gesichter, Kfz-Kennzeichen).
+- **Schwärzen (Blackout):** Blickdichte schwarze Blöcke zum vollständigen Zensieren vertraulicher Bildinhalte.
+- **Präzises Zuschneiden (Crop):** Freier Zuschnitt sowie vordefinierte Standard-Seitenverhältnisse (1:1 Quadrat, 16:9 Widescreen, 4:3 Foto, 3:2 Standard).
+- **Annotationen & Markierungen:** Pfeile mit dynamischer Spitze, Rechtecke, Kreise/Ellipsen, Freihand-Stift und transparenter Textmarker mit anpassbarer Strichstärke und Farbpalette.
+- **Nummerierte Schritt-Badges (1, 2, 3...):** Perfekt für Schritt-für-Schritt-Anleitungen, Bug-Reports und Dokumentationen.
+- **Text-Werkzeug:** Frei platzierbare Beschriftungen mit konfigurierbarer Schriftgröße und Farbe.
+- **Workflow-Komfort:** Vollständiges Undo/Redo (`Strg+Z` / `Strg+Y`), Original direkt ersetzen, als Kopie (`_bearbeitet.png`) speichern oder direkt in die Zwischenablage kopieren.
 
-### 📋 Smart Clipboard (Strg+V Zwischenablage-Import)
-- **Schneller Bild-Import:** Kopiere Screenshots im Browser oder beliebigen Tools (`Rechtsklick -> Bild kopieren`) und drücke in Imaginary einfach **`Strg + V`** (oder nutze den neuen Toolbar-Button).
-- **Dateien aus Zwischenablage:** Auch im Datei-Explorer kopierte Bilddateien (`Strg + C`) werden per `Strg + V` blitzschnell zur Liste hinzugefügt.
+### 🪄 & 🧠 2-Wege Hintergrund-Entferner (Freistell-Studio)
+- **Weg A – Magic Wand / Farb-Keying:** Sofort offline einsatzbereit (0 MB Download). Hintergrund per Klick auf die Schlüsselfarbe mit stufenlosem Toleranz-Regler blitzschnell transparent machen.
+- **Weg B – KI Deep Learning (ONNX Runtime):** Modernes U-2-Netp neuronales Netz zur vollautomatischen Segmentierung von Personen, Produkten und Objekten – ganz ohne Farbauswahl!
+- **On-Demand & 100% Offline:** Das kompakte KI-Modell (~4,7 MB) kann bei Bedarf mit einem Klick direkt in der App oder in den Einstellungen heruntergeladen werden und läuft danach permanent 100% lokal ohne Cloud oder externe Server.
+- **Verwaltung:** Umschaltung und Modellverwaltung (Download / Löschen) jederzeit in den Einstellungen oder direkt im Editor möglich.
 
-### 📸 Screenshot Snipping-Tool (F10 / Strg+Shift+S)
-- **Integrierte Bildschirm-Aufnahme:** Schneide beliebige Bildschirmbereiche pixelgenau aus, ohne Drittanbieter-Tools zu bemühen.
-- **Multi-Monitor-Unterstützung:** Erfasst nahtlos alle Bildschirme mit Live-Pixelabmessung und Fadenkreuz.
-- **Sofortige Zwischenablage & Studio:** Der Screenshot landet zeitgleich in voller Qualität in der Windows-Zwischenablage (sofort mit `Strg+V` in Chats/Mails einfügbar) sowie direkt in Imaginary zur Weiterverarbeitung.
-- **System-Tray Schnellzugriff:** Screenshot-Aufnahme direkt über das Kontextmenü im Infobereich neben der Uhr möglich.
+### 🔍 Synchronisierter Vorher/Nachher-Vergleich mit Parallel-Zoom
+- **Parallel-Zoom bis 800%:** Beim Scrollen mit dem Mausrad vergrößern und verkleinern sich Original und komprimiertes Bild synchron nebeneinander – für maximale Detailkontrolle von Kompressionsartefakten.
+- **Synchrones Verschieben (Pan):** Mit gedrückter rechter Maustaste wandern beide Bilder synchron über die Leinwand.
+- **Zoom-Reset:** Ein Klick auf die Zoom-Anzeige setzt die Ansicht sofort wieder auf 100% zurück.
 
-### ⚡ Verbesserungen & Feinschliff
-- **Optimierte Release-Notes:** Deutlich lesbarere Darstellung der Neuerungen mit Formatierungen und Kategorien im Update-Dialog.
-- **Stabilität & Performance:** Schnelleres Rendern und zuverlässigere Multi-Threading-Verarbeitung.
+### 🖱️ Verbesserte Bedienung im Hauptfenster
+- **Doppelklick:** Doppelklick auf eine Bildzeile öffnet diese sofort im neuen Paint Studio.
+- **Kontextmenü:** Rechtsklick auf beliebige Zeilen für Schnellzugriff auf Editor, Vorher/Nachher-Vergleich und Zwischenablage.
+- **100% Portable:** Alles weiterhin als eigenständige Single-File .exe ohne Administratorrechte.

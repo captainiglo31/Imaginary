@@ -32,4 +32,9 @@ public class AppSettings
     public string? SkippedVersion { get; set; }
     public string GitHubRepositoryOwner { get; set; } = "captainiglo31";
     public string GitHubRepositoryName { get; set; } = "Imaginary";
+
+    // Background Removal & AI
+    public BackgroundRemovalMode PreferredBackgroundRemovalMode { get; set; } = BackgroundRemovalMode.ColorKey;
+    public float ColorKeyTolerance { get; set; } = 0.15f;
+    public bool AiModelDownloaded { get; set; }
 }
