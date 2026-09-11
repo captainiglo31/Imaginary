@@ -1,10 +1,17 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using Imaginary.Core;
 using Imaginary.Core.Logging;
+using Imaginary.Core.Mcp;
+using Imaginary.Core.Services;
 using Imaginary.Desktop.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Imaginary.Desktop;
 
@@ -46,6 +53,42 @@ public partial class App : Application
         if (e.Args.Length > 0)
         {
             AppLogger.Info("App", $"Startargumente ({e.Args.Length}): {string.Join(", ", e.Args)}");
+        }
+
+        if (e.Args.Any(a => string.Equals(a, "--mcp", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (!Console.IsOutputRedirected)
+            {
+                EnsureConsoleOutput();
+            }
+            await RunMcpServerAsync();
+            Shutdown();
+            return;
+        }
+
+        if (e.Args.Any(a => string.Equals(a, "--mcp-config", StringComparison.OrdinalIgnoreCase)))
+        {
+            EnsureConsoleOutput();
+            string exe = Environment.ProcessPath ?? "Imaginary.exe";
+            Console.WriteLine(McpServer.GenerateClaudeDesktopConfig(exe));
+            Shutdown();
+            return;
+        }
+
+        if (e.Args.Any(a => string.Equals(a, "--mcp-install-claude", StringComparison.OrdinalIgnoreCase)))
+        {
+            EnsureConsoleOutput();
+            string exe = Environment.ProcessPath ?? "Imaginary.exe";
+            if (McpServer.TryInstallClaudeDesktopConfig(exe, out string msg))
+            {
+                Console.WriteLine("SUCCESS: " + msg);
+            }
+            else
+            {
+                Console.Error.WriteLine("ERROR: " + msg);
+            }
+            Shutdown();
+            return;
         }
 
         bool isFirstInstance = SingleInstanceService.TryRegisterSingleInstance(e.Args, files =>
@@ -175,5 +218,36 @@ public partial class App : Application
         var resourceDict = (ResourceDictionary)LoadComponent(themeUri);
         Current.Resources.MergedDictionaries.Clear();
         Current.Resources.MergedDictionaries.Add(resourceDict);
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AttachConsole(int dwProcessId);
+
+    private static void EnsureConsoleOutput()
+    {
+        try
+        {
+            AttachConsole(-1);
+            var stdOut = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true };
+            Console.SetOut(stdOut);
+            var stdErr = new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true };
+            Console.SetError(stdErr);
+        }
+        catch { }
+    }
+
+    private static async Task RunMcpServerAsync()
+    {
+        var services = new ServiceCollection();
+        services.AddImaginaryCore();
+        var sp = services.BuildServiceProvider();
+
+        var editor = sp.GetRequiredService<IImageEditorService>();
+        var bg = sp.GetRequiredService<IBackgroundRemovalService>();
+        var detector = sp.GetRequiredService<IImageFormatDetector>();
+        var preset = sp.GetService<IPresetManager>();
+
+        var mcpServer = ImaginaryMcpFactory.CreateServer(editor, bg, detector, preset);
+        await mcpServer.RunStdioAsync();
     }
 }
