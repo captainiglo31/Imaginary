@@ -4,16 +4,17 @@ using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Diagnostics;
 using Imaginary.Core.Logging;
+using Imaginary.Core.Mcp;
 using Imaginary.Core.Models;
 using Imaginary.Core.Services;
 using Imaginary.Desktop.Models;
+using Imaginary.Desktop.Services;
 using Imaginary.Desktop.Views;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using CoreResizeMode = Imaginary.Core.Models.ResizeMode;
-
-using Imaginary.Desktop.Services;
-using System.Windows.Media.Imaging;
 
 namespace Imaginary.Desktop.ViewModels;
 
@@ -242,7 +243,16 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.0.1";
+    public string AppVersionString => "v2.2.0";
+
+    public string McpConfigSnippet
+    {
+        get
+        {
+            var exe = Environment.ProcessPath ?? "Imaginary.exe";
+            return McpServer.GenerateClaudeDesktopConfig(exe);
+        }
+    }
 
     // Output & Execution
     [ObservableProperty]
@@ -1071,6 +1081,70 @@ public partial class MainViewModel : ObservableObject
         {
             AppLogger.Error("UI", "Fehler beim Öffnen des Protokolls: " + ex.Message, ex);
             MessageBox.Show(Application.Current.MainWindow, "Fehler beim Öffnen des Protokolls:\n" + ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void InstallClaudeMcp()
+    {
+        try
+        {
+            var exe = Environment.ProcessPath ?? "Imaginary.exe";
+            if (McpServer.TryInstallClaudeDesktopConfig(exe, out string msg))
+            {
+                MessageBox.Show(Application.Current.MainWindow,
+                    "Der MCP-Server für Imaginary wurde erfolgreich in Claude Desktop registriert!\n\n" +
+                    "Nach einem Neustart von Claude Desktop stehen dir alle Bildbearbeitungs-Tools direkt zur Verfügung.",
+                    "Claude Desktop Integration",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show(Application.Current.MainWindow,
+                    "Fehler bei der automatischen Installation:\n" + msg + "\n\nDu kannst die Konfiguration stattdessen manuell kopieren und einfügen.",
+                    "Fehler",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(Application.Current.MainWindow, "Fehler: " + ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void CopyMcpConfig()
+    {
+        try
+        {
+            Clipboard.SetText(McpConfigSnippet);
+            MessageBox.Show(Application.Current.MainWindow,
+                "Die MCP-Konfiguration wurde in deine Zwischenablage kopiert!\n\nFüge sie einfach in deine 'claude_desktop_config.json' oder deinen KI-Client ein.",
+                "In Zwischenablage kopiert",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(Application.Current.MainWindow, "Fehler beim Kopieren: " + ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenClaudeConfigFolder()
+    {
+        try
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string claudeDir = Path.Combine(appData, "Claude");
+            if (!Directory.Exists(claudeDir)) Directory.CreateDirectory(claudeDir);
+            Process.Start(new ProcessStartInfo { FileName = claudeDir, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(Application.Current.MainWindow, "Fehler: " + ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

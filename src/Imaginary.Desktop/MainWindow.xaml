@@ -175,6 +175,14 @@
                                 Padding="12,6" Margin="0,0,10,0" BorderThickness="0" Cursor="Hand"
                                 ToolTip="Klicken, um das neue Update herunterzuladen und zu installieren"/>
 
+                        <!-- MCP / KI Button -->
+                        <Button Content="🤖 MCP / KI" Command="{Binding SelectTabCommand}" CommandParameter="2"
+                                Padding="12,6" Margin="0,0,10,0"
+                                Background="{DynamicResource SecondaryButtonBackgroundBrush}"
+                                Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                Cursor="Hand" ToolTip="Model Context Protocol (MCP) &amp; KI-Agenten Konfiguration aufrufen"/>
+
                         <!-- Protokoll / Log Viewer Button -->
                         <Button Content="📋 Protokoll" Command="{Binding OpenLogViewerCommand}"
                                 Padding="12,6" Margin="0,0,2,0"
@@ -890,6 +898,79 @@
                                 <!-- Download Progress Bar if downloading -->
                                 <ProgressBar Value="{Binding AiModelDownloadProgress}" Minimum="0" Maximum="100" Height="6" Margin="0,4,0,0"
                                              Visibility="{Binding IsAiModelDownloading, Converter={StaticResource BoolToVis}}"/>
+                            </StackPanel>
+                        </GroupBox>
+ 
+                        <!-- Model Context Protocol (MCP) & KI-Agenten Integration -->
+                        <GroupBox Header="🤖 Model Context Protocol (MCP) &amp; KI-Agenten">
+                            <StackPanel Margin="0,4,0,0">
+                                <!-- Info Header & Badges -->
+                                <DockPanel Margin="0,0,0,8">
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                        <Border Background="#6366F1" CornerRadius="4" Padding="6,2" Margin="0,0,4,0">
+                                            <TextBlock Text="Claude Desktop" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                        </Border>
+                                        <Border Background="#10B981" CornerRadius="4" Padding="6,2" Margin="0,0,4,0">
+                                            <TextBlock Text="Cursor" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                        </Border>
+                                        <Border Background="#0EA5E9" CornerRadius="4" Padding="6,2" Margin="0,0,4,0">
+                                            <TextBlock Text="ChatGPT" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                        </Border>
+                                        <Border Background="#EC4899" CornerRadius="4" Padding="6,2">
+                                            <TextBlock Text="Antigravity" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="Automatisierte Bildbearbeitung via KI" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <TextBlock Text="Mit der standardisierten MCP-Schnittstelle können externe KI-Agenten Imaginary als Werkzeug verwenden: Bilder konvertieren, zuschneiden, Hintergründe mit der KI entfernen, sensible Daten DSGVO-konform schwärzen oder verpixeln und Icon-Sets erstellen."
+                                           FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                                <!-- 1-Click Action Buttons -->
+                                <WrapPanel Margin="0,0,0,12">
+                                    <Button Content="🤖 In Claude Desktop installieren (1-Klick)" Command="{Binding InstallClaudeMcpCommand}"
+                                            Style="{StaticResource ToolbarButtonStyle}" Background="{DynamicResource ActionButtonGradientBrush}"
+                                            Foreground="White" FontWeight="Bold" Padding="14,8" Margin="0,0,8,6" Cursor="Hand"
+                                            ToolTip="Trägt Imaginary vollautomatisch in %APPDATA%\Claude\claude_desktop_config.json ein"/>
+
+                                    <Button Content="📋 Konfiguration kopieren" Command="{Binding CopyMcpConfigCommand}"
+                                            Style="{StaticResource ToolbarButtonStyle}" Padding="12,8" Margin="0,0,8,6" Cursor="Hand"
+                                            ToolTip="Kopiert die JSON-Konfiguration in die Windows-Zwischenablage"/>
+
+                                    <Button Content="📂 Claude-Ordner öffnen" Command="{Binding OpenClaudeConfigFolderCommand}"
+                                            Style="{StaticResource ToolbarButtonStyle}" Padding="12,8" Margin="0,0,0,6" Cursor="Hand"
+                                            ToolTip="Öffnet den Claude Konfigurationsordner im Windows Explorer"/>
+                                </WrapPanel>
+
+                                <!-- JSON Snippet Preview Box -->
+                                <TextBlock Text="Konfiguration (claude_desktop_config.json):" FontWeight="SemiBold" FontSize="11.5" Margin="0,0,0,4"/>
+                                <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,0,0,12">
+                                    <TextBox Text="{Binding McpConfigSnippet, Mode=OneWay}"
+                                             IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                                             Foreground="{DynamicResource AccentBrush}" FontFamily="Consolas, Cascadia Code, Courier New"
+                                             FontSize="11.5" TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto"/>
+                                </Border>
+
+                                <!-- Expander for Available Tools -->
+                                <Expander Header="🔍 Verfügbare KI-Werkzeuge anzeigen (10 Tools)" IsExpanded="False"
+                                          BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                          Background="{DynamicResource SurfaceBackgroundBrush}" Padding="8" Margin="0,0,0,4">
+                                    <StackPanel Margin="4,8,4,4">
+                                        <TextBlock Text="Folgende Funktionen stehen angebundenen KIs vollautomatisch zur Verfügung:"
+                                                   FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                        <TextBlock Text="• inspect_image — Liest Abmessungen, Farbraum, Alphakanal, Format und Dateigröße" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• convert_image — Konvertiert (JPEG, PNG, WebP, AVIF, GIF, BMP, TIFF, ICO) mit Skalierung" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• remove_background — Entfernt Hintergründe via U-2-Net Deep-Learning oder Farb-Keying" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• segment_object_by_region — Schneidet Objekte gezielt innerhalb einer Bounding-Box [x, y, w, h] frei" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• redact_region — DSGVO-Zensur: Schwärzen (blackout), Verpixeln (pixelate), Weichzeichnen (blur)" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• crop_image — Verlustfreier Zuschnitt von Bildbereichen" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• apply_watermark — Text-Wasserzeichen mit Position, Deckkraft und Schriftgröße" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• generate_icon_set — Erzeugt Multi-Resolution Windows .ico-Dateien (16 bis 256 px)" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• check_ai_model — Prüft Installations- und Offline-Status des lokalen KI-Modells" FontSize="11" Margin="0,2,0,2"/>
+                                        <TextBlock Text="• download_ai_model — Lädt das U-2-Net KI-Modell (~4.7 MB) bei Bedarf herunter" FontSize="11" Margin="0,2,0,2"/>
+                                    </StackPanel>
+                                </Expander>
                             </StackPanel>
                         </GroupBox>
 
