@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPresetManager, PresetManager>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IExplorerIntegration, ExplorerIntegration>();
+        services.AddSingleton<IStartMenuIntegration, StartMenuIntegration>();
         services.AddSingleton<IAutostartService, AutostartService>();
         services.AddSingleton<IHotfolderWatcher, HotfolderWatcher>();
         services.AddSingleton<IUpdateService, UpdateService>();

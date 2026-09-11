@@ -1,6 +1,7 @@
 {
   "IsDarkMode": false,
   "ExplorerIntegrationEnabled": false,
+  "StartMenuIntegrationEnabled": true,
   "LastOutputDirectory": null,
   "SelectedPresetId": "preset-web",
   "HotfolderPath": null,

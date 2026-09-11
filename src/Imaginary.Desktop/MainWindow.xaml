@@ -787,6 +787,36 @@
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>
+
+                                <!-- Startmenü & Windows-Suche -->
+                                <Border Background="{DynamicResource CardHeaderBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10" Margin="0,4,0,4">
+                                    <DockPanel LastChildFill="True">
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <!-- Status Badge -->
+                                            <Border Background="#10B981" CornerRadius="4" Padding="7,3" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                    Visibility="{Binding IsStartMenuIntegrationEnabled, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="✔ Registriert" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                            </Border>
+                                            <Border Background="#475569" CornerRadius="4" Padding="7,3" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                    Visibility="{Binding IsStartMenuIntegrationEnabled, Converter={StaticResource InverseBoolToVis}}">
+                                                <TextBlock Text="⚪ Nicht registriert" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                            </Border>
+
+                                            <!-- Action Button -->
+                                            <Button Content="{Binding StartMenuIntegrationButtonText}"
+                                                    Command="{Binding ToggleStartMenuIntegrationCommand}"
+                                                    Padding="14,6" FontWeight="Bold" FontSize="12"
+                                                    Cursor="Hand"
+                                                    Style="{DynamicResource ToolbarButtonStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Startmenü &amp; Windows-Suche (Win + S)" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Erstellt eine Verknüpfung im Startmenü und registriert den App-Pfad, sodass Imaginary sofort in der Windows-Suche gefunden wird."
+                                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
                             </StackPanel>
                         </GroupBox>
 

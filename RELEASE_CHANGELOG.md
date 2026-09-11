@@ -1,3 +1,17 @@
+## 🚀 Was ist neu in Version 2.2.4 (Startmenü & Windows-Suche Integration):
+
+### 🔍 Windows-Startmenü & Windows-Suche (`Win + S`)
+- **Vollständige Auffindbarkeit als portable App:**
+  - Automatische Registrierung einer Startmenü-Verknüpfung unter `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Imaginary.lnk`.
+  - Registrierung in der Windows-Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\App Paths\Imaginary.exe`), wodurch Imaginary sofort über die Windows-Suche (`Win + S`), das Startmenü oder den Ausführen-Dialog (`Win + R -> imaginary`) gestartet werden kann.
+  - Funktioniert vollständig im Benutzerbereich ohne Administratorrechte.
+- **Auto-Synchronisation & Self-Healing:**
+  - Beim Verschieben oder Aktualisieren der portable `.exe` aktualisiert Imaginary beim Starten automatisch den Verknüpfungspfad.
+- **Einstellungskarte unter System & Hintergrundbetrieb:**
+  - Neue Einstellungskarte mit Status-Badge (`✔ Registriert` / `⚪ Nicht registriert`) und 1-Klick-Button zum Aktivieren bzw. sauberen Deaktivieren/Entfernen.
+
+---
+
 ## 🚀 Was ist neu in Version 2.2.3 (Studio-Fixes & Dark Mode Kontextmenü):
 
 ### ✏️ Quick-Edit & Studio-Fixes

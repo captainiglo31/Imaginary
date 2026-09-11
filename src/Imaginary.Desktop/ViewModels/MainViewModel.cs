@@ -25,6 +25,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IPresetManager _presetManager;
     private readonly ISettingsService _settingsService;
     private readonly IExplorerIntegration _explorerIntegration;
+    private readonly IStartMenuIntegration _startMenuIntegration;
     private readonly IAutostartService _autostartService;
     private readonly IHotfolderWatcher _hotfolderWatcher;
     private readonly IWatermarkService _watermarkService;
@@ -176,6 +177,14 @@ public partial class MainViewModel : ObservableObject
     public string ExplorerIntegrationButtonText => IsExplorerIntegrationEnabled ? "Deaktivieren" : "Aktivieren";
     public string ExplorerIntegrationStatusText => IsExplorerIntegrationEnabled ? "Aktiviert" : "Nicht aktiv";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StartMenuIntegrationButtonText))]
+    [NotifyPropertyChangedFor(nameof(StartMenuIntegrationStatusText))]
+    private bool _isStartMenuIntegrationEnabled;
+
+    public string StartMenuIntegrationButtonText => IsStartMenuIntegrationEnabled ? "Deaktivieren" : "Aktivieren";
+    public string StartMenuIntegrationStatusText => IsStartMenuIntegrationEnabled ? "Registriert" : "Nicht registriert";
+
     // Hotfolder Settings & State
     [ObservableProperty]
     private string _hotfolderPath = string.Empty;
@@ -248,7 +257,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.2.3";
+    public string AppVersionString => "v2.2.4";
 
     public string McpConfigSnippet
     {
@@ -319,6 +328,7 @@ public partial class MainViewModel : ObservableObject
         IPresetManager presetManager,
         ISettingsService settingsService,
         IExplorerIntegration explorerIntegration,
+        IStartMenuIntegration startMenuIntegration,
         IAutostartService autostartService,
         IHotfolderWatcher hotfolderWatcher,
         IWatermarkService watermarkService,
@@ -332,6 +342,7 @@ public partial class MainViewModel : ObservableObject
         _presetManager = presetManager ?? throw new ArgumentNullException(nameof(presetManager));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _explorerIntegration = explorerIntegration ?? throw new ArgumentNullException(nameof(explorerIntegration));
+        _startMenuIntegration = startMenuIntegration ?? throw new ArgumentNullException(nameof(startMenuIntegration));
         _autostartService = autostartService ?? throw new ArgumentNullException(nameof(autostartService));
         _hotfolderWatcher = hotfolderWatcher ?? throw new ArgumentNullException(nameof(hotfolderWatcher));
         _watermarkService = watermarkService ?? throw new ArgumentNullException(nameof(watermarkService));
@@ -352,6 +363,12 @@ public partial class MainViewModel : ObservableObject
         App.SetTheme(_isDarkMode);
 
         _isExplorerIntegrationEnabled = _explorerIntegration.IsRegistered();
+        _isStartMenuIntegrationEnabled = _startMenuIntegration.IsRegistered();
+        if (settings.StartMenuIntegrationEnabled)
+        {
+            _startMenuIntegration.Synchronize(true, Environment.ProcessPath);
+            _isStartMenuIntegrationEnabled = _startMenuIntegration.IsRegistered();
+        }
         _outputDirectory = settings.LastOutputDirectory ?? string.Empty;
 
         // Hotfolder settings
@@ -667,6 +684,34 @@ public partial class MainViewModel : ObservableObject
             else
             {
                 MessageBox.Show("Konnte Windows Explorer Kontextmenü nicht registrieren.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleStartMenuIntegration()
+    {
+        if (IsStartMenuIntegrationEnabled)
+        {
+            _startMenuIntegration.Unregister();
+            IsStartMenuIntegrationEnabled = false;
+            _settingsService.Settings.StartMenuIntegrationEnabled = false;
+            _settingsService.Save();
+            MessageBox.Show("Startmenü- und Windows-Suche-Registrierung erfolgreich entfernt.", "Startmenü & Suche", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            var exePath = Environment.ProcessPath;
+            if (_startMenuIntegration.Register(exePath))
+            {
+                IsStartMenuIntegrationEnabled = true;
+                _settingsService.Settings.StartMenuIntegrationEnabled = true;
+                _settingsService.Save();
+                MessageBox.Show("Imaginary erfolgreich im Windows Startmenü & Windows-Suche registriert!\nDu kannst nun jederzeit über das Startmenü oder 'Win + S' nach Imaginary suchen.", "Startmenü & Suche", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show("Konnte Verknüpfung im Startmenü nicht erstellen.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

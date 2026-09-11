@@ -34,10 +34,10 @@
     <Company>Pino Wackers</Company>
     <Authors>Pino Wackers</Authors>
     <Copyright>© 2026 Pino Wackers. Alle Rechte vorbehalten.</Copyright>
-    <Version>2.2.3</Version>
-    <AssemblyVersion>2.2.3.0</AssemblyVersion>
-    <FileVersion>2.2.3.0</FileVersion>
-    <InformationalVersion>2.2.3</InformationalVersion>
+    <Version>2.2.4</Version>
+    <AssemblyVersion>2.2.4.0</AssemblyVersion>
+    <FileVersion>2.2.4.0</FileVersion>
+    <InformationalVersion>2.2.4</InformationalVersion>
     <NeutralLanguage>de-DE</NeutralLanguage>
   </PropertyGroup>
 

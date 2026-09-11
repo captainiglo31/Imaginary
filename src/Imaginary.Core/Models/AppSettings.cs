@@ -4,6 +4,7 @@ public class AppSettings
 {
     public bool IsDarkMode { get; set; } = false;
     public bool ExplorerIntegrationEnabled { get; set; } = false;
+    public bool StartMenuIntegrationEnabled { get; set; } = true;
     public string? LastOutputDirectory { get; set; }
     public string? SelectedPresetId { get; set; }
 

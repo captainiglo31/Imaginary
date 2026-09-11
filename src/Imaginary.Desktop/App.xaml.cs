@@ -71,6 +71,20 @@ public partial class App : Application
             AppLogger.Info("App", $"Startargumente ({e.Args.Length}): {string.Join(", ", e.Args)}");
         }
 
+        // Startmenü & Windows-Suche Synchronisation (direkt bei Start ausführen)
+        try
+        {
+            var settings = new SettingsService().Settings;
+            if (settings.StartMenuIntegrationEnabled)
+            {
+                new StartMenuIntegration().Synchronize(true, Environment.ProcessPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("App", "Fehler bei Startmenü-Synchronisation", ex);
+        }
+
         // 0. CLI Notfallschalter: Rollback oder Recovery
         if (e.Args.Any(a => string.Equals(a, "--rollback", StringComparison.OrdinalIgnoreCase)))
         {
