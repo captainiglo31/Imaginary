@@ -1280,6 +1280,20 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void OpenOutputDirectory()
+    {
+        string target = string.IsNullOrWhiteSpace(OutputDirectory) ? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures) : OutputDirectory;
+        if (!Directory.Exists(target))
+        {
+            try { Directory.CreateDirectory(target); } catch { /* ignore */ }
+        }
+        if (Directory.Exists(target))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = target, UseShellExecute = true });
+        }
+    }
+
+    [RelayCommand]
     private async Task StartConversionAsync()
     {
         if (Files.Count == 0 || IsBusy) return;

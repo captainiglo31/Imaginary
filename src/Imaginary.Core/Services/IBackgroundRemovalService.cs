@@ -42,4 +42,24 @@ public interface IBackgroundRemovalService
         float tolerance = 0.15f,
         SKColor? keyColor = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Segments only the specific object within the user-specified bounding region/stroke using AI.
+    /// Surrounding background outside the region is made transparent.
+    /// </summary>
+    Task<SKBitmap> SegmentObjectRegionAsync(
+        SKBitmap source,
+        SKRectI boundingBox,
+        System.Collections.Generic.IReadOnlyList<SKPoint>? brushPoints = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Applies a manual mask touch-up brush (restore or erase) around the given center point.
+    /// </summary>
+    SKBitmap ApplyMaskBrush(
+        SKBitmap current,
+        SKBitmap original,
+        SKPoint point,
+        float radius,
+        bool restore);
 }

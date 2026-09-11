@@ -73,6 +73,81 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Modern Card Expander Style matching GroupBox cards -->
+        <Style x:Key="ModernCardExpanderStyle" TargetType="Expander">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition x:Name="ContentRow" Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Border Grid.Row="0" x:Name="HeaderBorder"
+                                        Background="{DynamicResource ToolbarBackgroundBrush}"
+                                        CornerRadius="7,7,7,7"
+                                        Padding="12,8">
+                                    <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                                  Cursor="Hand" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <DockPanel Background="Transparent" LastChildFill="True">
+                                                    <TextBlock x:Name="ArrowText" Text="▶" DockPanel.Dock="Right"
+                                                               FontSize="10" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    <ContentPresenter ContentSource="Content"
+                                                                      VerticalAlignment="Center"
+                                                                      TextBlock.FontWeight="SemiBold"
+                                                                      TextBlock.FontSize="12.5"
+                                                                      TextBlock.Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                </DockPanel>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <Setter TargetName="ArrowText" Property="Text" Value="▼"/>
+                                                        <Setter TargetName="ArrowText" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ArrowText" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                                    </ToggleButton>
+                                </Border>
+
+                                <Border Grid.Row="1" x:Name="ContentBorder"
+                                        Padding="{TemplateBinding Padding}"
+                                        Visibility="Collapsed">
+                                    <ContentPresenter/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ContentBorder" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="HeaderBorder" Property="CornerRadius" Value="7,7,0,0"/>
+                                <Setter TargetName="HeaderBorder" Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter TargetName="HeaderBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -171,225 +246,225 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-            <!-- Left Panel: Settings -->
-            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
-                <StackPanel>
+            <!-- Left Panel: Settings & Pinned Action Buttons -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                    <!-- Presets / Profiles -->
-                    <GroupBox Header="⚡ Profile / Presets">
-                        <StackPanel Margin="0,4,0,0">
-                            <ComboBox ItemsSource="{Binding Presets}"
-                                      SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
-                                      DisplayMemberPath="Name"
-                                      Padding="6,4" FontSize="13" Margin="0,0,0,8"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Content="💾 Als Profil speichern" Command="{Binding SaveCurrentAsPresetCommand}"
-                                        Padding="6,4" FontSize="11" Style="{StaticResource ToolbarButtonStyle}"/>
-                                <Button Grid.Column="2" Content="🗑️ Löschen" Command="{Binding DeleteCurrentPresetCommand}"
-                                        Padding="6,4" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0"/>
-                            </Grid>
-                        </StackPanel>
-                    </GroupBox>
+                <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
+                    <StackPanel>
 
-                    <!-- 1. Format & Metadata -->
-                    <GroupBox Header="1. Zielformat &amp; Metadaten">
-                        <StackPanel Margin="0,4,0,0">
-                            <ComboBox ItemsSource="{Binding AvailableFormats}"
-                                      SelectedIndex="{Binding SelectedFormatIndex, Mode=TwoWay}"
-                                      Padding="6,4" FontSize="13" Margin="0,0,0,8"/>
-                            <CheckBox IsChecked="{Binding StripMetadata, Mode=TwoWay}"
-                                      Content="EXIF &amp; GPS Metadaten entfernen"
-                                      FontWeight="Normal" ToolTip="Entfernt Kamera-, Standort- und Aufnahmedaten für Datenschutz und kleinere Dateien"/>
-                        </StackPanel>
-                    </GroupBox>
-
-                    <!-- 2. Size Constraint -->
-                    <GroupBox Header="2. Maximale Dateigröße">
-                        <StackPanel Margin="0,4,0,0">
-                            <CheckBox IsChecked="{Binding EnableSizeLimit, Mode=TwoWay}"
-                                      Content="Dateigröße strikt begrenzen"
-                                      FontWeight="Normal" Margin="0,0,0,8"/>
-
-                            <Grid Margin="0,0,0,8" IsEnabled="{Binding EnableSizeLimit}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="70"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" Text="{Binding SizeLimitValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         Padding="6,4" FontSize="13"/>
-                                <ComboBox Grid.Column="2" ItemsSource="{Binding AvailableUnits}"
-                                          SelectedIndex="{Binding SelectedUnitIndex, Mode=TwoWay}"
-                                          Padding="6,4" FontSize="13"/>
-                            </Grid>
-
-                            <TextBlock Text="Fallback bei verlustfreien Formaten (PNG):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,2"/>
-                            <ComboBox ItemsSource="{Binding AvailableFallbackStrategies}"
-                                      SelectedIndex="{Binding SelectedFallbackStrategyIndex, Mode=TwoWay}"
-                                      IsEnabled="{Binding EnableSizeLimit}"
-                                      Padding="6,4" FontSize="12"/>
-                        </StackPanel>
-                    </GroupBox>
-
-                    <!-- 3. Resize & Cropping -->
-                    <GroupBox Header="3. Auflösung &amp; Skalierung">
-                        <StackPanel Margin="0,4,0,0">
-                            <ComboBox ItemsSource="{Binding AvailableResizeModes}"
-                                      SelectedIndex="{Binding SelectedResizeModeIndex, Mode=TwoWay}"
-                                      Padding="6,4" FontSize="13" Margin="0,0,0,8"/>
-
-                            <!-- Mode 1: Percentage -->
-                            <StackPanel Visibility="{Binding SelectedResizeModeIndex, Converter={StaticResource IntToVis}, ConverterParameter=1}" Margin="0,4,0,0">
-                                <DockPanel Margin="0,0,0,4">
-                                    <TextBlock Text="Skalierung:" FontSize="12"/>
-                                    <TextBlock Text="{Binding ResizePercentage, StringFormat={}{0:N0} %}"
-                                               FontWeight="Bold" HorizontalAlignment="Right"/>
-                                </DockPanel>
-                                <Slider Minimum="1" Maximum="200" Value="{Binding ResizePercentage, Mode=TwoWay}"
-                                        TickFrequency="10" IsSnapToTickEnabled="False"/>
-                            </StackPanel>
-
-                            <!-- Mode 2, 3, 4: Width & Height -->
+                        <!-- Presets / Profiles -->
+                        <GroupBox Header="⚡ Profile / Presets">
                             <StackPanel Margin="0,4,0,0">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="2">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="3">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="4">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <Grid Margin="0,0,0,6">
+                                <ComboBox ItemsSource="{Binding Presets}"
+                                          SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
+                                          DisplayMemberPath="Name"
+                                          Padding="6,4" FontSize="13" Margin="0,0,0,8"/>
+                                <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="8"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="Breite (px):" FontSize="11" Margin="0,0,0,2"/>
-                                        <TextBox Text="{Binding TargetWidth, Mode=TwoWay, TargetNullValue=''}" Padding="6,4"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Höhe (px):" FontSize="11" Margin="0,0,0,2"/>
-                                        <TextBox Text="{Binding TargetHeight, Mode=TwoWay, TargetNullValue=''}" Padding="6,4"/>
-                                    </StackPanel>
+                                    <Button Grid.Column="0" Content="💾 Als Profil speichern" Command="{Binding SaveCurrentAsPresetCommand}"
+                                            Padding="6,4" FontSize="11" Style="{StaticResource ToolbarButtonStyle}"/>
+                                    <Button Grid.Column="2" Content="🗑️ Löschen" Command="{Binding DeleteCurrentPresetCommand}"
+                                            Padding="6,4" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0"/>
                                 </Grid>
-                                <CheckBox IsChecked="{Binding MaintainAspectRatio, Mode=TwoWay}"
-                                          Content="Seitenverhältnis beibehalten" FontSize="12" Margin="0,0,0,6"/>
-                                <!-- Mode 3 (Pad): Background color -->
-                                <DockPanel Visibility="{Binding SelectedResizeModeIndex, Converter={StaticResource IntToVis}, ConverterParameter=3}">
-                                    <TextBlock Text="Randfarbe (Hex):" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                    <TextBox Text="{Binding PadColor, Mode=TwoWay}" Width="90" HorizontalAlignment="Left"/>
-                                </DockPanel>
                             </StackPanel>
+                        </GroupBox>
 
-                            <!-- Mode 5: MaxEdge -->
-                            <StackPanel Visibility="{Binding SelectedResizeModeIndex, Converter={StaticResource IntToVis}, ConverterParameter=5}" Margin="0,4,0,0">
-                                <TextBlock Text="Längste Kante (px):" FontSize="11" Margin="0,0,0,2"/>
-                                <TextBox Text="{Binding MaxEdgeLength, Mode=TwoWay, TargetNullValue=''}" Padding="6,4"/>
+                        <!-- 1. Format & Metadata -->
+                        <GroupBox Header="1. Zielformat &amp; Metadaten">
+                            <StackPanel Margin="0,4,0,0">
+                                <ComboBox ItemsSource="{Binding AvailableFormats}"
+                                          SelectedIndex="{Binding SelectedFormatIndex, Mode=TwoWay}"
+                                          Padding="6,4" FontSize="13" Margin="0,0,0,8"/>
+                                <CheckBox IsChecked="{Binding StripMetadata, Mode=TwoWay}"
+                                          Content="EXIF &amp; GPS Metadaten entfernen"
+                                          FontWeight="Normal" ToolTip="Entfernt Kamera-, Standort- und Aufnahmedaten für Datenschutz und kleinere Dateien"/>
                             </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
+                        </GroupBox>
 
-                    <!-- 4. Watermark -->
-                    <GroupBox Header="4. Wasserzeichen">
-                        <StackPanel Margin="0,4,0,0">
-                            <CheckBox IsChecked="{Binding EnableWatermark, Mode=TwoWay}"
-                                      Content="Wasserzeichen aktivieren"
-                                      FontWeight="Normal" Margin="0,0,0,8"/>
+                        <!-- 2. Size Constraint (Aufklappbar) -->
+                        <Expander Header="2. Maximale Dateigröße (Optional)" Style="{StaticResource ModernCardExpanderStyle}"
+                                  IsExpanded="{Binding EnableSizeLimit, Mode=TwoWay}">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding EnableSizeLimit, Mode=TwoWay}"
+                                          Content="Dateigröße strikt begrenzen"
+                                          FontWeight="Normal" Margin="0,0,0,8"/>
 
-                            <StackPanel IsEnabled="{Binding EnableWatermark}">
-                                <Grid Margin="0,0,0,8">
+                                <Grid Margin="0,0,0,8" IsEnabled="{Binding EnableSizeLimit}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="8"/>
-                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="70"/>
                                     </Grid.ColumnDefinitions>
-                                    <ComboBox Grid.Column="0" ItemsSource="{Binding AvailableWatermarkTypes}"
-                                              SelectedIndex="{Binding SelectedWatermarkTypeIndex, Mode=TwoWay}"
-                                              Padding="6,4" FontSize="12"/>
-                                    <ComboBox Grid.Column="2" ItemsSource="{Binding AvailableWatermarkPositions}"
-                                              SelectedIndex="{Binding SelectedWatermarkPositionIndex, Mode=TwoWay}"
-                                              Padding="6,4" FontSize="12"/>
+                                    <TextBox Grid.Column="0" Text="{Binding SizeLimitValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             Padding="6,4" FontSize="13"/>
+                                    <ComboBox Grid.Column="2" ItemsSource="{Binding AvailableUnits}"
+                                              SelectedIndex="{Binding SelectedUnitIndex, Mode=TwoWay}"
+                                              Padding="6,4" FontSize="13"/>
                                 </Grid>
 
-                                <!-- Text Watermark Options -->
-                                <StackPanel Visibility="{Binding SelectedWatermarkTypeIndex, Converter={StaticResource IntToVis}, ConverterParameter=0}" Margin="0,0,0,8">
-                                    <TextBlock Text="Text:" FontSize="11" Margin="0,0,0,2"/>
-                                    <TextBox Text="{Binding WatermarkText, Mode=TwoWay}" Padding="6,4" Margin="0,0,0,6"/>
-                                    <Grid>
+                                <TextBlock Text="Fallback bei verlustfreien Formaten (PNG):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,4,0,2"/>
+                                <ComboBox ItemsSource="{Binding AvailableFallbackStrategies}"
+                                          SelectedIndex="{Binding SelectedFallbackStrategyIndex, Mode=TwoWay}"
+                                          IsEnabled="{Binding EnableSizeLimit}"
+                                          Padding="6,4" FontSize="12"/>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- 3. Resize & Cropping -->
+                        <GroupBox Header="3. Auflösung &amp; Skalierung">
+                            <StackPanel Margin="0,4,0,0">
+                                <ComboBox ItemsSource="{Binding AvailableResizeModes}"
+                                          SelectedIndex="{Binding SelectedResizeModeIndex, Mode=TwoWay}"
+                                          Padding="6,4" FontSize="13" Margin="0,0,0,8"/>
+
+                                <!-- Mode 1: Percentage -->
+                                <StackPanel Visibility="{Binding SelectedResizeModeIndex, Converter={StaticResource IntToVis}, ConverterParameter=1}" Margin="0,4,0,0">
+                                    <DockPanel Margin="0,0,0,4">
+                                        <TextBlock Text="Skalierung:" FontSize="12"/>
+                                        <TextBlock Text="{Binding ResizePercentage, StringFormat={}{0:N0} %}"
+                                                   FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    </DockPanel>
+                                    <Slider Minimum="1" Maximum="200" Value="{Binding ResizePercentage, Mode=TwoWay}"
+                                            TickFrequency="10" IsSnapToTickEnabled="False"/>
+                                </StackPanel>
+
+                                <!-- Mode 2, 3, 4: Width & Height -->
+                                <StackPanel Margin="0,4,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="2">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="3">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="4">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Grid Margin="0,0,0,6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="Schriftgröße:" FontSize="11" Margin="0,0,0,2"/>
-                                            <TextBox Text="{Binding WatermarkFontSize, Mode=TwoWay}" Padding="6,4"/>
+                                            <TextBlock Text="Breite (px):" FontSize="11" Margin="0,0,0,2"/>
+                                            <TextBox Text="{Binding TargetWidth, Mode=TwoWay, TargetNullValue=''}" Padding="6,4"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="2">
-                                            <TextBlock Text="Farbe (Hex):" FontSize="11" Margin="0,0,0,2"/>
-                                            <TextBox Text="{Binding WatermarkTextColor, Mode=TwoWay}" Padding="6,4"/>
+                                            <TextBlock Text="Höhe (px):" FontSize="11" Margin="0,0,0,2"/>
+                                            <TextBox Text="{Binding TargetHeight, Mode=TwoWay, TargetNullValue=''}" Padding="6,4"/>
                                         </StackPanel>
                                     </Grid>
-                                </StackPanel>
-
-                                <!-- Image Watermark Options -->
-                                <StackPanel Visibility="{Binding SelectedWatermarkTypeIndex, Converter={StaticResource IntToVis}, ConverterParameter=1}" Margin="0,0,0,8">
-                                    <TextBlock Text="Logo-Datei:" FontSize="11" Margin="0,0,0,2"/>
-                                    <DockPanel>
-                                        <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectWatermarkImageCommand}"
-                                                Padding="8,4" Margin="6,0,0,0"/>
-                                        <TextBox Text="{Binding WatermarkImagePath, Mode=TwoWay}" Padding="6,4"/>
+                                    <CheckBox IsChecked="{Binding MaintainAspectRatio, Mode=TwoWay}"
+                                              Content="Seitenverhältnis beibehalten" FontSize="12" Margin="0,0,0,6"/>
+                                    <!-- Mode 3 (Pad): Background color -->
+                                    <DockPanel Visibility="{Binding SelectedResizeModeIndex, Converter={StaticResource IntToVis}, ConverterParameter=3}">
+                                        <TextBlock Text="Randfarbe (Hex):" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBox Text="{Binding PadColor, Mode=TwoWay}" Width="90" HorizontalAlignment="Left"/>
                                     </DockPanel>
                                 </StackPanel>
 
-                                <!-- Opacity Slider -->
-                                <DockPanel Margin="0,2,0,0">
-                                    <TextBlock Text="Transparenz:" FontSize="11"/>
-                                    <TextBlock Text="{Binding WatermarkOpacity, StringFormat={}{0:P0}}"
-                                               FontWeight="Bold" HorizontalAlignment="Right" FontSize="11"/>
-                                </DockPanel>
-                                <Slider Minimum="0.1" Maximum="1.0" Value="{Binding WatermarkOpacity, Mode=TwoWay}"
-                                        TickFrequency="0.05" IsSnapToTickEnabled="False"/>
+                                <!-- Mode 5: MaxEdge -->
+                                <StackPanel Visibility="{Binding SelectedResizeModeIndex, Converter={StaticResource IntToVis}, ConverterParameter=5}" Margin="0,4,0,0">
+                                    <TextBlock Text="Längste Kante (px):" FontSize="11" Margin="0,0,0,2"/>
+                                    <TextBox Text="{Binding MaxEdgeLength, Mode=TwoWay, TargetNullValue=''}" Padding="6,4"/>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
-                    </GroupBox>
+                        </GroupBox>
 
-                    <!-- 5. Output Folder -->
-                    <GroupBox Header="5. Ausgabeordner">
-                        <StackPanel Margin="0,4,0,0">
-                            <TextBlock Text="Standard: Unterordner 'converted' neben Original" FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectOutputDirectoryCommand}"
-                                        Padding="8,4" Margin="6,0,0,0"/>
-                                <TextBox Text="{Binding OutputDirectory, Mode=TwoWay}" Padding="6,4" FontSize="12"/>
-                            </DockPanel>
-                        </StackPanel>
-                    </GroupBox>
+                        <!-- 4. Watermark (Aufklappbar) -->
+                        <Expander Header="4. Wasserzeichen (Optional)" Style="{StaticResource ModernCardExpanderStyle}"
+                                  IsExpanded="{Binding EnableWatermark, Mode=TwoWay}">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding EnableWatermark, Mode=TwoWay}"
+                                          Content="Wasserzeichen aktivieren"
+                                          FontWeight="Normal" Margin="0,0,0,8"/>
 
-                    <!-- Action Buttons -->
-                    <StackPanel Margin="0,8,0,0">
+                                <StackPanel IsEnabled="{Binding EnableWatermark}">
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox Grid.Column="0" ItemsSource="{Binding AvailableWatermarkTypes}"
+                                                  SelectedIndex="{Binding SelectedWatermarkTypeIndex, Mode=TwoWay}"
+                                                  Padding="6,4" FontSize="12"/>
+                                        <ComboBox Grid.Column="2" ItemsSource="{Binding AvailableWatermarkPositions}"
+                                                  SelectedIndex="{Binding SelectedWatermarkPositionIndex, Mode=TwoWay}"
+                                                  Padding="6,4" FontSize="12"/>
+                                    </Grid>
+
+                                    <!-- Text Watermark Options -->
+                                    <StackPanel Visibility="{Binding SelectedWatermarkTypeIndex, Converter={StaticResource IntToVis}, ConverterParameter=0}" Margin="0,0,0,8">
+                                        <TextBlock Text="Text:" FontSize="11" Margin="0,0,0,2"/>
+                                        <TextBox Text="{Binding WatermarkText, Mode=TwoWay}" Padding="6,4" Margin="0,0,0,6"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Schriftgröße:" FontSize="11" Margin="0,0,0,2"/>
+                                                <TextBox Text="{Binding WatermarkFontSize, Mode=TwoWay}" Padding="6,4"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Farbe (Hex):" FontSize="11" Margin="0,0,0,2"/>
+                                                <TextBox Text="{Binding WatermarkTextColor, Mode=TwoWay}" Padding="6,4"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <!-- Image Watermark Options -->
+                                    <StackPanel Visibility="{Binding SelectedWatermarkTypeIndex, Converter={StaticResource IntToVis}, ConverterParameter=1}" Margin="0,0,0,8">
+                                        <TextBlock Text="Logo-Datei:" FontSize="11" Margin="0,0,0,2"/>
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectWatermarkImageCommand}"
+                                                    Padding="8,4" Margin="6,0,0,0"/>
+                                            <TextBox Text="{Binding WatermarkImagePath, Mode=TwoWay}" Padding="6,4"/>
+                                        </DockPanel>
+                                    </StackPanel>
+
+                                    <!-- Opacity Slider -->
+                                    <DockPanel Margin="0,2,0,0">
+                                        <TextBlock Text="Transparenz:" FontSize="11"/>
+                                        <TextBlock Text="{Binding WatermarkOpacity, StringFormat={}{0:P0}}"
+                                                   FontWeight="Bold" HorizontalAlignment="Right" FontSize="11"/>
+                                    </DockPanel>
+                                    <Slider Minimum="0.1" Maximum="1.0" Value="{Binding WatermarkOpacity, Mode=TwoWay}"
+                                            TickFrequency="0.05" IsSnapToTickEnabled="False"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Fixed Bottom Action Buttons (Always Visible!) -->
+                <Border Grid.Row="1" Background="{DynamicResource WindowBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,6,0,0">
+                    <StackPanel>
                         <Button Content="🚀 Konvertierung starten"
                                 Command="{Binding StartConversionCommand}"
                                 IsEnabled="{Binding CanStart}"
                                 Style="{StaticResource ActionButtonStyle}"
                                 Background="{DynamicResource ActionButtonGradientBrush}" Foreground="White"
-                                Height="44" Margin="0,0,0,8"/>
+                                Height="44" Margin="0,0,0,6"/>
 
                         <Button Content="Abbrechen"
                                 Command="{Binding CancelConversionCommand}"
@@ -399,14 +474,15 @@
                                 Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
                                 Height="36"/>
                     </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
+                </Border>
+            </Grid>
 
             <!-- Right Panel: Files and Results -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Toolbar -->
@@ -512,8 +588,22 @@
                         </DataGrid>
                     </Grid>
                 </Border>
-                </Grid>
-                </Grid>
+
+                <!-- Row 2: Ausgabeordner Bar -->
+                <Border Grid.Row="2" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10,8" Margin="0,10,0,0">
+                    <DockPanel LastChildFill="True">
+                        <TextBlock Text="📁 Ausgabeordner:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <Button DockPanel.Dock="Right" Content="📂 Öffnen" Command="{Binding OpenOutputDirectoryCommand}"
+                                Padding="10,6" Margin="6,0,0,0" ToolTip="Öffnet den Ausgabeordner im Windows Explorer"/>
+                        <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectOutputDirectoryCommand}"
+                                Padding="10,6" Margin="6,0,0,0"/>
+                        <TextBox Text="{Binding OutputDirectory, Mode=TwoWay}" VerticalAlignment="Center" Padding="8,5" FontSize="12"/>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
             </TabItem>
 
             <!-- Tab 1: 📁 Hotfolder & Automation -->

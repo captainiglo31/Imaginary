@@ -258,6 +258,9 @@
                             <Rectangle x:Name="PreviewRect" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
                             <Ellipse x:Name="PreviewEllipse" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
                         </Canvas>
+
+                        <!-- Interactive AI Brush Stroke Canvas -->
+                        <Canvas x:Name="InteractiveStrokeCanvas" IsHitTestVisible="False"/>
                     </Grid>
                 </ScrollViewer>
             </Border>
@@ -274,6 +277,7 @@
                                 <ComboBox x:Name="ComboBgMode" SelectionChanged="OnBgModeChanged" Margin="0,0,0,12" Padding="6,4">
                                     <ComboBoxItem Content="🎨 Klassisch (Farbe / Magic Wand)"/>
                                     <ComboBoxItem Content="🧠 KI-Modell (U-2-Net Deep Learning)"/>
+                                    <ComboBoxItem Content="🎯 KI-Pinsel &amp; Objektauswahl"/>
                                 </ComboBox>
 
                                 <!-- Panel for Color Keying -->
@@ -310,6 +314,54 @@
 
                                     <Button x:Name="ButtonExecuteAiRemoval" Content="🧠 Mit KI freistellen" Click="OnExecuteAiRemovalClicked"
                                             FontWeight="Bold" Background="#10B981" Foreground="White" Padding="10,6" Style="{StaticResource ToolbarButtonStyle}"/>
+                                </StackPanel>
+
+                                <!-- Panel for Interactive AI Brush & Object Selection -->
+                                <StackPanel x:Name="PanelInteractiveAiOptions" Visibility="Collapsed">
+                                    <TextBlock Text="🎯 Objekt mit dem Pinsel übermalen, um es gezielt durch KI freizustellen, oder Kanten manuell korrigieren."
+                                               FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                    <!-- AI Model Status in Interactive Panel -->
+                                    <Border x:Name="BorderInteractiveAiStatus" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock x:Name="TextInteractiveAiStatus" Text="Modell bereit" FontWeight="SemiBold" FontSize="11.5"/>
+                                            <Button x:Name="ButtonDownloadInteractiveAi" Content="⬇️ KI-Modell herunterladen" Click="OnDownloadAiModelClicked"
+                                                    Margin="0,6,0,0" Padding="8,4" FontSize="11" Style="{StaticResource ToolbarButtonStyle}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Mode Selector -->
+                                    <TextBlock Text="Pinsel-Funktion:" FontWeight="SemiBold" FontSize="11.5" Margin="0,0,0,4"/>
+                                    <StackPanel Margin="0,0,0,10">
+                                        <RadioButton x:Name="RadioBrushSelectObject" GroupName="InteractiveBrushMode" IsChecked="True"
+                                                     Content="🎯 Objekt markieren (KI schneidet aus)" Margin="0,0,0,4"
+                                                     Checked="OnInteractiveBrushModeChanged"/>
+                                        <RadioButton x:Name="RadioBrushRestore" GroupName="InteractiveBrushMode"
+                                                     Content="🟢 Kanten wiederherstellen (Original)" Margin="0,0,0,4"
+                                                     Checked="OnInteractiveBrushModeChanged"/>
+                                        <RadioButton x:Name="RadioBrushErase" GroupName="InteractiveBrushMode"
+                                                     Content="🔴 Kanten radieren (Transparent)" Margin="0,0,0,4"
+                                                     Checked="OnInteractiveBrushModeChanged"/>
+                                    </StackPanel>
+
+                                    <!-- Brush Size -->
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBlock Text="Pinselgröße:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding ElementName=SliderInteractiveBrushSize, Path=Value, StringFormat='{}{0:0} px'}"
+                                                   DockPanel.Dock="Right" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                    </DockPanel>
+                                    <Slider x:Name="SliderInteractiveBrushSize" Minimum="6" Maximum="120" Value="32" Margin="0,0,0,12"/>
+
+                                    <!-- Object Cutout Action Buttons -->
+                                    <StackPanel x:Name="PanelCutoutButtons" Margin="0,0,0,4">
+                                        <Button x:Name="ButtonExecuteInteractiveAiCutout" Content="✂️ Markiertes Objekt freistellen"
+                                                Click="OnExecuteInteractiveAiCutoutClicked" FontWeight="Bold"
+                                                Background="#10B981" Foreground="White" Padding="10,8" Margin="0,0,0,6"
+                                                Style="{StaticResource ToolbarButtonStyle}"/>
+                                        <Button x:Name="ButtonResetInteractiveStroke" Content="🔄 Pinselauswahl zurücksetzen"
+                                                Click="OnResetInteractiveStrokeClicked" Padding="8,4" FontSize="11"
+                                                Style="{StaticResource ToolbarButtonStyle}"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </StackPanel>
                         </GroupBox>

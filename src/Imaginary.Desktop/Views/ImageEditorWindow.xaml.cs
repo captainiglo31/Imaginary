@@ -28,6 +28,10 @@ public partial class ImageEditorWindow : Window
     private readonly IBackgroundRemovalService _bgRemovalService;
 
     private SKBitmap _currentBitmap;
+    private SKBitmap? _originalBitmap;
+    private readonly List<SKPoint> _interactiveBrushPoints = new();
+    private SKRectI _interactiveBoundingBox = SKRectI.Empty;
+    private bool _isDrawingInteractiveStroke;
     private List<EditorAnnotation> _annotations = new();
     private EditorAnnotation? _selectedAnnotation;
     private bool _isMovingAnnotation;
@@ -88,6 +92,8 @@ public partial class ImageEditorWindow : Window
         {
             throw new InvalidOperationException($"Das Bild '{Path.GetFileName(filePath)}' konnte nicht geladen werden (nicht unterstütztes oder beschädigtes Format).");
         }
+
+        _originalBitmap = _currentBitmap.Copy();
 
         UpdateImageDisplay();
         UpdateUndoRedoButtons();
@@ -211,6 +217,9 @@ public partial class ImageEditorWindow : Window
 
         UpdateImageDisplay();
         UpdateUndoRedoButtons();
+        _interactiveBrushPoints.Clear();
+        _interactiveBoundingBox = SKRectI.Empty;
+        InteractiveStrokeCanvas?.Children.Clear();
     }
 
     private void OnRedoClicked(object sender, RoutedEventArgs e)
@@ -233,6 +242,9 @@ public partial class ImageEditorWindow : Window
 
         UpdateImageDisplay();
         UpdateUndoRedoButtons();
+        _interactiveBrushPoints.Clear();
+        _interactiveBoundingBox = SKRectI.Empty;
+        InteractiveStrokeCanvas?.Children.Clear();
     }
 
     private void OnToolSelected(object sender, RoutedEventArgs e)
@@ -285,7 +297,7 @@ public partial class ImageEditorWindow : Window
                 EditorTool.Pen => "✏️ Freihand: Mit der Maus frei zeichnen.",
                 EditorTool.Highlighter => "🖍️ Textmarker: Halbtransparente Markierung über Text ziehen.",
                 EditorTool.Text => "🔤 Text: Klick ins Bild, um Text einzugeben.",
-                EditorTool.BackgroundRemoval => "🪄 Hintergrund: Rechts Farbe oder KI-Modell wählen • Mausrad zum Zoomen.",
+                EditorTool.BackgroundRemoval => "🪄 Hintergrund: Rechts Methode (Farbe, KI-Vollbild oder KI-Pinsel) wählen • Mausrad zum Zoomen.",
                 _ => "Werkzeug aktiv."
             };
         }
@@ -357,6 +369,29 @@ public partial class ImageEditorWindow : Window
                 _panMouseStart = e.GetPosition(CanvasScrollViewer);
                 _panScrollStart = new WpfPoint(CanvasScrollViewer.HorizontalOffset, CanvasScrollViewer.VerticalOffset);
                 CanvasContainer.CaptureMouse();
+            }
+            return;
+        }
+
+        if (_currentTool == EditorTool.BackgroundRemoval)
+        {
+            if (ComboBgMode?.SelectedIndex == 2)
+            {
+                if (RadioBrushSelectObject?.IsChecked == true)
+                {
+                    _isDrawingInteractiveStroke = true;
+                    AddInteractiveBrushPoint(pt);
+                    CanvasContainer.CaptureMouse();
+                    return;
+                }
+                if (RadioBrushRestore?.IsChecked == true || RadioBrushErase?.IsChecked == true)
+                {
+                    PushUndoState();
+                    _isDrawingInteractiveStroke = true;
+                    ApplyMaskBrushAt(pt);
+                    CanvasContainer.CaptureMouse();
+                    return;
+                }
             }
             return;
         }
@@ -464,6 +499,28 @@ public partial class ImageEditorWindow : Window
             return;
         }
 
+        if (_currentTool == EditorTool.BackgroundRemoval)
+        {
+            if (ComboBgMode?.SelectedIndex == 2)
+            {
+                CanvasContainer.Cursor = Cursors.Pen;
+                if (_isDrawingInteractiveStroke)
+                {
+                    if (RadioBrushSelectObject?.IsChecked == true)
+                    {
+                        AddInteractiveBrushPoint(currentPt);
+                        return;
+                    }
+                    if (RadioBrushRestore?.IsChecked == true || RadioBrushErase?.IsChecked == true)
+                    {
+                        ApplyMaskBrushAt(currentPt);
+                        return;
+                    }
+                }
+            }
+            return;
+        }
+
         if (!_isDragging) return;
 
         double left = Math.Min(_dragStart.X, current.X);
@@ -531,6 +588,16 @@ public partial class ImageEditorWindow : Window
             if (_isPanningCanvas)
             {
                 _isPanningCanvas = false;
+                CanvasContainer.ReleaseMouseCapture();
+            }
+            return;
+        }
+
+        if (_currentTool == EditorTool.BackgroundRemoval)
+        {
+            if (_isDrawingInteractiveStroke)
+            {
+                _isDrawingInteractiveStroke = false;
                 CanvasContainer.ReleaseMouseCapture();
             }
             return;
@@ -737,9 +804,22 @@ public partial class ImageEditorWindow : Window
     private void OnBgModeChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ComboBgMode == null || PanelColorKeyOptions == null || PanelAiOptions == null) return;
-        bool isAi = ComboBgMode.SelectedIndex == 1;
-        PanelColorKeyOptions.Visibility = isAi ? Visibility.Collapsed : Visibility.Visible;
-        PanelAiOptions.Visibility = isAi ? Visibility.Visible : Visibility.Collapsed;
+        int idx = ComboBgMode.SelectedIndex;
+        PanelColorKeyOptions.Visibility = idx == 0 ? Visibility.Visible : Visibility.Collapsed;
+        PanelAiOptions.Visibility = idx == 1 ? Visibility.Visible : Visibility.Collapsed;
+        if (PanelInteractiveAiOptions != null)
+            PanelInteractiveAiOptions.Visibility = idx == 2 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (TextStatusHint != null)
+        {
+            TextStatusHint.Text = idx switch
+            {
+                0 => "Farbe: Wähle mit der Pipette eine Hintergrundfarbe zum Entfernen.",
+                1 => "KI Vollbild: Segmentiert Personen, Tiere und Hauptobjekte vollautomatisch.",
+                2 => "KI Pinsel: Male über ein Objekt, um es gezielt durch KI auszuschneiden, oder nutze Korrektur-Pinsel.",
+                _ => "Hintergrundentfernung aktiv."
+            };
+        }
     }
 
     private void OnPickColorClicked(object sender, RoutedEventArgs e)
@@ -773,15 +853,24 @@ public partial class ImageEditorWindow : Window
         if (downloaded)
         {
             long size = _bgRemovalService.GetModelSizeBytes();
-            TextAiStatus.Text = $"🟢 Modell bereit ({size / (1024.0 * 1024.0):F1} MB)";
+            string sizeStr = $"{size / (1024.0 * 1024.0):F1} MB";
+            TextAiStatus.Text = $"🟢 Modell bereit ({sizeStr})";
             ButtonDownloadAiModel.Visibility = Visibility.Collapsed;
             ButtonExecuteAiRemoval.IsEnabled = true;
+
+            if (TextInteractiveAiStatus != null) TextInteractiveAiStatus.Text = $"🟢 Modell bereit ({sizeStr})";
+            if (ButtonDownloadInteractiveAi != null) ButtonDownloadInteractiveAi.Visibility = Visibility.Collapsed;
+            if (ButtonExecuteInteractiveAiCutout != null) ButtonExecuteInteractiveAiCutout.IsEnabled = true;
         }
         else
         {
             TextAiStatus.Text = "⚪ Modell noch nicht heruntergeladen";
             ButtonDownloadAiModel.Visibility = Visibility.Visible;
             ButtonExecuteAiRemoval.IsEnabled = false;
+
+            if (TextInteractiveAiStatus != null) TextInteractiveAiStatus.Text = "⚪ Modell noch nicht heruntergeladen";
+            if (ButtonDownloadInteractiveAi != null) ButtonDownloadInteractiveAi.Visibility = Visibility.Visible;
+            if (ButtonExecuteInteractiveAiCutout != null) ButtonExecuteInteractiveAiCutout.IsEnabled = false;
         }
     }
 
@@ -831,6 +920,124 @@ public partial class ImageEditorWindow : Window
         finally
         {
             ButtonExecuteAiRemoval.IsEnabled = true;
+        }
+    }
+
+    private void OnInteractiveBrushModeChanged(object sender, RoutedEventArgs e)
+    {
+        if (PanelCutoutButtons == null) return;
+        bool isSelect = RadioBrushSelectObject?.IsChecked == true;
+        PanelCutoutButtons.Visibility = isSelect ? Visibility.Visible : Visibility.Collapsed;
+
+        if (TextStatusHint != null)
+        {
+            if (isSelect)
+                TextStatusHint.Text = "🎯 Objekt markieren: Male mit dem Pinsel über das gewünschte Objekt • Klicke dann auf 'Markiertes Objekt freistellen'.";
+            else if (RadioBrushRestore?.IsChecked == true)
+                TextStatusHint.Text = "🟢 Kanten wiederherstellen: Ziehe mit gedrückter Maustaste über das Bild, um Original-Pixel zurückzuholen.";
+            else if (RadioBrushErase?.IsChecked == true)
+                TextStatusHint.Text = "🔴 Kanten radieren: Ziehe mit gedrückter Maustaste über das Bild, um Pixel transparent wegzuradieren.";
+        }
+    }
+
+    private void AddInteractiveBrushPoint(SKPoint pt)
+    {
+        _interactiveBrushPoints.Add(pt);
+        float radius = SliderInteractiveBrushSize != null ? (float)SliderInteractiveBrushSize.Value : 32f;
+
+        int minX = (int)Math.Floor(pt.X - radius);
+        int maxX = (int)Math.Ceiling(pt.X + radius);
+        int minY = (int)Math.Floor(pt.Y - radius);
+        int maxY = (int)Math.Ceiling(pt.Y + radius);
+
+        var ptBox = new SKRectI(minX, minY, maxX, maxY);
+        _interactiveBoundingBox = _interactiveBoundingBox.IsEmpty
+            ? ptBox
+            : SKRectI.Union(_interactiveBoundingBox, ptBox);
+
+        if (InteractiveStrokeCanvas != null)
+        {
+            var dot = new System.Windows.Shapes.Ellipse
+            {
+                Width = radius * 2,
+                Height = radius * 2,
+                Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(115, 56, 189, 248)), // #7338BDF8 vibrant cyan
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(dot, pt.X - radius);
+            Canvas.SetTop(dot, pt.Y - radius);
+            InteractiveStrokeCanvas.Children.Add(dot);
+        }
+    }
+
+    private void ApplyMaskBrushAt(SKPoint pt)
+    {
+        if (_originalBitmap == null || _currentBitmap == null) return;
+        float radius = SliderInteractiveBrushSize != null ? (float)SliderInteractiveBrushSize.Value : 32f;
+        bool restore = RadioBrushRestore?.IsChecked == true;
+
+        _bgRemovalService.ApplyMaskBrush(_currentBitmap, _originalBitmap, pt, radius, restore);
+        UpdateImageDisplay();
+    }
+
+    private void OnResetInteractiveStrokeClicked(object sender, RoutedEventArgs e)
+    {
+        _interactiveBrushPoints.Clear();
+        _interactiveBoundingBox = SKRectI.Empty;
+        InteractiveStrokeCanvas?.Children.Clear();
+        if (TextStatusHint != null)
+        {
+            TextStatusHint.Text = "Pinselauswahl zurückgesetzt.";
+        }
+    }
+
+    private async void OnExecuteInteractiveAiCutoutClicked(object sender, RoutedEventArgs e)
+    {
+        if (!_bgRemovalService.IsAiModelDownloaded())
+        {
+            MessageBox.Show(this, "Das KI-Modell wurde noch nicht heruntergeladen. Bitte zuerst auf 'KI-Modell herunterladen' klicken.", "Modell erforderlich", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (_interactiveBrushPoints.Count == 0 || _interactiveBoundingBox.IsEmpty)
+        {
+            MessageBox.Show(this, "Bitte malen Sie zuerst mit dem Pinsel über das gewünschte Objekt.", "Keine Objektauswahl", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            if (ButtonExecuteInteractiveAiCutout != null) ButtonExecuteInteractiveAiCutout.IsEnabled = false;
+            if (TextStatusHint != null) TextStatusHint.Text = "🧠 KI isoliert das markierte Objekt und schneidet es aus...";
+
+            PushUndoState();
+            var cutout = await _bgRemovalService.SegmentObjectRegionAsync(
+                _currentBitmap,
+                _interactiveBoundingBox,
+                _interactiveBrushPoints);
+
+            _currentBitmap.Dispose();
+            _currentBitmap = cutout;
+
+            // Clear visual brush selection
+            _interactiveBrushPoints.Clear();
+            _interactiveBoundingBox = SKRectI.Empty;
+            InteractiveStrokeCanvas?.Children.Clear();
+
+            UpdateImageDisplay();
+            if (TextStatusHint != null)
+            {
+                TextStatusHint.Text = "Objekt erfolgreich freigestellt! Kanten können nun mit 🟢/🔴 korrigiert werden.";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("AI", "Fehler bei KI-Objektauswahl", ex);
+            MessageBox.Show(this, "Fehler beim Freistellen des Objekts: " + ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (ButtonExecuteInteractiveAiCutout != null) ButtonExecuteInteractiveAiCutout.IsEnabled = true;
         }
     }
 
@@ -954,6 +1161,7 @@ public partial class ImageEditorWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _currentBitmap?.Dispose();
+        _originalBitmap?.Dispose();
         while (_undoStack.Count > 0) _undoStack.Pop().Dispose();
         while (_redoStack.Count > 0) _redoStack.Pop().Dispose();
         base.OnClosed(e);

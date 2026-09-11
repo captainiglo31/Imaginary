@@ -233,6 +233,117 @@ public class BackgroundRemovalService : IBackgroundRemovalService
         return finalBitmap;
     }
 
+    public async Task<SKBitmap> SegmentObjectRegionAsync(
+        SKBitmap source,
+        SKRectI boundingBox,
+        IReadOnlyList<SKPoint>? brushPoints = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (!IsAiModelDownloaded())
+        {
+            throw new InvalidOperationException("Das KI-Modell wurde noch nicht heruntergeladen.");
+        }
+
+        return await Task.Run(() =>
+        {
+            // Clamp and expand bounding box slightly (15% padding) for context
+            int padX = (int)(boundingBox.Width * 0.15f);
+            int padY = (int)(boundingBox.Height * 0.15f);
+
+            int left = Math.Clamp(boundingBox.Left - padX, 0, source.Width);
+            int top = Math.Clamp(boundingBox.Top - padY, 0, source.Height);
+            int right = Math.Clamp(boundingBox.Right + padX, 0, source.Width);
+            int bottom = Math.Clamp(boundingBox.Bottom + padY, 0, source.Height);
+
+            int regionW = right - left;
+            int regionH = bottom - top;
+            if (regionW < 10 || regionH < 10)
+            {
+                // Fallback to full inference if bounding box is too small
+                return RunOnnxInference(source);
+            }
+
+            var regionRect = new SKRectI(left, top, right, bottom);
+            using var subBitmap = _editorService.Crop(source, regionRect);
+
+            // Run ONNX inference on cropped subregion
+            using var subSegmented = RunOnnxInference(subBitmap);
+
+            // Compose: create transparent full-size bitmap, and paste the subregion
+            var result = new SKBitmap(source.Width, source.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+            result.Erase(SKColors.Transparent);
+
+            using (var canvas = new SKCanvas(result))
+            {
+                canvas.DrawBitmap(subSegmented, left, top);
+                canvas.Flush();
+            }
+
+            return result;
+        }, ct);
+    }
+
+    public SKBitmap ApplyMaskBrush(
+        SKBitmap current,
+        SKBitmap original,
+        SKPoint point,
+        float radius,
+        bool restore)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(original);
+
+        int minX = Math.Clamp((int)(point.X - radius), 0, current.Width - 1);
+        int maxX = Math.Clamp((int)(point.X + radius), 0, current.Width - 1);
+        int minY = Math.Clamp((int)(point.Y - radius), 0, current.Height - 1);
+        int maxY = Math.Clamp((int)(point.Y + radius), 0, current.Height - 1);
+
+        float rSquared = radius * radius;
+        float innerRadius = radius * 0.65f;
+
+        for (int y = minY; y <= maxY; y++)
+        {
+            float dy = y - point.Y;
+            float dy2 = dy * dy;
+
+            for (int x = minX; x <= maxX; x++)
+            {
+                float dx = x - point.X;
+                float dist2 = dx * dx + dy2;
+
+                if (dist2 <= rSquared)
+                {
+                    float factor = 1.0f;
+                    if (dist2 > innerRadius * innerRadius)
+                    {
+                        float dist = MathF.Sqrt(dist2);
+                        factor = 1.0f - ((dist - innerRadius) / (radius - innerRadius));
+                    }
+
+                    var curPx = current.GetPixel(x, y);
+                    int origX = Math.Clamp(x, 0, original.Width - 1);
+                    int origY = Math.Clamp(y, 0, original.Height - 1);
+                    var origPx = original.GetPixel(origX, origY);
+
+                    if (restore)
+                    {
+                        byte newAlpha = (byte)Math.Clamp((int)(curPx.Alpha + (origPx.Alpha - curPx.Alpha) * factor), 0, 255);
+                        current.SetPixel(x, y, new SKColor(origPx.Red, origPx.Green, origPx.Blue, newAlpha));
+                    }
+                    else
+                    {
+                        byte newAlpha = (byte)Math.Clamp((int)(curPx.Alpha * (1.0f - factor)), 0, 255);
+                        current.SetPixel(x, y, new SKColor(curPx.Red, curPx.Green, curPx.Blue, newAlpha));
+                    }
+                }
+            }
+        }
+
+        return current;
+    }
+
     private static SKColor DetectDominantCornerColor(SKBitmap bitmap)
     {
         // Sample top-left corner
