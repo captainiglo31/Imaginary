@@ -29,6 +29,8 @@ public partial class PreviewWindow : Window
         ImageProcessedSplit.RenderTransform = group;
         ImageOriginalSide.RenderTransform = group;
         ImageProcessedSide.RenderTransform = group;
+
+        UpdateCursor();
     }
 
     public void LoadComparison(FileItemViewModel item)
@@ -134,6 +136,7 @@ public partial class PreviewWindow : Window
             _isDraggingSplit = true;
             SplitViewGrid.CaptureMouse();
             UpdateSliderFromMouse(e.GetPosition(SplitViewGrid).X);
+            e.Handled = true;
         }
     }
 
@@ -142,6 +145,7 @@ public partial class PreviewWindow : Window
         if (_isDraggingSplit && e.LeftButton == MouseButtonState.Pressed)
         {
             UpdateSliderFromMouse(e.GetPosition(SplitViewGrid).X);
+            e.Handled = true;
         }
     }
 
@@ -151,6 +155,7 @@ public partial class PreviewWindow : Window
         {
             _isDraggingSplit = false;
             SplitViewGrid.ReleaseMouseCapture();
+            e.Handled = true;
         }
     }
 
@@ -168,17 +173,33 @@ public partial class PreviewWindow : Window
     {
         if (SplitViewGrid == null || SideBySideGrid == null) return;
 
+        ResetZoom();
+
         if (RadioSplit.IsChecked == true)
         {
             SplitViewGrid.Visibility = Visibility.Visible;
             SideBySideGrid.Visibility = Visibility.Collapsed;
             UpdateSplitClip();
+            if (TextHint != null)
+            {
+                TextHint.Text = "Ziehen Sie den Slider oder klicken Sie ins Bild, um Details zu vergleichen. Mausrad: Zoom, Rechtsklick: Pan.";
+            }
         }
         else
         {
             SplitViewGrid.Visibility = Visibility.Collapsed;
             SideBySideGrid.Visibility = Visibility.Visible;
+            if (ColOriginal != null && ColProcessed != null)
+            {
+                ColOriginal.Width = new GridLength(1, GridUnitType.Star);
+                ColProcessed.Width = new GridLength(1, GridUnitType.Star);
+            }
+            if (TextHint != null)
+            {
+                TextHint.Text = "Mausrad: Paralleler Zoom beider Bilder • Linksklick/Rechtsklick: Pan • Doppelklick: Reset";
+            }
         }
+        UpdateCursor();
     }
 
     private void OnCloseClicked(object sender, RoutedEventArgs e)
@@ -189,10 +210,51 @@ public partial class PreviewWindow : Window
     private void OnContainerMouseWheel(object sender, MouseWheelEventArgs e)
     {
         double factor = e.Delta > 0 ? 1.2 : (1.0 / 1.2);
-        double targetScale = Math.Clamp(_syncScale.ScaleX * factor, 0.5, 8.0);
+        double targetScale = Math.Clamp(_syncScale.ScaleX * factor, 1.0, 10.0);
+
+        if (Math.Abs(targetScale - 1.0) < 0.001)
+        {
+            ResetZoom();
+            e.Handled = true;
+            return;
+        }
+
         double actualFactor = targetScale / _syncScale.ScaleX;
 
-        Point mousePos = e.GetPosition((IInputElement)sender);
+        Point mousePos;
+
+        if (RadioSideBySide?.IsChecked == true && BorderOriginalSide != null && BorderProcessedSide != null)
+        {
+            Point posOriginal = e.GetPosition(BorderOriginalSide);
+            Point posProcessed = e.GetPosition(BorderProcessedSide);
+
+            double origW = BorderOriginalSide.ActualWidth > 0 ? BorderOriginalSide.ActualWidth : 500;
+            double origH = BorderOriginalSide.ActualHeight > 0 ? BorderOriginalSide.ActualHeight : 400;
+            double procW = BorderProcessedSide.ActualWidth > 0 ? BorderProcessedSide.ActualWidth : 500;
+            double procH = BorderProcessedSide.ActualHeight > 0 ? BorderProcessedSide.ActualHeight : 400;
+
+            bool overOriginal = posOriginal.X >= 0 && posOriginal.X <= origW &&
+                                 posOriginal.Y >= 0 && posOriginal.Y <= origH;
+            bool overProcessed = posProcessed.X >= 0 && posProcessed.X <= procW &&
+                                  posProcessed.Y >= 0 && posProcessed.Y <= procH;
+
+            if (overOriginal)
+            {
+                mousePos = posOriginal;
+            }
+            else if (overProcessed)
+            {
+                mousePos = posProcessed;
+            }
+            else
+            {
+                mousePos = new Point(origW / 2.0, origH / 2.0);
+            }
+        }
+        else
+        {
+            mousePos = e.GetPosition(SplitViewGrid ?? (IInputElement)sender);
+        }
 
         _syncTranslate.X = mousePos.X - (mousePos.X - _syncTranslate.X) * actualFactor;
         _syncTranslate.Y = mousePos.Y - (mousePos.Y - _syncTranslate.Y) * actualFactor;
@@ -201,17 +263,32 @@ public partial class PreviewWindow : Window
         _syncScale.ScaleY = targetScale;
 
         UpdateZoomBadge();
+        UpdateCursor();
         e.Handled = true;
     }
 
     private void OnContainerMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.RightButton == MouseButtonState.Pressed || e.MiddleButton == MouseButtonState.Pressed)
+        if (e.ClickCount == 2)
+        {
+            ResetZoom();
+            e.Handled = true;
+            return;
+        }
+
+        bool isSideBySide = RadioSideBySide?.IsChecked == true;
+        bool isPanButton = e.RightButton == MouseButtonState.Pressed ||
+                           e.MiddleButton == MouseButtonState.Pressed ||
+                           (isSideBySide && e.LeftButton == MouseButtonState.Pressed);
+
+        if (isPanButton && _syncScale.ScaleX > 1.001)
         {
             _isPanning = true;
             _panStartPoint = e.GetPosition(this);
             _startTranslate = new Point(_syncTranslate.X, _syncTranslate.Y);
             ((IInputElement)sender).CaptureMouse();
+            Mouse.OverrideCursor = Cursors.SizeAll;
+            e.Handled = true;
         }
     }
 
@@ -223,6 +300,7 @@ public partial class PreviewWindow : Window
             var delta = current - _panStartPoint;
             _syncTranslate.X = _startTranslate.X + delta.X;
             _syncTranslate.Y = _startTranslate.Y + delta.Y;
+            e.Handled = true;
         }
     }
 
@@ -232,21 +310,58 @@ public partial class PreviewWindow : Window
         {
             _isPanning = false;
             ((IInputElement)sender).ReleaseMouseCapture();
+            Mouse.OverrideCursor = null;
+            UpdateCursor();
+            e.Handled = true;
+        }
+    }
+
+    private void OnContainerLostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (_isPanning)
+        {
+            _isPanning = false;
+            Mouse.OverrideCursor = null;
+            UpdateCursor();
         }
     }
 
     private void OnResetZoomClicked(object sender, MouseButtonEventArgs e)
+    {
+        ResetZoom();
+    }
+
+    private void ResetZoom()
     {
         _syncScale.ScaleX = 1.0;
         _syncScale.ScaleY = 1.0;
         _syncTranslate.X = 0.0;
         _syncTranslate.Y = 0.0;
         UpdateZoomBadge();
+        UpdateCursor();
     }
 
     private void UpdateZoomBadge()
     {
         int pct = (int)Math.Round(_syncScale.ScaleX * 100.0);
         TextZoomLevel.Text = $"{pct}%";
+    }
+
+    private void UpdateCursor()
+    {
+        if (RadioSideBySide?.IsChecked == true)
+        {
+            if (SideBySideGrid != null)
+            {
+                SideBySideGrid.Cursor = _syncScale.ScaleX > 1.001 ? Cursors.SizeAll : Cursors.Arrow;
+            }
+        }
+        else
+        {
+            if (SplitViewGrid != null)
+            {
+                SplitViewGrid.Cursor = Cursors.SizeWE;
+            }
+        }
     }
 }

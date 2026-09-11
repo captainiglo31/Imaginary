@@ -22,9 +22,9 @@
                 CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
             <DockPanel LastChildFill="True">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                    <RadioButton x:Name="RadioSplit" Content="Split-Slider" IsChecked="True" 
+                    <RadioButton x:Name="RadioSplit" Content="Split-Slider" GroupName="PreviewMode" IsChecked="True" 
                                  Checked="OnViewModeChanged" Margin="0,0,14,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                    <RadioButton x:Name="RadioSideBySide" Content="Nebeneinander" 
+                    <RadioButton x:Name="RadioSideBySide" Content="Nebeneinander" GroupName="PreviewMode"
                                  Checked="OnViewModeChanged" Margin="0,0,16,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     <Button Content="Schließen" Click="OnCloseClicked" Padding="14,5"
                             Background="{DynamicResource SecondaryButtonBackgroundBrush}"
@@ -48,20 +48,21 @@
                 MouseWheel="OnContainerMouseWheel"
                 MouseDown="OnContainerMouseDown"
                 MouseMove="OnContainerMouseMove"
-                MouseUp="OnContainerMouseUp">
-            <Grid>
+                MouseUp="OnContainerMouseUp"
+                LostMouseCapture="OnContainerLostMouseCapture">
+            <Grid ClipToBounds="True">
                 <!-- Split Slider View Mode -->
-                <Grid x:Name="SplitViewGrid" Visibility="Visible" Cursor="SizeWE" Background="#05000000"
+                <Grid x:Name="SplitViewGrid" Visibility="Visible" Cursor="SizeWE" Background="#05000000" ClipToBounds="True"
                       MouseDown="OnImageAreaMouseDown" MouseMove="OnImageAreaMouseMove" MouseUp="OnImageAreaMouseUp">
                     <!-- Layer 1: Original Image (Bottom) -->
-                    <Image x:Name="ImageOriginalSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Image x:Name="ImageOriginalSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0,0"/>
                     
                     <!-- Layer 2: Processed Image inside a Container matching Grid bounds with Clip -->
                     <Grid x:Name="ProcessedContainer" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
                         <Grid.Clip>
                             <RectangleGeometry x:Name="SplitClipGeometry"/>
                         </Grid.Clip>
-                        <Image x:Name="ImageProcessedSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Image x:Name="ImageProcessedSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0,0"/>
                     </Grid>
 
                     <!-- Layer 3: Split line and draggable circle handle -->
@@ -87,18 +88,19 @@
                 </Grid>
 
                 <!-- Side By Side View Mode -->
-                <Grid x:Name="SideBySideGrid" Visibility="Collapsed" Margin="8">
+                <Grid x:Name="SideBySideGrid" Visibility="Collapsed" Margin="8" ClipToBounds="True">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition x:Name="ColOriginal" Width="*"/>
                         <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition x:Name="ColProcessed" Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
-                        <Grid>
-                            <Image x:Name="ImageOriginalSide" Stretch="Uniform" Margin="4"/>
+                    <Border x:Name="BorderOriginalSide" Grid.Column="0" BorderBrush="{DynamicResource BorderBrush}" 
+                            BorderThickness="1" CornerRadius="6" ClipToBounds="True" Background="Transparent">
+                        <Grid x:Name="GridOriginalSide" ClipToBounds="True">
+                            <Image x:Name="ImageOriginalSide" Stretch="Uniform" RenderTransformOrigin="0,0"/>
                             <Border Background="#B0000000" VerticalAlignment="Top" HorizontalAlignment="Left"
-                                    CornerRadius="4" Padding="8,3" Margin="8">
+                                    CornerRadius="4" Padding="8,3" Margin="8" IsHitTestVisible="False">
                                 <TextBlock Text="Original (Vorher)" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
                             </Border>
                         </Grid>
@@ -106,11 +108,12 @@
 
                     <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="{DynamicResource BorderBrush}"/>
 
-                    <Border Grid.Column="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
-                        <Grid>
-                            <Image x:Name="ImageProcessedSide" Stretch="Uniform" Margin="4"/>
+                    <Border x:Name="BorderProcessedSide" Grid.Column="2" BorderBrush="{DynamicResource BorderBrush}" 
+                            BorderThickness="1" CornerRadius="6" ClipToBounds="True" Background="Transparent">
+                        <Grid x:Name="GridProcessedSide" ClipToBounds="True">
+                            <Image x:Name="ImageProcessedSide" Stretch="Uniform" RenderTransformOrigin="0,0"/>
                             <Border Background="#B0000000" VerticalAlignment="Top" HorizontalAlignment="Left"
-                                    CornerRadius="4" Padding="8,3" Margin="8">
+                                    CornerRadius="4" Padding="8,3" Margin="8" IsHitTestVisible="False">
                                 <TextBlock Text="Konvertiert (Nachher)" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
                             </Border>
                         </Grid>
@@ -121,7 +124,7 @@
                 <Border x:Name="BadgeZoom" Background="#CC0A0E1A" BorderBrush="#38BDF8" BorderThickness="1"
                         CornerRadius="14" Padding="10,4" Margin="14" HorizontalAlignment="Right" VerticalAlignment="Top"
                         Cursor="Hand" MouseLeftButtonDown="OnResetZoomClicked"
-                        ToolTip="Mausrad zum Zoomen • Rechte Maustaste zum Verschieben • Klick zum Zurücksetzen">
+                        ToolTip="Mausrad zum Zoomen • Verschieben (Pan) mit linker/rechter Maustaste • Doppelklick zum Zurücksetzen">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="🔍 " FontSize="11" VerticalAlignment="Center"/>
                         <TextBlock x:Name="TextZoomLevel" Text="100%" FontWeight="Bold" FontSize="11.5" Foreground="#38BDF8" VerticalAlignment="Center"/>
