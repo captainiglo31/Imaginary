@@ -52,10 +52,24 @@ public partial class App : Application
         {
             Current.Dispatcher.Invoke(() =>
             {
-                AppLogger.Info("SingleInstance", $"Dateien über IPC empfangen ({files.Length} Stück): {string.Join(", ", files)}");
-                FilesReceivedViaIpc?.Invoke(files);
+                AppLogger.Info("SingleInstance", $"Aktivierungssignal / IPC empfangen ({files.Length} Datei(en))");
+                if (files.Length > 0)
+                {
+                    FilesReceivedViaIpc?.Invoke(files);
+                }
+
                 if (Current.MainWindow != null)
                 {
+                    if (!Current.MainWindow.IsVisible)
+                    {
+                        Current.MainWindow.Show();
+                    }
+                    if (Current.MainWindow.WindowState == WindowState.Minimized)
+                    {
+                        Current.MainWindow.WindowState = WindowState.Normal;
+                    }
+                    Current.MainWindow.Activate();
+                    Current.MainWindow.Focus();
                     var helper = new WindowInteropHelper(Current.MainWindow);
                     SingleInstanceService.ActivateWindow(helper.Handle);
                 }
@@ -101,7 +115,21 @@ public partial class App : Application
             AppLogger.Info("App", "Startparameter --tray / --minimized erkannt – Starte lautlos im Hintergrund.");
             var mainWindow = new MainWindow();
             MainWindow = mainWindow;
-            // Fenster bleibt unsichtbar, TrayService läuft im Infobereich
+
+            if (mainWindow.DataContext is ViewModels.MainViewModel vm && vm.ShowTrayNotifications)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                    Current.Dispatcher.Invoke(() =>
+                    {
+                        vm.TrayService?.ShowNotification(
+                            "Imaginary ist aktiv",
+                            "Imaginary läuft minimiert im Infobereich. Klicke auf das Symbol oder die Benachrichtigung, um das Fenster zu öffnen.",
+                            System.Windows.Forms.ToolTipIcon.Info);
+                    });
+                });
+            }
             return;
         }
 

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Imaginary.Core.Logging;
@@ -31,6 +32,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IImageEditorService _editorService;
     private readonly IBackgroundRemovalService _bgRemovalService;
     private ITrayService? _trayService;
+    public ITrayService? TrayService => _trayService;
 
     private UpdateInfo? _latestUpdateInfo;
     private CancellationTokenSource? _cts;
@@ -227,6 +229,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _checkForUpdatesOnStartup = true;
 
+    [ObservableProperty]
+    private bool _checkForUpdatesPeriodically = true;
+
+    private DispatcherTimer? _periodicUpdateTimer;
+
     public bool HasShownTrayIntroBalloon => _settingsService.Settings.HasShownTrayIntroBalloon;
 
     public void MarkTrayIntroBalloonShown()
@@ -359,11 +366,30 @@ public partial class MainViewModel : ObservableObject
         _startMinimizedInTray = settings.StartMinimizedInTray;
         _showTrayNotifications = settings.ShowTrayNotifications;
         _checkForUpdatesOnStartup = settings.CheckForUpdatesOnStartup;
+        _checkForUpdatesPeriodically = settings.CheckForUpdatesPeriodically;
 
         // Auto-heal autostart path if enabled
         if (_isAutostartEnabled)
         {
-            _autostartService.SynchronizeAutostart(true);
+            _autostartService.SynchronizeAutostart(true, arguments: _startMinimizedInTray ? "--tray" : "");
+        }
+
+        // Periodischer Update-Check im Hintergrund (alle 4 Stunden)
+        _periodicUpdateTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromHours(4)
+        };
+        _periodicUpdateTimer.Tick += async (s, e) =>
+        {
+            if (CheckForUpdatesPeriodically)
+            {
+                AppLogger.Info("Update", "Periodischer Hintergrund-Update-Check wird ausgeführt...");
+                await CheckForUpdatesInternalAsync(showFeedbackWhenNoUpdate: false);
+            }
+        };
+        if (_checkForUpdatesPeriodically)
+        {
+            _periodicUpdateTimer.Start();
         }
 
         // Load Presets
@@ -640,7 +666,8 @@ public partial class MainViewModel : ObservableObject
     {
         if (value)
         {
-            _autostartService.EnableAutostart();
+            var args = StartMinimizedInTray ? "--tray" : "";
+            _autostartService.EnableAutostart(arguments: args);
         }
         else
         {
@@ -660,6 +687,11 @@ public partial class MainViewModel : ObservableObject
     {
         _settingsService.Settings.StartMinimizedInTray = value;
         _settingsService.Save();
+        if (IsAutostartEnabled)
+        {
+            var args = value ? "--tray" : "";
+            _autostartService.EnableAutostart(arguments: args);
+        }
     }
 
     partial void OnShowTrayNotificationsChanged(bool value)
@@ -672,6 +704,20 @@ public partial class MainViewModel : ObservableObject
     {
         _settingsService.Settings.CheckForUpdatesOnStartup = value;
         _settingsService.Save();
+    }
+
+    partial void OnCheckForUpdatesPeriodicallyChanged(bool value)
+    {
+        _settingsService.Settings.CheckForUpdatesPeriodically = value;
+        _settingsService.Save();
+        if (value)
+        {
+            _periodicUpdateTimer?.Start();
+        }
+        else
+        {
+            _periodicUpdateTimer?.Stop();
+        }
     }
 
     partial void OnHotfolderSelectedPresetChanged(Preset? value)
@@ -1445,7 +1491,17 @@ public partial class MainViewModel : ObservableObject
                 var currentVerStr = updateInfo.LatestVersion?.ToString();
                 if (showFeedbackWhenNoUpdate || string.IsNullOrEmpty(skipped) || !string.Equals(skipped, currentVerStr, StringComparison.OrdinalIgnoreCase))
                 {
-                    ShowUpdateDialog();
+                    if (Application.Current.MainWindow != null && Application.Current.MainWindow.IsVisible)
+                    {
+                        ShowUpdateDialog();
+                    }
+                    else
+                    {
+                        _trayService?.ShowNotification(
+                            "Neues Imaginary Update verfügbar!",
+                            $"Version v{updateInfo.LatestVersion} steht bereit. Klicke hier zum Aktualisieren.",
+                            System.Windows.Forms.ToolTipIcon.Info);
+                    }
                 }
             }
             else

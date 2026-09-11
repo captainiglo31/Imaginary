@@ -67,8 +67,6 @@ public static class SingleInstanceService
 
     private static void SendArgsToPrimaryInstance(string[] args)
     {
-        if (args == null || args.Length == 0) return;
-
         // Try to connect to pipe server with retry in case primary is still initializing
         for (int retry = 0; retry < 5; retry++)
         {
@@ -78,9 +76,16 @@ public static class SingleInstanceService
                 pipeClient.Connect(1500);
 
                 using var writer = new StreamWriter(pipeClient, Encoding.UTF8);
-                foreach (var arg in args)
+                if (args != null && args.Length > 0)
                 {
-                    writer.WriteLine(arg);
+                    foreach (var arg in args)
+                    {
+                        writer.WriteLine(arg);
+                    }
+                }
+                else
+                {
+                    writer.WriteLine("__ACTIVATE__");
                 }
                 writer.Flush();
                 return;
@@ -120,10 +125,12 @@ public static class SingleInstanceService
                         }
                     }
 
-                    if (receivedLines.Count > 0)
-                    {
-                        onArgsReceived(receivedLines.ToArray());
-                    }
+                    var fileArgs = receivedLines.Where(l =>
+                        !string.Equals(l, "__ACTIVATE__", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(l, "--tray", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(l, "--minimized", StringComparison.OrdinalIgnoreCase)).ToArray();
+
+                    onArgsReceived(fileArgs);
                 }
                 catch (OperationCanceledException)
                 {

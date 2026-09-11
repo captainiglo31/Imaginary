@@ -1,12 +1,17 @@
-## 🚀 Was ist neu in Version 2.0.2:
+## 🚀 Was ist neu in Version 2.0.3:
 
-### 🐛 Fehlerbehebungen (Vorher/Nachher-Vergleich)
-- **Überlappung beim Zoomen behoben:** In der Nebeneinander-Ansicht konnten vergrößerte Bilder bisher über ihren Anzeigebereich hinausrendern und das jeweils andere Bild oder den Trenner überdecken. Durch striktes Layout-Clipping bleiben beide Bilder nun jederzeit sauber in ihren Spalten abgegrenzt.
-- **Synchroner Zoom ohne Drift:** Der Fokuspunkt beim Hinein- und Herauszoomen mit dem Mausrad wird nun exakt innerhalb der jeweiligen Bildhälfte berechnet. Dadurch tritt kein seitliches Wegdriften der Bilder mehr auf.
-- **Perfekte Zentrierung beim Reset:** Beim Herauszoomen auf 100% rasten beide Bilder automatisch wieder passgenau und zentriert ein, ohne dass ein Rest-Offset verbleibt.
+### 🐛 Kritische Fehlerbehebungen
+- **Bild-Editor-Absturz behoben:** Beim Klick auf den Button „Bearbeiten“ kam es bisher zu einer unbehandelten Ausnahme (`NullReferenceException`), da Steuerelemente für den Hintergrundmodus noch während der Fenster-Initialisierung Ereignisse auslösten. Dies wurde vollständig behoben; der Bild-Editor öffnet sich nun blitzschnell und stabil.
+- **Autostart-Fensteranzeige behoben:** Wenn Imaginary mit Windows minimiert im Infobereich gestartet wurde, reagierte ein erneuter Klick auf das Desktop-Icon oder die Anwendungsdatei bisher nicht. Das IPC-Aktivierungssignal (Single Instance Pipe) wurde grundlegend überarbeitet: Imaginary erkennt den Aufruf sofort, stellt das Fenster wieder her und bringt es zuverlässig in den Vordergrund.
 
-### 🔍 Verbesserte Bedienung im Vergleichs-Viewer
-- **Intuitives Verschieben (Pan):** In der Nebeneinander-Ansicht kann das Bild bei Vergrößerung nun neben der rechten/mittleren Maustaste auch bequem mit der **linken Maustaste** gegriffen und synchron verschoben werden.
-- **Dynamischer Mauszeiger:** Bei aktivem Zoom signalisiert der Mauszeiger automatisch die Verschiebbarkeit (Pan-Symbol).
-- **Doppelklick-Reset:** Ein Doppelklick auf eine beliebige Stelle des Bildes setzt den Zoom sofort wieder auf 100% zurück.
-- **Kontextsensitive Hilfetexte:** Die untere Hinweisleiste zeigt stets die passenden Shortcuts für den aktuell gewählten Modus (Split-Slider vs. Nebeneinander).
+### ⚙️ Verbesserungen für System & Autostart
+- **Freie Wahl des Autostart-Verhaltens:** In den Einstellungen (*🖥️ System & Hintergrundbetrieb*) kann nun flexibel gewählt werden, ob Imaginary beim Windows-Login:
+  - **Sichtbar** mit dem vollen Hauptfenster geöffnet werden soll (Standard).
+  - Oder **lautlos minimiert** im Windows-Infobereich (System-Tray) startet.
+- **Dezenter Tray-Hinweis:** Beim Start im Infobereich informiert nun eine kurze Windows-Benachrichtigung darüber, dass Imaginary im Hintergrund aktiv ist. Ein Klick darauf öffnet direkt die Oberfläche.
+- **Klick-Aktivierung aus dem Infobereich:** Ein Klick auf Benachrichtigungen aus dem Infobereich stellt das Hauptfenster nun ebenfalls unmittelbar wieder her.
+
+### 🔄 Automatische Updates im laufenden Betrieb
+- **Periodische Hintergrundprüfung:** Imaginary prüft nun nicht mehr nur beim Start, sondern auch während des laufenden Betriebs (alle 4 Stunden dezent im Hintergrund) auf neue Releases und Aktualisierungen.
+- **Einstellungsoption:** In den Einstellungen unter *🔄 Updates & Info* lässt sich diese automatische periodische Hintergrundsuche jederzeit nach Wunsch aktivieren oder deaktivieren.
+- **Tray-Update-Benachrichtigung:** Wird ein neues Update gefunden während das Fenster minimiert ist, erscheint ein Hinweis im Infobereich, über den das Update sofort bezogen werden kann.

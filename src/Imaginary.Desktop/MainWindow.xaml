@@ -717,8 +717,15 @@
                                 <CheckBox IsChecked="{Binding IsAutostartEnabled, Mode=TwoWay}"
                                           Content="Mit Windows starten (Autostart)"
                                           FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
-                                <TextBlock Text="Imaginary startet beim Windows-Login automatisch lautlos im Hintergrund (Infobereich). Keine Administratorrechte erforderlich."
-                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,14" TextWrapping="Wrap"/>
+                                <TextBlock Text="Imaginary startet beim Windows-Login automatisch. Keine Administratorrechte erforderlich."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,6" TextWrapping="Wrap"/>
+
+                                <CheckBox IsChecked="{Binding StartMinimizedInTray, Mode=TwoWay}"
+                                          IsEnabled="{Binding IsAutostartEnabled}"
+                                          Content="Beim Autostart minimiert im Infobereich (Tray) starten"
+                                          FontWeight="Normal" FontSize="12.5" Margin="24,0,0,2"/>
+                                <TextBlock Text="Wenn deaktiviert, öffnet sich das Hauptfenster direkt nach der Windows-Anmeldung sichtbar auf dem Bildschirm."
+                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="48,0,0,14" TextWrapping="Wrap"/>
 
                                 <CheckBox IsChecked="{Binding MinimizeToTrayOnClose, Mode=TwoWay}"
                                           Content="Beim Schließen (X) in den Windows-Infobereich (System-Tray) minimieren"
@@ -812,7 +819,13 @@
                             <StackPanel Margin="0,4,0,0">
                                 <CheckBox IsChecked="{Binding CheckForUpdatesOnStartup, Mode=TwoWay}"
                                           Content="Beim Programmstart automatisch nach neuen Versionen suchen"
-                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,8"/>
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,6"/>
+
+                                <CheckBox IsChecked="{Binding CheckForUpdatesPeriodically, Mode=TwoWay}"
+                                          Content="Im laufenden Betrieb regelmäßig im Hintergrund nach neuen Versionen suchen"
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                                <TextBlock Text="Prüft alle 4 Stunden im Hintergrund auf neue Releases. Bei neuen Versionen erscheint ein dezenter Hinweis."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,10" TextWrapping="Wrap"/>
 
                                 <DockPanel Margin="0,4,0,12">
                                     <Button DockPanel.Dock="Left" Content="🔄 Jetzt nach Updates suchen" Command="{Binding CheckForUpdatesManualCommand}"

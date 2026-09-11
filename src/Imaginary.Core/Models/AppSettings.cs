@@ -28,6 +28,7 @@ public class AppSettings
 
     // Update settings
     public bool CheckForUpdatesOnStartup { get; set; } = true;
+    public bool CheckForUpdatesPeriodically { get; set; } = true;
     public DateTime? LastUpdateCheckUtc { get; set; }
     public string? SkippedVersion { get; set; }
     public string GitHubRepositoryOwner { get; set; } = "captainiglo31";

@@ -93,8 +93,9 @@ public class TrayService : ITrayService
 
             _notifyIcon.ContextMenuStrip = contextMenu;
 
-            // Double Click -> Restore Window
+            // Double Click or Balloon Click -> Restore Window
             _notifyIcon.DoubleClick += (s, e) => RestoreWindow();
+            _notifyIcon.BalloonTipClicked += (s, e) => RestoreWindow();
 
             UpdateHotfolderStatus(_isHotfolderRunning?.Invoke() ?? false);
         }

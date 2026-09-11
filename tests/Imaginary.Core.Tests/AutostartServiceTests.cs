@@ -36,4 +36,15 @@ public class AutostartServiceTests
         item.FormattedSavings.Should().StartWith("-75").And.EndWith("%");
         item.StatusText.Should().Be("Erfolgreich");
     }
+
+    [Fact]
+    public void AppSettings_DefaultValues_ShouldMatchExpectations()
+    {
+        var settings = new AppSettings();
+        settings.CheckForUpdatesPeriodically.Should().BeTrue();
+        settings.CheckForUpdatesOnStartup.Should().BeTrue();
+        settings.StartMinimizedInTray.Should().BeFalse();
+        settings.MinimizeToTrayOnClose.Should().BeTrue();
+        settings.IsAutostartEnabled.Should().BeFalse();
+    }
 }
