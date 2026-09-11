@@ -12,6 +12,7 @@
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/app.ico"
         Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
         FontFamily="Segoe UI">
 
     <Window.InputBindings>
@@ -56,6 +57,7 @@
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
                                               TextBlock.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -67,81 +69,6 @@
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource ActionButtonGradientBrush}"/>
                                 <Setter Property="Foreground" Value="White"/>
                                 <Setter Property="FontWeight" Value="Bold"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Modern Card Expander Style matching GroupBox cards -->
-        <Style x:Key="ModernCardExpanderStyle" TargetType="Expander">
-            <Setter Property="Margin" Value="0,0,0,12"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Expander">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8"
-                                SnapsToDevicePixels="True">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition x:Name="ContentRow" Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <Border Grid.Row="0" x:Name="HeaderBorder"
-                                        Background="{DynamicResource ToolbarBackgroundBrush}"
-                                        CornerRadius="7,7,7,7"
-                                        Padding="12,8">
-                                    <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                                  Cursor="Hand" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch">
-                                        <ToggleButton.Template>
-                                            <ControlTemplate TargetType="ToggleButton">
-                                                <DockPanel Background="Transparent" LastChildFill="True">
-                                                    <TextBlock x:Name="ArrowText" Text="▶" DockPanel.Dock="Right"
-                                                               FontSize="10" VerticalAlignment="Center" Margin="8,0,0,0"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                    <ContentPresenter ContentSource="Content"
-                                                                      VerticalAlignment="Center"
-                                                                      TextBlock.FontWeight="SemiBold"
-                                                                      TextBlock.FontSize="12.5"
-                                                                      TextBlock.Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                </DockPanel>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsChecked" Value="True">
-                                                        <Setter TargetName="ArrowText" Property="Text" Value="▼"/>
-                                                        <Setter TargetName="ArrowText" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-                                                    </Trigger>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="ArrowText" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </ToggleButton.Template>
-                                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
-                                    </ToggleButton>
-                                </Border>
-
-                                <Border Grid.Row="1" x:Name="ContentBorder"
-                                        Padding="{TemplateBinding Padding}"
-                                        Visibility="Collapsed">
-                                    <ContentPresenter/>
-                                </Border>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsExpanded" Value="True">
-                                <Setter TargetName="ContentBorder" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="HeaderBorder" Property="CornerRadius" Value="7,7,0,0"/>
-                                <Setter TargetName="HeaderBorder" Property="BorderThickness" Value="0,0,0,1"/>
-                                <Setter TargetName="HeaderBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -278,9 +205,9 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <Button Grid.Column="0" Content="💾 Als Profil speichern" Command="{Binding SaveCurrentAsPresetCommand}"
-                                            Padding="6,4" FontSize="11" Style="{StaticResource ToolbarButtonStyle}"/>
+                                            Padding="6,4" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}"/>
                                     <Button Grid.Column="2" Content="🗑️ Löschen" Command="{Binding DeleteCurrentPresetCommand}"
-                                            Padding="6,4" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0"/>
+                                            Padding="6,4" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0"/>
                                 </Grid>
                             </StackPanel>
                         </GroupBox>
@@ -298,7 +225,7 @@
                         </GroupBox>
 
                         <!-- 2. Size Constraint (Aufklappbar) -->
-                        <Expander Header="2. Maximale Dateigröße (Optional)" Style="{StaticResource ModernCardExpanderStyle}"
+                        <Expander Header="2. Maximale Dateigröße (Optional)" Style="{DynamicResource ModernCardExpanderStyle}"
                                   IsExpanded="{Binding EnableSizeLimit, Mode=TwoWay}">
                             <StackPanel Margin="0,4,0,0">
                                 <CheckBox IsChecked="{Binding EnableSizeLimit, Mode=TwoWay}"
@@ -395,7 +322,7 @@
                         </GroupBox>
 
                         <!-- 4. Watermark (Aufklappbar) -->
-                        <Expander Header="4. Wasserzeichen (Optional)" Style="{StaticResource ModernCardExpanderStyle}"
+                        <Expander Header="4. Wasserzeichen (Optional)" Style="{DynamicResource ModernCardExpanderStyle}"
                                   IsExpanded="{Binding EnableWatermark, Mode=TwoWay}">
                             <StackPanel Margin="0,4,0,0">
                                 <CheckBox IsChecked="{Binding EnableWatermark, Mode=TwoWay}"
@@ -499,32 +426,32 @@
                     <DockPanel>
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                             <Button Content="+ Dateien" Command="{Binding AddFilesCommand}"
-                                    Style="{StaticResource ToolbarButtonStyle}"/>
+                                    Style="{DynamicResource ToolbarButtonStyle}"/>
                             <Button Content="+ Ordner" Command="{Binding AddFolderCommand}"
-                                    Style="{StaticResource ToolbarButtonStyle}"/>
+                                    Style="{DynamicResource ToolbarButtonStyle}"/>
                             <Button Content="📋 Zwischenablage (Strg+V)" Command="{Binding PasteClipboardCommand}"
-                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    Style="{DynamicResource ToolbarButtonStyle}"
                                     ToolTip="Fügt ein kopiertes Bild oder Bilddateien aus der Windows-Zwischenablage ein (Strg+V)"/>
                             <Button Content="📸 Screenshot (F10)" Command="{Binding CaptureScreenshotCommand}"
-                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    Style="{DynamicResource ToolbarButtonStyle}"
                                     FontWeight="SemiBold"
                                     ToolTip="Bereich aufnehmen und direkt hier einfügen (F10 oder Strg+Shift+S)"/>
                             <Button Content="🔍 Vorher / Nachher" Command="{Binding OpenPreviewCommand}"
                                     IsEnabled="{Binding CanOpenPreview}"
-                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    Style="{DynamicResource ToolbarButtonStyle}"
                                     FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
                                     ToolTip="Vorher/Nachher-Vergleich mit synchronisiertem Zoom bis 800%"/>
                             <Button Content="✏️ Bearbeiten / Paint" Command="{Binding OpenEditorCommand}"
-                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    Style="{DynamicResource ToolbarButtonStyle}"
                                     FontWeight="SemiBold" Foreground="#10B981"
                                     ToolTip="Öffnet das Bild im integrierten Quick-Edit &amp; Paint Studio (Zuschneiden, DSGVO-Blur, Pfeile, Freistellen)"/>
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
                             <Button Content="Auswahl entfernen" Command="{Binding RemoveSelectedCommand}"
-                                    Style="{StaticResource ToolbarButtonStyle}"/>
+                                    Style="{DynamicResource ToolbarButtonStyle}"/>
                             <Button Content="Liste leeren" Command="{Binding ClearFilesCommand}"
-                                    Style="{StaticResource ToolbarButtonStyle}" Margin="0"/>
+                                    Style="{DynamicResource ToolbarButtonStyle}" Margin="0"/>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -671,7 +598,7 @@
                                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
                                     <DockPanel Margin="0,0,0,10">
                                         <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectHotfolderCommand}"
-                                                Padding="8,4" Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}"/>
+                                                Padding="8,4" Margin="6,0,0,0" Style="{DynamicResource ToolbarButtonStyle}"/>
                                         <TextBox Text="{Binding HotfolderPath, Mode=TwoWay}" Padding="6,4" FontSize="12"/>
                                     </DockPanel>
 
@@ -679,7 +606,7 @@
                                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
                                     <DockPanel Margin="0,0,0,10">
                                         <Button DockPanel.Dock="Right" Content="Wählen..." Command="{Binding SelectHotfolderOutputCommand}"
-                                                Padding="8,4" Margin="6,0,0,0" Style="{StaticResource ToolbarButtonStyle}"/>
+                                                Padding="8,4" Margin="6,0,0,0" Style="{DynamicResource ToolbarButtonStyle}"/>
                                         <TextBox Text="{Binding HotfolderOutputPath, Mode=TwoWay}" Padding="6,4" FontSize="12"/>
                                     </DockPanel>
 
@@ -767,7 +694,7 @@
 
                                 <Button Grid.Column="3" Content="Statistik zurücksetzen" Command="{Binding ResetHotfolderStatsCommand}"
                                         VerticalAlignment="Center" Margin="14,0,0,0" Padding="8,5" FontSize="11"
-                                        Style="{StaticResource ToolbarButtonStyle}"/>
+                                        Style="{DynamicResource ToolbarButtonStyle}"/>
                             </Grid>
                         </Border>
 
@@ -779,7 +706,7 @@
                                     <TextBlock Text="📋 Automatisch verarbeitete Dateien:" FontWeight="Bold" FontSize="13"
                                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                     <Button DockPanel.Dock="Right" Content="Verlauf leeren" Command="{Binding ClearHotfolderHistoryCommand}"
-                                            Padding="8,3" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0"/>
+                                            Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0"/>
                                 </DockPanel>
 
                                 <DataGrid ItemsSource="{Binding HotfolderHistory}"
@@ -831,17 +758,34 @@
                                 <TextBlock Text="Lässt die Ordnerüberwachung und Hotfolder zuverlässig im Hintergrund aktiv, wenn das Hauptfenster geschlossen wird."
                                            FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,14" TextWrapping="Wrap"/>
 
-                                <DockPanel Margin="0,0,0,4">
-                                    <Button DockPanel.Dock="Right"
-                                            Content="{Binding IsExplorerIntegrationEnabled, Converter={StaticResource InverseBool}, StringFormat={}{0:Aktivieren;Deaktivieren}}"
-                                            Command="{Binding ToggleExplorerIntegrationCommand}"
-                                            Padding="12,5" FontWeight="SemiBold" Style="{StaticResource ToolbarButtonStyle}" Margin="10,0,0,0"/>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Windows-Explorer Rechtsklick-Menü" FontWeight="SemiBold" FontSize="13"/>
-                                        <TextBlock Text="Bilder oder Ordner direkt per Rechtsklick im Windows Explorer mit Imaginary öffnen."
-                                                   FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                </DockPanel>
+                                <Border Background="{DynamicResource CardHeaderBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10" Margin="0,4,0,4">
+                                    <DockPanel LastChildFill="True">
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <!-- Status Badge -->
+                                            <Border Background="#10B981" CornerRadius="4" Padding="7,3" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                    Visibility="{Binding IsExplorerIntegrationEnabled, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="✔ Aktiviert" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                            </Border>
+                                            <Border Background="#475569" CornerRadius="4" Padding="7,3" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                    Visibility="{Binding IsExplorerIntegrationEnabled, Converter={StaticResource InverseBoolToVis}}">
+                                                <TextBlock Text="⚪ Nicht aktiv" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                            </Border>
+
+                                            <!-- Action Button -->
+                                            <Button Content="{Binding ExplorerIntegrationButtonText}"
+                                                    Command="{Binding ToggleExplorerIntegrationCommand}"
+                                                    Padding="14,6" FontWeight="Bold" FontSize="12"
+                                                    Cursor="Hand"
+                                                    Style="{DynamicResource ToolbarButtonStyle}"/>
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Windows-Explorer Rechtsklick-Menü" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Bilder oder Ordner direkt per Rechtsklick im Windows Explorer mit Imaginary öffnen."
+                                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
                             </StackPanel>
                         </GroupBox>
 
@@ -887,10 +831,10 @@
                                             <Button Content="⬇️ KI-Modell herunterladen" Command="{Binding DownloadAiModelCommand}"
                                                     Visibility="{Binding IsAiModelDownloaded, Converter={StaticResource InverseBoolToVis}}"
                                                     IsEnabled="{Binding IsAiModelDownloading, Converter={StaticResource InverseBool}}"
-                                                    Style="{StaticResource ToolbarButtonStyle}" Padding="12,6" FontWeight="SemiBold"/>
+                                                    Style="{DynamicResource ToolbarButtonStyle}" Padding="12,6" FontWeight="SemiBold"/>
                                             <Button Content="🗑️ Modell löschen" Command="{Binding DeleteAiModelCommand}"
                                                     Visibility="{Binding IsAiModelDownloaded, Converter={StaticResource BoolToVis}}"
-                                                    Style="{StaticResource ToolbarButtonStyle}" Padding="10,6" Foreground="#EF4444"/>
+                                                    Style="{DynamicResource ToolbarButtonStyle}" Padding="10,6" Foreground="#EF4444"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -929,16 +873,16 @@
                                 <!-- 1-Click Action Buttons -->
                                 <WrapPanel Margin="0,0,0,12">
                                     <Button Content="🤖 In Claude Desktop installieren (1-Klick)" Command="{Binding InstallClaudeMcpCommand}"
-                                            Style="{StaticResource ToolbarButtonStyle}" Background="{DynamicResource ActionButtonGradientBrush}"
+                                            Style="{DynamicResource ToolbarButtonStyle}" Background="{DynamicResource ActionButtonGradientBrush}"
                                             Foreground="White" FontWeight="Bold" Padding="14,8" Margin="0,0,8,6" Cursor="Hand"
                                             ToolTip="Trägt Imaginary vollautomatisch in %APPDATA%\Claude\claude_desktop_config.json ein"/>
 
                                     <Button Content="📋 Konfiguration kopieren" Command="{Binding CopyMcpConfigCommand}"
-                                            Style="{StaticResource ToolbarButtonStyle}" Padding="12,8" Margin="0,0,8,6" Cursor="Hand"
+                                            Style="{DynamicResource ToolbarButtonStyle}" Padding="12,8" Margin="0,0,8,6" Cursor="Hand"
                                             ToolTip="Kopiert die JSON-Konfiguration in die Windows-Zwischenablage"/>
 
                                     <Button Content="📂 Claude-Ordner öffnen" Command="{Binding OpenClaudeConfigFolderCommand}"
-                                            Style="{StaticResource ToolbarButtonStyle}" Padding="12,8" Margin="0,0,0,6" Cursor="Hand"
+                                            Style="{DynamicResource ToolbarButtonStyle}" Padding="12,8" Margin="0,0,0,6" Cursor="Hand"
                                             ToolTip="Öffnet den Claude Konfigurationsordner im Windows Explorer"/>
                                 </WrapPanel>
 
@@ -954,8 +898,7 @@
 
                                 <!-- Expander for Available Tools -->
                                 <Expander Header="🔍 Verfügbare KI-Werkzeuge anzeigen (10 Tools)" IsExpanded="False"
-                                          BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                          Background="{DynamicResource SurfaceBackgroundBrush}" Padding="8" Margin="0,0,0,4">
+                                          Style="{DynamicResource ModernCardExpanderStyle}" Margin="0,0,0,4">
                                     <StackPanel Margin="4,8,4,4">
                                         <TextBlock Text="Folgende Funktionen stehen angebundenen KIs vollautomatisch zur Verfügung:"
                                                    FontSize="11.5" FontWeight="SemiBold" Margin="0,0,0,6"/>
@@ -1000,7 +943,7 @@
 
                                 <DockPanel Margin="0,4,0,12">
                                     <Button DockPanel.Dock="Left" Content="🔄 Jetzt nach Updates suchen" Command="{Binding CheckForUpdatesManualCommand}"
-                                            Padding="12,6" Style="{StaticResource ToolbarButtonStyle}" Margin="0,0,14,0"/>
+                                            Padding="12,6" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,14,0"/>
                                     <TextBlock Text="{Binding AppVersionString, StringFormat='Aktuelle Version: {0}'}"
                                                FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </DockPanel>
@@ -1048,10 +991,10 @@
 
                     <TextBlock Text="Entwickelt von Pino Wackers" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <Button Content="🔄 Updates" Command="{Binding CheckForUpdatesManualCommand}"
-                            Padding="8,3" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0,0,6,0"
+                            Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0"
                             ToolTip="Online nach neuen Versionen von Imaginary suchen"/>
                     <Button Content="📋 Protokoll" Command="{Binding OpenLogViewerCommand}"
-                            Padding="8,3" FontSize="11" Style="{StaticResource ToolbarButtonStyle}" Margin="0"
+                            Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0"
                             ToolTip="Echtzeit-System- &amp; Fehler-Protokoll öffnen"/>
                 </StackPanel>
 

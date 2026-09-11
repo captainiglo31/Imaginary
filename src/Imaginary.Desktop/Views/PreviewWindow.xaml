@@ -50,13 +50,13 @@
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4,2" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
                             <RadioButton x:Name="RadioSplit" Content="↔️ Split-Slider" IsChecked="True" 
-                                         Checked="OnViewModeChanged" Style="{StaticResource ToolbarRadioButtonStyle}" Margin="0,0,4,0"/>
+                                         Checked="OnViewModeChanged" Style="{DynamicResource ToolbarRadioButtonStyle}" Margin="0,0,4,0"/>
                             <RadioButton x:Name="RadioSideBySide" Content="📑 Nebeneinander" 
-                                         Checked="OnViewModeChanged" Style="{StaticResource ToolbarRadioButtonStyle}"/>
+                                         Checked="OnViewModeChanged" Style="{DynamicResource ToolbarRadioButtonStyle}"/>
                         </StackPanel>
                     </Border>
                     
-                    <Button Content="Schließen" Click="OnCloseClicked" Style="{StaticResource ToolbarButtonStyle}"/>
+                    <Button Content="Schließen" Click="OnCloseClicked" Style="{DynamicResource ToolbarButtonStyle}"/>
                 </StackPanel>
 
                 <StackPanel VerticalAlignment="Center">

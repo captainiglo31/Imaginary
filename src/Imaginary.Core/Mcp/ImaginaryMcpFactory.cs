@@ -33,7 +33,7 @@ public static class ImaginaryMcpFactory
             reader: _ => Task.FromResult(JsonSerializer.Serialize(new
             {
                 name = "imaginary-mcp",
-                version = "2.2.1",
+                version = "2.2.2",
                 supportedFormats = new[] { "JPEG", "PNG", "WebP", "AVIF", "GIF", "BMP", "TIFF", "ICO" },
                 unterstuetzteFormate = new[] { "JPEG", "PNG", "WebP", "AVIF", "GIF", "BMP", "TIFF", "ICO" },
                 kiModell = "U-2-Net (ONNX Runtime, 100% Offline)",

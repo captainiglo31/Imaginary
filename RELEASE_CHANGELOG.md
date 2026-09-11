@@ -1,3 +1,20 @@
+## 🚀 Was ist neu in Version 2.2.2 (Dark Mode Kontrast & UI-Optimierungen):
+
+### 🎨 Dunkles Design (Dark Mode) Perfektionierung & Hoher Kontrast
+- **Lesbarkeit aller eingeklappten Bereiche (Studio / Batches):**
+  - Alle auf- und zuklappbaren Karten (`Expander`) besitzen jetzt ein konsistentes Card-Design mit klar abgehobenem Header (`CardHeaderBackgroundBrush`), kontrastreicher weißer Schrift (`TextPrimaryBrush`) und sauberer visueller Hierarchie.
+  - Kein schwarzer Standard-Text mehr auf dunklem Hintergrund in Aufklapp-Panels.
+- **Windows-Explorer Integration in den Einstellungen:**
+  - Der Button zeigt nun professionelle deutsche Handlungsverben („Aktivieren“ / „Deaktivieren“) anstelle von kryptischem `True`/`False`.
+  - Ergänzt durch sichtbare Status-Badges (`✔ Aktiviert` in Smaragdgrün / `⚪ Nicht aktiv` in Schiefergrau) und optimal lesbare Beschriftung.
+- **Vollständige DynamicResource-Harmonisierung:**
+  - Alle Buttons, RadioButtons und Toolbars in `MainWindow`, `ImageEditorWindow`, `PreviewWindow` und `LogViewerWindow` wurden auf dynamische Ressourcen umgestellt.
+  - Schneller, fehlerfreier Theme-Wechsel zwischen Hell und Dunkel in Echtzeit ohne Neustart.
+- **Globale Vererbung von Schriftfarben:**
+  - Globale WPF-Stile für `Window`, `TextBlock`, `CheckBox` und `Expander` garantieren optimale Kontrastwerte und verhindern, dass unformatierter Text auf Standard-Schwarz zurückfällt.
+
+---
+
 ## 🚀 Was ist neu in Version 2.2.1 (Hotfix & Resilienz-Update):
 
 ### 🛡️ Robuste Notfall-Wiederherstellung & Automatischer Rollback

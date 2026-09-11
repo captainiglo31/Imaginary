@@ -16,6 +16,8 @@
     <SolidColorBrush x:Key="InputBorderBrush" Color="#26354F"/>
     <SolidColorBrush x:Key="ToolbarBackgroundBrush" Color="#111827"/>
     <SolidColorBrush x:Key="CardBackgroundBrush" Color="#111827"/>
+    <SolidColorBrush x:Key="CardHeaderBackgroundBrush" Color="#151E32"/>
+    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#2E3F5E"/>
     <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="#1E293B"/>
     <SolidColorBrush x:Key="SecondaryButtonForegroundBrush" Color="#F1F5F9"/>
     <SolidColorBrush x:Key="SecondaryButtonHoverBrush" Color="#334155"/>
@@ -42,11 +44,23 @@
         <GradientStop Color="#2563EB" Offset="1.0"/>
     </LinearGradientBrush>
 
+    <!-- Global Window Style -->
+    <Style TargetType="Window">
+        <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- Global TextBlock Style -->
+    <Style TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
     <!-- Global Base Button Style & ControlTemplate -->
     <Style TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource SecondaryButtonBackgroundBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource SecondaryButtonForegroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SecondaryButtonBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="10,6"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -65,16 +79,17 @@
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           RecognizesAccessKey="True"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"
                                           TextBlock.Foreground="{TemplateBinding Foreground}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource SecondaryButtonHoverBrush}"/>
-                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderFocusBrush}"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource SecondaryButtonHoverBrush}"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource BorderFocusBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="border" Property="Background" Value="#0F172A"/>
-                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="border" Property="Opacity" Value="0.4"/>
@@ -96,10 +111,10 @@
     <Style TargetType="GroupBox">
         <Setter Property="Margin" Value="0,0,0,12"/>
         <Setter Property="Padding" Value="12"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Background" Value="{StaticResource SurfaceBackgroundBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="GroupBox">
@@ -115,16 +130,17 @@
                             </Grid.RowDefinitions>
 
                             <Border Grid.Row="0"
-                                    Background="#141E30"
+                                    Background="{DynamicResource CardHeaderBackgroundBrush}"
                                     CornerRadius="7,7,0,0"
-                                    BorderBrush="{StaticResource BorderBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="0,0,0,1"
                                     Padding="12,8">
                                 <ContentPresenter ContentSource="Header"
                                                   RecognizesAccessKey="True"
+                                                  TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
                                                   TextBlock.FontWeight="SemiBold"
                                                   TextBlock.FontSize="12.5"
-                                                  TextBlock.Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                  TextBlock.Foreground="{DynamicResource TextPrimaryBrush}"/>
                             </Border>
 
                             <ContentPresenter Grid.Row="1" Margin="{TemplateBinding Padding}"/>
@@ -134,6 +150,91 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- Global Modern Card Expander Style matching GroupBox cards -->
+    <Style TargetType="Expander">
+        <Setter Property="Margin" Value="0,0,0,12"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition x:Name="ContentRow" Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" x:Name="HeaderBorder"
+                                    Background="{DynamicResource CardHeaderBackgroundBrush}"
+                                    CornerRadius="7,7,7,7"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="0"
+                                    Padding="12,8">
+                                <ToggleButton IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                              Content="{TemplateBinding Header}"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                              Cursor="Hand" Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Stretch">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <DockPanel Background="Transparent" LastChildFill="True">
+                                                <TextBlock x:Name="ArrowText" Text="▶" DockPanel.Dock="Right"
+                                                           FontSize="10" VerticalAlignment="Center" Margin="8,0,0,0"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <ContentPresenter Content="{TemplateBinding Content}"
+                                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                  VerticalAlignment="Center"
+                                                                  RecognizesAccessKey="True"
+                                                                  TextElement.Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                  TextBlock.Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                  TextBlock.FontWeight="SemiBold"
+                                                                  TextBlock.FontSize="12.5"/>
+                                            </DockPanel>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="ArrowText" Property="Text" Value="▼"/>
+                                                    <Setter TargetName="ArrowText" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ArrowText" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                            </Border>
+
+                            <Border Grid.Row="1" x:Name="ContentBorder"
+                                    Padding="{TemplateBinding Padding}"
+                                    Visibility="Collapsed">
+                                <ContentPresenter/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ContentBorder" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="HeaderBorder" Property="CornerRadius" Value="7,7,0,0"/>
+                            <Setter TargetName="HeaderBorder" Property="BorderThickness" Value="0,0,0,1"/>
+                        </Trigger>
+                        <Trigger SourceName="HeaderBorder" Property="IsMouseOver" Value="True">
+                            <Setter TargetName="HeaderBorder" Property="Background" Value="#1C273E"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="ModernCardExpanderStyle" TargetType="Expander" BasedOn="{StaticResource {x:Type Expander}}"/>
 
     <!-- Modern TextBox Style -->
     <Style TargetType="TextBox">

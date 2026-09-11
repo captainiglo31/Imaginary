@@ -169,7 +169,12 @@ public partial class MainViewModel : ObservableObject
     private bool _isDarkMode;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExplorerIntegrationButtonText))]
+    [NotifyPropertyChangedFor(nameof(ExplorerIntegrationStatusText))]
     private bool _isExplorerIntegrationEnabled;
+
+    public string ExplorerIntegrationButtonText => IsExplorerIntegrationEnabled ? "Deaktivieren" : "Aktivieren";
+    public string ExplorerIntegrationStatusText => IsExplorerIntegrationEnabled ? "Aktiviert" : "Nicht aktiv";
 
     // Hotfolder Settings & State
     [ObservableProperty]
@@ -243,7 +248,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.2.1";
+    public string AppVersionString => "v2.2.2";
 
     public string McpConfigSnippet
     {
