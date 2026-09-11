@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -27,8 +28,30 @@ public partial class ImageEditorWindow : Window
     private readonly IBackgroundRemovalService _bgRemovalService;
 
     private SKBitmap _currentBitmap;
-    private readonly Stack<SKBitmap> _undoStack = new();
-    private readonly Stack<SKBitmap> _redoStack = new();
+    private List<EditorAnnotation> _annotations = new();
+    private EditorAnnotation? _selectedAnnotation;
+    private bool _isMovingAnnotation;
+    private bool _hasMovedSelectedAnnotation;
+    private WpfPoint _moveStart;
+    private bool _isPanningCanvas;
+    private WpfPoint _panMouseStart;
+    private WpfPoint _panScrollStart;
+    private List<SKPoint> _activeFreehandPoints = new();
+
+    private class EditorHistoryState : IDisposable
+    {
+        public SKBitmap BaseBitmap { get; set; } = null!;
+        public List<EditorAnnotation> Annotations { get; set; } = new();
+        public int StepBadgeCounter { get; set; }
+
+        public void Dispose()
+        {
+            BaseBitmap?.Dispose();
+        }
+    }
+
+    private readonly Stack<EditorHistoryState> _undoStack = new();
+    private readonly Stack<EditorHistoryState> _redoStack = new();
 
     private EditorTool _currentTool = EditorTool.Pan;
     private SKColor _selectedColor = SKColors.Red;
@@ -79,9 +102,40 @@ public partial class ImageEditorWindow : Window
 
     private void UpdateImageDisplay()
     {
+        if (_currentBitmap == null) return;
         TextDimensions.Text = $"{_currentBitmap.Width} × {_currentBitmap.Height} px";
 
-        using var image = SKImage.FromBitmap(_currentBitmap);
+        using var displayBitmap = _currentBitmap.Copy();
+        using (var canvas = new SKCanvas(displayBitmap))
+        {
+            foreach (var ann in _annotations)
+            {
+                ann.Render(canvas);
+            }
+
+            if (_selectedAnnotation != null && _currentTool == EditorTool.Pan)
+            {
+                var bounds = _selectedAnnotation.GetBounds();
+                using var selectPaint = new SKPaint
+                {
+                    Color = SKColor.Parse("#38BDF8"),
+                    StrokeWidth = 2f,
+                    Style = SKPaintStyle.Stroke,
+                    PathEffect = SKPathEffect.CreateDash(new float[] { 6, 4 }, 0),
+                    IsAntialias = true
+                };
+                canvas.DrawRoundRect(bounds.Left - 4, bounds.Top - 4, bounds.Width + 8, bounds.Height + 8, 4, 4, selectPaint);
+
+                using var handlePaint = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill, IsAntialias = true };
+                using var handleBorder = new SKPaint { Color = SKColor.Parse("#0284C7"), StrokeWidth = 1.5f, Style = SKPaintStyle.Stroke, IsAntialias = true };
+                DrawHandle(canvas, bounds.Left - 4, bounds.Top - 4, handlePaint, handleBorder);
+                DrawHandle(canvas, bounds.Right + 4, bounds.Top - 4, handlePaint, handleBorder);
+                DrawHandle(canvas, bounds.Left - 4, bounds.Bottom + 4, handlePaint, handleBorder);
+                DrawHandle(canvas, bounds.Right + 4, bounds.Bottom + 4, handlePaint, handleBorder);
+            }
+        }
+
+        using var image = SKImage.FromBitmap(displayBitmap);
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         using var stream = new MemoryStream();
         data.SaveTo(stream);
@@ -97,10 +151,36 @@ public partial class ImageEditorWindow : Window
         BaseImage.Source = bitmapImage;
     }
 
+    private static void DrawHandle(SKCanvas canvas, float x, float y, SKPaint fill, SKPaint border)
+    {
+        canvas.DrawCircle(x, y, 4.5f, fill);
+        canvas.DrawCircle(x, y, 4.5f, border);
+    }
+
+    public SKBitmap GetFinalBitmap()
+    {
+        var finalBitmap = _currentBitmap.Copy();
+        using var canvas = new SKCanvas(finalBitmap);
+        foreach (var ann in _annotations)
+        {
+            ann.Render(canvas);
+        }
+        return finalBitmap;
+    }
+
     private void PushUndoState()
     {
-        _undoStack.Push(_currentBitmap.Copy());
-        _redoStack.Clear();
+        _undoStack.Push(new EditorHistoryState
+        {
+            BaseBitmap = _currentBitmap.Copy(),
+            Annotations = _annotations.Select(a => a.Clone()).ToList(),
+            StepBadgeCounter = _stepBadgeCounter
+        });
+        while (_redoStack.Count > 0)
+        {
+            var r = _redoStack.Pop();
+            r.BaseBitmap.Dispose();
+        }
         HasChanges = true;
         UpdateUndoRedoButtons();
     }
@@ -115,8 +195,20 @@ public partial class ImageEditorWindow : Window
     {
         if (_undoStack.Count == 0) return;
 
-        _redoStack.Push(_currentBitmap);
-        _currentBitmap = _undoStack.Pop();
+        _redoStack.Push(new EditorHistoryState
+        {
+            BaseBitmap = _currentBitmap.Copy(),
+            Annotations = _annotations.Select(a => a.Clone()).ToList(),
+            StepBadgeCounter = _stepBadgeCounter
+        });
+
+        var state = _undoStack.Pop();
+        _currentBitmap.Dispose();
+        _currentBitmap = state.BaseBitmap;
+        _annotations = state.Annotations;
+        _stepBadgeCounter = state.StepBadgeCounter;
+        _selectedAnnotation = null;
+
         UpdateImageDisplay();
         UpdateUndoRedoButtons();
     }
@@ -125,8 +217,20 @@ public partial class ImageEditorWindow : Window
     {
         if (_redoStack.Count == 0) return;
 
-        _undoStack.Push(_currentBitmap);
-        _currentBitmap = _redoStack.Pop();
+        _undoStack.Push(new EditorHistoryState
+        {
+            BaseBitmap = _currentBitmap.Copy(),
+            Annotations = _annotations.Select(a => a.Clone()).ToList(),
+            StepBadgeCounter = _stepBadgeCounter
+        });
+
+        var state = _redoStack.Pop();
+        _currentBitmap.Dispose();
+        _currentBitmap = state.BaseBitmap;
+        _annotations = state.Annotations;
+        _stepBadgeCounter = state.StepBadgeCounter;
+        _selectedAnnotation = null;
+
         UpdateImageDisplay();
         UpdateUndoRedoButtons();
     }
@@ -155,6 +259,12 @@ public partial class ImageEditorWindow : Window
             _ => EditorTool.Pan
         };
 
+        if (_currentTool != EditorTool.Pan && _selectedAnnotation != null)
+        {
+            _selectedAnnotation = null;
+            UpdateImageDisplay();
+        }
+
         if (PanelCropOptions != null) PanelCropOptions.Visibility = _currentTool == EditorTool.Crop ? Visibility.Visible : Visibility.Collapsed;
         if (PanelBlurOptions != null) PanelBlurOptions.Visibility = _currentTool == EditorTool.Pixelate ? Visibility.Visible : Visibility.Collapsed;
         if (SidePanel != null) SidePanel.Visibility = _currentTool == EditorTool.BackgroundRemoval ? Visibility.Visible : Visibility.Collapsed;
@@ -162,22 +272,22 @@ public partial class ImageEditorWindow : Window
         if (TextStatusHint != null)
         {
             TextStatusHint.Text = _currentTool switch
-        {
-            EditorTool.Pan => "✋ Hand-Modus: Bild mit der Maus verschieben • Mausrad zum Zoomen.",
-            EditorTool.Crop => "✂️ Zuschnitt: Bereich mit der Maus aufziehen • Dann 'Zuschnitt anwenden' klicken.",
-            EditorTool.Pixelate => "🔲 DSGVO-Verpixelung: Bereich über sensible Daten (Passwörter, Gesichter, Kennzeichen) ziehen.",
-            EditorTool.Blur => "💧 Weichzeichner: Bereich ziehen, um Inhalt sanft unkenntlich zu machen.",
-            EditorTool.Blackout => "⬛ Schwärzen: Blickdichten Block über vertrauliche Daten ziehen.",
-            EditorTool.Arrow => "🏹 Pfeil: Vom Startpunkt zum Zielpunkt ziehen.",
-            EditorTool.Rectangle => "▭ Rechteck: Rahmen zur Hervorhebung aufziehen.",
-            EditorTool.Oval => "⭕ Kreis: Detail einkreisen.",
-            EditorTool.StepBadge => $"❶ Schritt-Badge: Klick ins Bild platziert Schritt-Nummer {_stepBadgeCounter}.",
-            EditorTool.Pen => "✏️ Freihand: Mit der Maus frei zeichnen.",
-            EditorTool.Highlighter => "🖍️ Textmarker: Halbtransparente Markierung über Text ziehen.",
-            EditorTool.Text => "🔤 Text: Klick ins Bild, um Text einzugeben.",
-            EditorTool.BackgroundRemoval => "🪄 Hintergrund: Rechts Farbe oder KI-Modell wählen.",
-            _ => "Werkzeug aktiv."
-        };
+            {
+                EditorTool.Pan => "✋ Verschieben: Platziertes Element anklicken & verschieben (Entf = Löschen) • Freie Fläche ziehen zum Verschieben • Mausrad zum Zoomen.",
+                EditorTool.Crop => "✂️ Zuschnitt: Bereich mit der Maus aufziehen • Dann 'Zuschnitt anwenden' klicken.",
+                EditorTool.Pixelate => "🔲 DSGVO-Verpixelung: Bereich über sensible Daten (Passwörter, Gesichter, Kennzeichen) ziehen.",
+                EditorTool.Blur => "💧 Weichzeichner: Bereich ziehen, um Inhalt sanft unkenntlich zu machen.",
+                EditorTool.Blackout => "⬛ Schwärzen: Blickdichten Block über vertrauliche Daten ziehen.",
+                EditorTool.Arrow => "🏹 Pfeil: Vom Startpunkt zum Zielpunkt ziehen.",
+                EditorTool.Rectangle => "▭ Rechteck: Rahmen zur Hervorhebung aufziehen.",
+                EditorTool.Oval => "⭕ Kreis: Detail einkreisen.",
+                EditorTool.StepBadge => $"❶ Schritt-Badge: Klick ins Bild platziert Schritt-Nummer {_stepBadgeCounter}.",
+                EditorTool.Pen => "✏️ Freihand: Mit der Maus frei zeichnen.",
+                EditorTool.Highlighter => "🖍️ Textmarker: Halbtransparente Markierung über Text ziehen.",
+                EditorTool.Text => "🔤 Text: Klick ins Bild, um Text einzugeben.",
+                EditorTool.BackgroundRemoval => "🪄 Hintergrund: Rechts Farbe oder KI-Modell wählen • Mausrad zum Zoomen.",
+                _ => "Werkzeug aktiv."
+            };
         }
     }
 
@@ -199,11 +309,8 @@ public partial class ImageEditorWindow : Window
 
     private void OnCanvasMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (_currentTool == EditorTool.Pan) return;
-
         var pos = e.GetPosition(BaseImage);
-        _dragStart = pos;
-        _isDragging = true;
+        var pt = new SKPoint((float)pos.X, (float)pos.Y);
 
         if (_isPickingColor)
         {
@@ -216,13 +323,58 @@ public partial class ImageEditorWindow : Window
             return;
         }
 
+        if (_currentTool == EditorTool.Pan)
+        {
+            // Check if user clicked an existing annotation to move it
+            EditorAnnotation? hit = null;
+            for (int i = _annotations.Count - 1; i >= 0; i--)
+            {
+                if (_annotations[i].HitTest(pt))
+                {
+                    hit = _annotations[i];
+                    break;
+                }
+            }
+
+            if (hit != null)
+            {
+                _selectedAnnotation = hit;
+                _isMovingAnnotation = true;
+                _hasMovedSelectedAnnotation = false;
+                _moveStart = pos;
+                CanvasContainer.CaptureMouse();
+                UpdateImageDisplay();
+                TextStatusHint.Text = "Element ausgewählt. Ziehen zum Verschieben • Entf zum Löschen.";
+            }
+            else
+            {
+                if (_selectedAnnotation != null)
+                {
+                    _selectedAnnotation = null;
+                    UpdateImageDisplay();
+                }
+                _isPanningCanvas = true;
+                _panMouseStart = e.GetPosition(CanvasScrollViewer);
+                _panScrollStart = new WpfPoint(CanvasScrollViewer.HorizontalOffset, CanvasScrollViewer.VerticalOffset);
+                CanvasContainer.CaptureMouse();
+            }
+            return;
+        }
+
+        _dragStart = pos;
+        _isDragging = true;
+
         if (_currentTool == EditorTool.StepBadge)
         {
             PushUndoState();
-            var center = new SKPoint((float)pos.X, (float)pos.Y);
-            var updated = _editorService.DrawStepBadge(_currentBitmap, center, _stepBadgeCounter++, _selectedColor);
-            _currentBitmap.Dispose();
-            _currentBitmap = updated;
+            var badge = new EditorAnnotation
+            {
+                Type = AnnotationType.StepBadge,
+                StartPoint = pt,
+                Color = _selectedColor,
+                BadgeNumber = _stepBadgeCounter++
+            };
+            _annotations.Add(badge);
             UpdateImageDisplay();
             TextStatusHint.Text = $"Schritt-Badge {_stepBadgeCounter - 1} platziert. Nächster: {_stepBadgeCounter}.";
             _isDragging = false;
@@ -235,14 +387,26 @@ public partial class ImageEditorWindow : Window
             if (!string.IsNullOrWhiteSpace(input))
             {
                 PushUndoState();
-                var textPos = new SKPoint((float)pos.X, (float)pos.Y);
-                var updated = _editorService.DrawText(_currentBitmap, input, textPos, _selectedColor, fontSize: 24f, backgroundColor: new SKColor(15, 23, 42, 210));
-                _currentBitmap.Dispose();
-                _currentBitmap = updated;
+                var textAnn = new EditorAnnotation
+                {
+                    Type = AnnotationType.Text,
+                    StartPoint = pt,
+                    Text = input,
+                    Color = _selectedColor,
+                    FontSize = 24f,
+                    BackgroundColor = new SKColor(15, 23, 42, 210)
+                };
+                _annotations.Add(textAnn);
                 UpdateImageDisplay();
             }
             _isDragging = false;
             return;
+        }
+
+        if (_currentTool == EditorTool.Pen)
+        {
+            _activeFreehandPoints.Clear();
+            _activeFreehandPoints.Add(pt);
         }
 
         CanvasContainer.CaptureMouse();
@@ -250,9 +414,58 @@ public partial class ImageEditorWindow : Window
 
     private void OnCanvasMouseMove(object sender, MouseEventArgs e)
     {
+        var current = e.GetPosition(BaseImage);
+        var currentPt = new SKPoint((float)current.X, (float)current.Y);
+
+        if (_currentTool == EditorTool.Pan)
+        {
+            if (_isMovingAnnotation && _selectedAnnotation != null)
+            {
+                float dx = (float)(current.X - _moveStart.X);
+                float dy = (float)(current.Y - _moveStart.Y);
+                if (Math.Abs(dx) > 0.5f || Math.Abs(dy) > 0.5f)
+                {
+                    if (!_hasMovedSelectedAnnotation)
+                    {
+                        PushUndoState();
+                        _hasMovedSelectedAnnotation = true;
+                    }
+                    _selectedAnnotation.MoveBy(dx, dy);
+                    _moveStart = current;
+                    UpdateImageDisplay();
+                }
+                return;
+            }
+
+            if (_isPanningCanvas)
+            {
+                var currentScrollPos = e.GetPosition(CanvasScrollViewer);
+                double deltaX = currentScrollPos.X - _panMouseStart.X;
+                double deltaY = currentScrollPos.Y - _panMouseStart.Y;
+                CanvasScrollViewer.ScrollToHorizontalOffset(_panScrollStart.X - deltaX);
+                CanvasScrollViewer.ScrollToVerticalOffset(_panScrollStart.Y - deltaY);
+                return;
+            }
+
+            // Hover cursor indication in Pan mode
+            if (!_isDragging && !_isMovingAnnotation && !_isPanningCanvas)
+            {
+                bool overElement = false;
+                for (int i = _annotations.Count - 1; i >= 0; i--)
+                {
+                    if (_annotations[i].HitTest(currentPt))
+                    {
+                        overElement = true;
+                        break;
+                    }
+                }
+                CanvasContainer.Cursor = overElement ? Cursors.SizeAll : Cursors.Hand;
+            }
+            return;
+        }
+
         if (!_isDragging) return;
 
-        var current = e.GetPosition(BaseImage);
         double left = Math.Min(_dragStart.X, current.X);
         double top = Math.Min(_dragStart.Y, current.Y);
         double width = Math.Abs(_dragStart.X - current.X);
@@ -283,8 +496,18 @@ public partial class ImageEditorWindow : Window
                 break;
 
             case EditorTool.Arrow:
-            case EditorTool.Pen:
             case EditorTool.Highlighter:
+                PreviewLine.Visibility = Visibility.Visible;
+                PreviewLine.X1 = _dragStart.X;
+                PreviewLine.Y1 = _dragStart.Y;
+                PreviewLine.X2 = current.X;
+                PreviewLine.Y2 = current.Y;
+                PreviewLine.Stroke = new SolidColorBrush(WpfColor.FromRgb(_selectedColor.Red, _selectedColor.Green, _selectedColor.Blue));
+                PreviewLine.StrokeThickness = _currentTool == EditorTool.Highlighter ? 24 : _strokeWidth;
+                break;
+
+            case EditorTool.Pen:
+                _activeFreehandPoints.Add(currentPt);
                 PreviewLine.Visibility = Visibility.Visible;
                 PreviewLine.X1 = _dragStart.X;
                 PreviewLine.Y1 = _dragStart.Y;
@@ -298,6 +521,21 @@ public partial class ImageEditorWindow : Window
 
     private void OnCanvasMouseUp(object sender, MouseButtonEventArgs e)
     {
+        if (_currentTool == EditorTool.Pan)
+        {
+            if (_isMovingAnnotation)
+            {
+                _isMovingAnnotation = false;
+                CanvasContainer.ReleaseMouseCapture();
+            }
+            if (_isPanningCanvas)
+            {
+                _isPanningCanvas = false;
+                CanvasContainer.ReleaseMouseCapture();
+            }
+            return;
+        }
+
         if (!_isDragging) return;
 
         _isDragging = false;
@@ -331,59 +569,97 @@ public partial class ImageEditorWindow : Window
             return;
         }
 
-        if (w < 4 && h < 4 && _currentTool != EditorTool.Pen) return;
+        if (_currentTool == EditorTool.Pen)
+        {
+            if (_activeFreehandPoints.Count >= 2)
+            {
+                PushUndoState();
+                _annotations.Add(new EditorAnnotation
+                {
+                    Type = AnnotationType.Freehand,
+                    Points = new List<SKPoint>(_activeFreehandPoints),
+                    Color = _selectedColor,
+                    StrokeWidth = _strokeWidth
+                });
+                _activeFreehandPoints.Clear();
+                UpdateImageDisplay();
+            }
+            return;
+        }
+
+        if (w < 4 && h < 4) return;
 
         PushUndoState();
-
-        SKBitmap updated = _currentBitmap;
 
         switch (_currentTool)
         {
             case EditorTool.Pixelate:
                 int pixelSize = (int)SliderPixelSize.Value;
-                updated = _editorService.ApplyPixelate(_currentBitmap, new SKRectI(x1, y1, x2, y2), pixelSize);
+                var pixUpdated = _editorService.ApplyPixelate(_currentBitmap, new SKRectI(x1, y1, x2, y2), pixelSize);
+                _currentBitmap.Dispose();
+                _currentBitmap = pixUpdated;
+                UpdateImageDisplay();
                 break;
 
             case EditorTool.Blur:
-                updated = _editorService.ApplyGaussianBlur(_currentBitmap, new SKRectI(x1, y1, x2, y2), sigma: 14f);
+                var blurUpdated = _editorService.ApplyGaussianBlur(_currentBitmap, new SKRectI(x1, y1, x2, y2), sigma: 14f);
+                _currentBitmap.Dispose();
+                _currentBitmap = blurUpdated;
+                UpdateImageDisplay();
                 break;
 
             case EditorTool.Blackout:
-                updated = _editorService.ApplyBlackout(_currentBitmap, new SKRectI(x1, y1, x2, y2), _selectedColor);
+                var blkUpdated = _editorService.ApplyBlackout(_currentBitmap, new SKRectI(x1, y1, x2, y2), _selectedColor);
+                _currentBitmap.Dispose();
+                _currentBitmap = blkUpdated;
+                UpdateImageDisplay();
                 break;
 
             case EditorTool.Arrow:
-                var startPt = new SKPoint((float)_dragStart.X, (float)_dragStart.Y);
-                var endPt = new SKPoint((float)end.X, (float)end.Y);
-                updated = _editorService.DrawArrow(_currentBitmap, startPt, endPt, _selectedColor, _strokeWidth);
+                _annotations.Add(new EditorAnnotation
+                {
+                    Type = AnnotationType.Arrow,
+                    StartPoint = new SKPoint((float)_dragStart.X, (float)_dragStart.Y),
+                    EndPoint = new SKPoint((float)end.X, (float)end.Y),
+                    Color = _selectedColor,
+                    StrokeWidth = _strokeWidth
+                });
+                UpdateImageDisplay();
                 break;
 
             case EditorTool.Rectangle:
-                updated = _editorService.DrawRectangle(_currentBitmap, new SKRect(x1, y1, x2, y2), _selectedColor, _strokeWidth);
+                _annotations.Add(new EditorAnnotation
+                {
+                    Type = AnnotationType.Rectangle,
+                    Rect = new SKRect(x1, y1, x2, y2),
+                    Color = _selectedColor,
+                    StrokeWidth = _strokeWidth
+                });
+                UpdateImageDisplay();
                 break;
 
             case EditorTool.Oval:
-                updated = _editorService.DrawOval(_currentBitmap, new SKRect(x1, y1, x2, y2), _selectedColor, _strokeWidth);
-                break;
-
-            case EditorTool.Pen:
-                var p1 = new SKPoint((float)_dragStart.X, (float)_dragStart.Y);
-                var p2 = new SKPoint((float)end.X, (float)end.Y);
-                updated = _editorService.DrawArrow(_currentBitmap, p1, p2, _selectedColor, _strokeWidth); // simple line
+                _annotations.Add(new EditorAnnotation
+                {
+                    Type = AnnotationType.Oval,
+                    Rect = new SKRect(x1, y1, x2, y2),
+                    Color = _selectedColor,
+                    StrokeWidth = _strokeWidth
+                });
+                UpdateImageDisplay();
                 break;
 
             case EditorTool.Highlighter:
-                var hl1 = new SKPoint((float)_dragStart.X, (float)_dragStart.Y);
-                var hl2 = new SKPoint((float)end.X, (float)end.Y);
-                updated = _editorService.DrawHighlighter(_currentBitmap, hl1, hl2, _selectedColor, strokeWidth: 26f);
+                _annotations.Add(new EditorAnnotation
+                {
+                    Type = AnnotationType.Highlighter,
+                    StartPoint = new SKPoint((float)_dragStart.X, (float)_dragStart.Y),
+                    EndPoint = new SKPoint((float)end.X, (float)end.Y),
+                    Color = _selectedColor,
+                    StrokeWidth = 26f
+                });
+                UpdateImageDisplay();
                 break;
-        }
-
-        if (updated != _currentBitmap)
-        {
-            _currentBitmap.Dispose();
-            _currentBitmap = updated;
-            UpdateImageDisplay();
         }
     }
 
@@ -392,9 +668,16 @@ public partial class ImageEditorWindow : Window
         if (_activeCropRect.HasValue)
         {
             PushUndoState();
-            var cropped = _editorService.Crop(_currentBitmap, _activeCropRect.Value);
+            var crop = _activeCropRect.Value;
+            var cropped = _editorService.Crop(_currentBitmap, crop);
             _currentBitmap.Dispose();
             _currentBitmap = cropped;
+
+            foreach (var ann in _annotations)
+            {
+                ann.MoveBy(-crop.Left, -crop.Top);
+            }
+
             _activeCropRect = null;
             PreviewRect.Visibility = Visibility.Collapsed;
             UpdateImageDisplay();
@@ -409,12 +692,22 @@ public partial class ImageEditorWindow : Window
 
     private void OnCanvasMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (Keyboard.Modifiers == ModifierKeys.Control || _currentTool == EditorTool.Pan)
+        double factor = e.Delta > 0 ? 1.15 : (1.0 / 1.15);
+        var mousePos = e.GetPosition(CanvasScrollViewer);
+        double oldScale = CanvasScaleTransform.ScaleX;
+        double newScale = Math.Clamp(oldScale * factor, 0.1, 8.0);
+
+        if (Math.Abs(newScale - oldScale) > 0.001)
         {
-            double factor = e.Delta > 0 ? 1.15 : (1.0 / 1.15);
-            SetZoom(CanvasScaleTransform.ScaleX * factor);
-            e.Handled = true;
+            double relX = (mousePos.X + CanvasScrollViewer.HorizontalOffset) / oldScale;
+            double relY = (mousePos.Y + CanvasScrollViewer.VerticalOffset) / oldScale;
+
+            SetZoom(newScale);
+
+            CanvasScrollViewer.ScrollToHorizontalOffset(relX * newScale - mousePos.X);
+            CanvasScrollViewer.ScrollToVerticalOffset(relY * newScale - mousePos.Y);
         }
+        e.Handled = true;
     }
 
     private void OnZoomInClicked(object sender, RoutedEventArgs e) => SetZoom(CanvasScaleTransform.ScaleX * 1.25);
@@ -546,7 +839,8 @@ public partial class ImageEditorWindow : Window
     {
         try
         {
-            SaveBitmapToFile(_currentBitmap, _filePath);
+            using var final = GetFinalBitmap();
+            SaveBitmapToFile(final, _filePath);
             ResultFilePath = _filePath;
             DialogResult = true;
             Close();
@@ -566,7 +860,8 @@ public partial class ImageEditorWindow : Window
             string name = Path.GetFileNameWithoutExtension(_filePath);
             string copyPath = Path.Combine(dir, $"{name}_bearbeitet.png");
 
-            SaveBitmapToFile(_currentBitmap, copyPath);
+            using var final = GetFinalBitmap();
+            SaveBitmapToFile(final, copyPath);
             ResultFilePath = copyPath;
             DialogResult = true;
             Close();
@@ -582,7 +877,8 @@ public partial class ImageEditorWindow : Window
     {
         try
         {
-            using var image = SKImage.FromBitmap(_currentBitmap);
+            using var final = GetFinalBitmap();
+            using var image = SKImage.FromBitmap(final);
             using var data = image.Encode(SKEncodedImageFormat.Png, 100);
             using var stream = new MemoryStream();
             data.SaveTo(stream);
@@ -622,6 +918,15 @@ public partial class ImageEditorWindow : Window
             OnRedoClicked(sender, e);
             e.Handled = true;
         }
+        else if (e.Key == Key.Delete && _selectedAnnotation != null && _currentTool == EditorTool.Pan)
+        {
+            PushUndoState();
+            _annotations.Remove(_selectedAnnotation);
+            _selectedAnnotation = null;
+            UpdateImageDisplay();
+            TextStatusHint.Text = "Element gelöscht.";
+            e.Handled = true;
+        }
         else if (e.Key == Key.Escape)
         {
             if (_activeCropRect.HasValue)
@@ -629,6 +934,11 @@ public partial class ImageEditorWindow : Window
                 _activeCropRect = null;
                 PreviewRect.Visibility = Visibility.Collapsed;
                 TextStatusHint.Text = "Zuschnitt abgebrochen.";
+            }
+            else if (_selectedAnnotation != null)
+            {
+                _selectedAnnotation = null;
+                UpdateImageDisplay();
             }
         }
     }
@@ -665,4 +975,360 @@ public enum EditorTool
     Highlighter,
     Text,
     BackgroundRemoval
+}
+
+public enum AnnotationType
+{
+    Arrow,
+    Rectangle,
+    Oval,
+    StepBadge,
+    Freehand,
+    Highlighter,
+    Text
+}
+
+public class EditorAnnotation
+{
+    public AnnotationType Type { get; set; }
+    public SKPoint StartPoint { get; set; }
+    public SKPoint EndPoint { get; set; }
+    public SKRect Rect { get; set; }
+    public List<SKPoint> Points { get; set; } = new();
+    public SKColor Color { get; set; }
+    public float StrokeWidth { get; set; } = 4f;
+    public int BadgeNumber { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public float FontSize { get; set; } = 24f;
+    public SKColor BackgroundColor { get; set; } = new SKColor(15, 23, 42, 210);
+
+    public EditorAnnotation Clone()
+    {
+        return new EditorAnnotation
+        {
+            Type = this.Type,
+            StartPoint = this.StartPoint,
+            EndPoint = this.EndPoint,
+            Rect = this.Rect,
+            Points = new List<SKPoint>(this.Points),
+            Color = this.Color,
+            StrokeWidth = this.StrokeWidth,
+            BadgeNumber = this.BadgeNumber,
+            Text = this.Text,
+            FontSize = this.FontSize,
+            BackgroundColor = this.BackgroundColor
+        };
+    }
+
+    public void MoveBy(float dx, float dy)
+    {
+        StartPoint = new SKPoint(StartPoint.X + dx, StartPoint.Y + dy);
+        EndPoint = new SKPoint(EndPoint.X + dx, EndPoint.Y + dy);
+        Rect = new SKRect(Rect.Left + dx, Rect.Top + dy, Rect.Right + dx, Rect.Bottom + dy);
+        for (int i = 0; i < Points.Count; i++)
+        {
+            Points[i] = new SKPoint(Points[i].X + dx, Points[i].Y + dy);
+        }
+    }
+
+    public SKRect GetBounds()
+    {
+        switch (Type)
+        {
+            case AnnotationType.Arrow:
+            case AnnotationType.Highlighter:
+                float minX = Math.Min(StartPoint.X, EndPoint.X);
+                float minY = Math.Min(StartPoint.Y, EndPoint.Y);
+                float maxX = Math.Max(StartPoint.X, EndPoint.X);
+                float maxY = Math.Max(StartPoint.Y, EndPoint.Y);
+                float pad = Math.Max(StrokeWidth * 2, 10f);
+                return new SKRect(minX - pad, minY - pad, maxX + pad, maxY + pad);
+
+            case AnnotationType.Rectangle:
+            case AnnotationType.Oval:
+                float rPad = StrokeWidth / 2f + 4f;
+                return new SKRect(Math.Min(Rect.Left, Rect.Right) - rPad,
+                                  Math.Min(Rect.Top, Rect.Bottom) - rPad,
+                                  Math.Max(Rect.Left, Rect.Right) + rPad,
+                                  Math.Max(Rect.Top, Rect.Bottom) + rPad);
+
+            case AnnotationType.StepBadge:
+                float radius = 18f;
+                return new SKRect(StartPoint.X - radius - 4, StartPoint.Y - radius - 4, StartPoint.X + radius + 4, StartPoint.Y + radius + 4);
+
+            case AnnotationType.Text:
+                using (var paint = new SKPaint { TextSize = FontSize, IsAntialias = true })
+                {
+                    var textBounds = new SKRect();
+                    paint.MeasureText(Text, ref textBounds);
+                    float w = textBounds.Width + 24;
+                    float h = FontSize + 16;
+                    return new SKRect(StartPoint.X - 6, StartPoint.Y - 6, StartPoint.X + w + 6, StartPoint.Y + h + 6);
+                }
+
+            case AnnotationType.Freehand:
+                if (Points.Count == 0) return new SKRect(StartPoint.X, StartPoint.Y, StartPoint.X, StartPoint.Y);
+                float fMinX = float.MaxValue, fMinY = float.MaxValue, fMaxX = float.MinValue, fMaxY = float.MinValue;
+                foreach (var p in Points)
+                {
+                    if (p.X < fMinX) fMinX = p.X;
+                    if (p.Y < fMinY) fMinY = p.Y;
+                    if (p.X > fMaxX) fMaxX = p.X;
+                    if (p.Y > fMaxY) fMaxY = p.Y;
+                }
+                float fPad = StrokeWidth + 6;
+                return new SKRect(fMinX - fPad, fMinY - fPad, fMaxX + fPad, fMaxY + fPad);
+
+            default:
+                return SKRect.Empty;
+        }
+    }
+
+    public bool HitTest(SKPoint p)
+    {
+        var bounds = GetBounds();
+        if (!bounds.Contains(p.X, p.Y)) return false;
+
+        switch (Type)
+        {
+            case AnnotationType.Arrow:
+            case AnnotationType.Highlighter:
+                return DistanceToSegment(p, StartPoint, EndPoint) <= Math.Max(StrokeWidth + 8, 14f);
+
+            case AnnotationType.Rectangle:
+                return bounds.Contains(p.X, p.Y);
+
+            case AnnotationType.Oval:
+                return bounds.Contains(p.X, p.Y);
+
+            case AnnotationType.StepBadge:
+                float dx = p.X - StartPoint.X;
+                float dy = p.Y - StartPoint.Y;
+                return (dx * dx + dy * dy) <= (22f * 22f);
+
+            case AnnotationType.Text:
+                return bounds.Contains(p.X, p.Y);
+
+            case AnnotationType.Freehand:
+                for (int i = 0; i < Points.Count - 1; i++)
+                {
+                    if (DistanceToSegment(p, Points[i], Points[i + 1]) <= Math.Max(StrokeWidth + 8, 12f))
+                        return true;
+                }
+                return bounds.Contains(p.X, p.Y);
+
+            default:
+                return bounds.Contains(p.X, p.Y);
+        }
+    }
+
+    private static float DistanceToSegment(SKPoint p, SKPoint v, SKPoint w)
+    {
+        float l2 = (w.X - v.X) * (w.X - v.X) + (w.Y - v.Y) * (w.Y - v.Y);
+        if (l2 == 0) return (float)Math.Sqrt((p.X - v.X) * (p.X - v.X) + (p.Y - v.Y) * (p.Y - v.Y));
+        float t = Math.Max(0, Math.Min(1, ((p.X - v.X) * (w.X - v.X) + (p.Y - v.Y) * (w.Y - v.Y)) / l2));
+        SKPoint projection = new SKPoint(v.X + t * (w.X - v.X), v.Y + t * (w.Y - v.Y));
+        return (float)Math.Sqrt((p.X - projection.X) * (p.X - projection.X) + (p.Y - projection.Y) * (p.Y - projection.Y));
+    }
+
+    public void Render(SKCanvas canvas)
+    {
+        switch (Type)
+        {
+            case AnnotationType.Arrow:
+                using (var paint = new SKPaint
+                {
+                    Color = Color,
+                    StrokeWidth = StrokeWidth,
+                    Style = SKPaintStyle.Stroke,
+                    StrokeCap = SKStrokeCap.Round,
+                    IsAntialias = true
+                })
+                {
+                    canvas.DrawLine(StartPoint, EndPoint, paint);
+                    float dx = EndPoint.X - StartPoint.X;
+                    float dy = EndPoint.Y - StartPoint.Y;
+                    float angle = MathF.Atan2(dy, dx);
+                    float arrowLen = Math.Max(16f, StrokeWidth * 4f);
+                    float wingAngle = 28f * (MathF.PI / 180f);
+
+                    var wing1 = new SKPoint(
+                        EndPoint.X - arrowLen * MathF.Cos(angle - wingAngle),
+                        EndPoint.Y - arrowLen * MathF.Sin(angle - wingAngle));
+
+                    var wing2 = new SKPoint(
+                        EndPoint.X - arrowLen * MathF.Cos(angle + wingAngle),
+                        EndPoint.Y - arrowLen * MathF.Sin(angle + wingAngle));
+
+                    using var headPaint = new SKPaint
+                    {
+                        Color = Color,
+                        Style = SKPaintStyle.Fill,
+                        IsAntialias = true
+                    };
+
+                    using var path = new SKPath();
+                    path.MoveTo(EndPoint);
+                    path.LineTo(wing1);
+                    path.LineTo(wing2);
+                    path.Close();
+
+                    canvas.DrawPath(path, headPaint);
+                }
+                break;
+
+            case AnnotationType.Rectangle:
+                using (var paint = new SKPaint
+                {
+                    Color = Color,
+                    StrokeWidth = StrokeWidth,
+                    Style = SKPaintStyle.Stroke,
+                    IsAntialias = true
+                })
+                {
+                    canvas.DrawRoundRect(Rect, 4f, 4f, paint);
+                }
+                break;
+
+            case AnnotationType.Oval:
+                {
+                    using var ovalPaint = new SKPaint
+                    {
+                        Color = Color,
+                        StrokeWidth = StrokeWidth,
+                        Style = SKPaintStyle.Stroke,
+                        IsAntialias = true
+                    };
+                    canvas.DrawOval(Rect, ovalPaint);
+                    break;
+                }
+
+            case AnnotationType.StepBadge:
+                {
+                    float radius = 18f;
+                    using (var shadowPaint = new SKPaint
+                    {
+                        Color = new SKColor(0, 0, 0, 100),
+                        Style = SKPaintStyle.Fill,
+                        IsAntialias = true
+                    })
+                    {
+                        canvas.DrawCircle(StartPoint.X, StartPoint.Y + 1.5f, radius + 1f, shadowPaint);
+                    }
+
+                    using (var circlePaint = new SKPaint
+                    {
+                        Color = Color,
+                        Style = SKPaintStyle.Fill,
+                        IsAntialias = true
+                    })
+                    {
+                        canvas.DrawCircle(StartPoint, radius, circlePaint);
+                    }
+
+                    float lum = (0.2126f * Color.Red + 0.7152f * Color.Green + 0.0722f * Color.Blue) / 255f;
+                    bool isLight = lum > 0.55f;
+                    SKColor textColor = isLight ? new SKColor(15, 23, 42) : SKColors.White;
+                    SKColor borderColor = isLight ? new SKColor(15, 23, 42, 160) : SKColors.White;
+
+                    using (var borderPaint = new SKPaint
+                    {
+                        Color = borderColor,
+                        StrokeWidth = 2f,
+                        Style = SKPaintStyle.Stroke,
+                        IsAntialias = true
+                    })
+                    {
+                        canvas.DrawCircle(StartPoint, radius, borderPaint);
+                    }
+
+                    using (var textPaint = new SKPaint
+                    {
+                        Color = textColor,
+                        TextSize = radius * 1.15f,
+                        IsAntialias = true,
+                        TextAlign = SKTextAlign.Center,
+                        Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
+                    })
+                    {
+                        var textBounds = new SKRect();
+                        string numStr = BadgeNumber.ToString();
+                        textPaint.MeasureText(numStr, ref textBounds);
+                        float textY = StartPoint.Y - textBounds.MidY;
+                        canvas.DrawText(numStr, StartPoint.X, textY, textPaint);
+                    }
+                    break;
+                }
+
+            case AnnotationType.Highlighter:
+                {
+                    var highlightColor = new SKColor(Color.Red, Color.Green, Color.Blue, 115);
+                    using (var hlPaint = new SKPaint
+                    {
+                        Color = highlightColor,
+                        StrokeWidth = StrokeWidth > 0 ? StrokeWidth : 24f,
+                        Style = SKPaintStyle.Stroke,
+                        StrokeCap = SKStrokeCap.Round,
+                        BlendMode = SKBlendMode.SrcOver,
+                        IsAntialias = true
+                    })
+                    {
+                        canvas.DrawLine(StartPoint, EndPoint, hlPaint);
+                    }
+                    break;
+                }
+
+            case AnnotationType.Text:
+                if (string.IsNullOrEmpty(Text)) return;
+                using (var textPaint = new SKPaint
+                {
+                    Color = Color,
+                    TextSize = FontSize,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
+                })
+                {
+                    var bounds = new SKRect();
+                    textPaint.MeasureText(Text, ref bounds);
+
+                    using var bgPaint = new SKPaint
+                    {
+                        Color = BackgroundColor,
+                        Style = SKPaintStyle.Fill,
+                        IsAntialias = true
+                    };
+                    var bgRect = new SKRect(
+                        StartPoint.X - 6f,
+                        StartPoint.Y - bounds.Height - 6f,
+                        StartPoint.X + bounds.Width + 6f,
+                        StartPoint.Y + 6f);
+
+                    canvas.DrawRoundRect(bgRect, 4f, 4f, bgPaint);
+                    canvas.DrawText(Text, StartPoint.X, StartPoint.Y, textPaint);
+                }
+                break;
+
+            case AnnotationType.Freehand:
+                if (Points == null || Points.Count < 2) return;
+                using (var paint = new SKPaint
+                {
+                    Color = Color,
+                    StrokeWidth = StrokeWidth,
+                    Style = SKPaintStyle.Stroke,
+                    StrokeCap = SKStrokeCap.Round,
+                    StrokeJoin = SKStrokeJoin.Round,
+                    IsAntialias = true
+                })
+                {
+                    using var path = new SKPath();
+                    path.MoveTo(Points[0]);
+                    for (int i = 1; i < Points.Count; i++)
+                    {
+                        path.LineTo(Points[i]);
+                    }
+                    canvas.DrawPath(path, paint);
+                }
+                break;
+        }
+    }
 }

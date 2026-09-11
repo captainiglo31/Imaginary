@@ -9,39 +9,64 @@
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
     
-    <Grid Margin="16">
+    <Window.Resources>
+        <!-- Checkerboard brush for transparency preview -->
+        <DrawingBrush x:Key="CheckerboardBrush" Viewport="0,0,16,16" ViewportUnits="Absolute" TileMode="Tile">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#1E293B">
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="0,0,16,16"/>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                    <GeometryDrawing Brush="#0F172A">
+                        <GeometryDrawing.Geometry>
+                            <GeometryGroup>
+                                <RectangleGeometry Rect="0,0,8,8"/>
+                                <RectangleGeometry Rect="8,8,8,8"/>
+                            </GeometryGroup>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+    </Window.Resources>
+
+    <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Top Header Info -->
+        <!-- Top Header & Controls -->
         <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" 
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                 CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
             <DockPanel LastChildFill="True">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                    <RadioButton x:Name="RadioSplit" Content="Split-Slider" GroupName="PreviewMode" IsChecked="True" 
-                                 Checked="OnViewModeChanged" Margin="0,0,14,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                    <RadioButton x:Name="RadioSideBySide" Content="Nebeneinander" GroupName="PreviewMode"
-                                 Checked="OnViewModeChanged" Margin="0,0,16,0" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                    <Button Content="Schließen" Click="OnCloseClicked" Padding="14,5"
-                            Background="{DynamicResource SecondaryButtonBackgroundBrush}"
-                            Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Cursor="Hand"/>
+                    <!-- Mode Switcher -->
+                    <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4,2" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="RadioSplit" Content="↔️ Split-Slider" IsChecked="True" 
+                                         Checked="OnViewModeChanged" Style="{StaticResource ToolbarRadioButtonStyle}" Margin="0,0,4,0"/>
+                            <RadioButton x:Name="RadioSideBySide" Content="📑 Nebeneinander" 
+                                         Checked="OnViewModeChanged" Style="{StaticResource ToolbarRadioButtonStyle}"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <Button Content="Schließen" Click="OnCloseClicked" Style="{StaticResource ToolbarButtonStyle}"/>
                 </StackPanel>
-                
+
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock x:Name="TextFileName" Text="Dateiname" FontWeight="Bold" FontSize="15"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    <TextBlock x:Name="TextDetails" Text="Original: - | Konvertiert: -" FontSize="12"
-                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                    <TextBlock x:Name="TextFileName" Text="Dateiname.png" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock x:Name="TextDetails" Text="Details werden geladen..." FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <!-- Central Image Comparison Area -->
+        <!-- Main Image Area (Common Container for Zoom & Pan) -->
         <Border Grid.Row="1" Background="{DynamicResource SurfaceBackgroundBrush}" 
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                 CornerRadius="8" ClipToBounds="True" SizeChanged="OnContainerSizeChanged"
@@ -52,12 +77,17 @@
                 LostMouseCapture="OnContainerLostMouseCapture">
             <Grid ClipToBounds="True">
                 <!-- Split Slider View Mode -->
-                <Grid x:Name="SplitViewGrid" Visibility="Visible" Cursor="SizeWE" Background="#05000000" ClipToBounds="True"
+                <Grid x:Name="SplitViewGrid" Visibility="Visible" Cursor="SizeWE" Background="{StaticResource CheckerboardBrush}" ClipToBounds="True"
                       MouseDown="OnImageAreaMouseDown" MouseMove="OnImageAreaMouseMove" MouseUp="OnImageAreaMouseUp">
-                    <!-- Layer 1: Original Image (Bottom) -->
-                    <Image x:Name="ImageOriginalSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0,0"/>
+                    <!-- Layer 1: Original Image inside Container with Clip (Left of split) -->
+                    <Grid x:Name="OriginalContainer" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
+                        <Grid.Clip>
+                            <RectangleGeometry x:Name="OriginalClipGeometry"/>
+                        </Grid.Clip>
+                        <Image x:Name="ImageOriginalSplit" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0,0"/>
+                    </Grid>
                     
-                    <!-- Layer 2: Processed Image inside a Container matching Grid bounds with Clip -->
+                    <!-- Layer 2: Processed Image inside a Container matching Grid bounds with Clip (Right of split) -->
                     <Grid x:Name="ProcessedContainer" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
                         <Grid.Clip>
                             <RectangleGeometry x:Name="SplitClipGeometry"/>
@@ -97,7 +127,7 @@
 
                     <Border x:Name="BorderOriginalSide" Grid.Column="0" BorderBrush="{DynamicResource BorderBrush}" 
                             BorderThickness="1" CornerRadius="6" ClipToBounds="True" Background="Transparent">
-                        <Grid x:Name="GridOriginalSide" ClipToBounds="True">
+                        <Grid x:Name="GridOriginalSide" Background="{StaticResource CheckerboardBrush}" ClipToBounds="True">
                             <Image x:Name="ImageOriginalSide" Stretch="Uniform" RenderTransformOrigin="0,0"/>
                             <Border Background="#B0000000" VerticalAlignment="Top" HorizontalAlignment="Left"
                                     CornerRadius="4" Padding="8,3" Margin="8" IsHitTestVisible="False">
@@ -110,7 +140,7 @@
 
                     <Border x:Name="BorderProcessedSide" Grid.Column="2" BorderBrush="{DynamicResource BorderBrush}" 
                             BorderThickness="1" CornerRadius="6" ClipToBounds="True" Background="Transparent">
-                        <Grid x:Name="GridProcessedSide" ClipToBounds="True">
+                        <Grid x:Name="GridProcessedSide" Background="{StaticResource CheckerboardBrush}" ClipToBounds="True">
                             <Image x:Name="ImageProcessedSide" Stretch="Uniform" RenderTransformOrigin="0,0"/>
                             <Border Background="#B0000000" VerticalAlignment="Top" HorizontalAlignment="Left"
                                     CornerRadius="4" Padding="8,3" Margin="8" IsHitTestVisible="False">

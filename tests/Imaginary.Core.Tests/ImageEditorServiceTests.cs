@@ -116,4 +116,33 @@ public class ImageEditorServiceTests
         // Point within badge radius should have badge color
         result.GetPixel(60, 50).Should().NotBe(SKColors.White);
     }
+
+    [Fact]
+    public void DrawStepBadge_WhiteColor_ShouldDrawWithDarkContrastText()
+    {
+        // Transparent background so we can clearly see the badge and border/text
+        using var source = CreateTestBitmap(100, 100, SKColors.Transparent);
+        using var result = _service.DrawStepBadge(source, new SKPoint(50, 50), number: 1, SKColors.White, radius: 20f);
+
+        result.Width.Should().Be(100);
+        result.Height.Should().Be(100);
+
+        // At center (where number 1 is drawn), text pixels should be dark (#0F172A)
+        bool hasDarkTextPixel = false;
+        for (int y = 40; y <= 60; y++)
+        {
+            for (int x = 40; x <= 60; x++)
+            {
+                var px = result.GetPixel(x, y);
+                if (px.Red < 50 && px.Green < 50 && px.Blue < 60 && px.Alpha > 200)
+                {
+                    hasDarkTextPixel = true;
+                    break;
+                }
+            }
+            if (hasDarkTextPixel) break;
+        }
+
+        hasDarkTextPixel.Should().BeTrue("White badge must use dark contrast text instead of white-on-white.");
+    }
 }

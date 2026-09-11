@@ -35,22 +35,47 @@
             </Setter>
         </Style>
 
+        <!-- Checkerboard brush for transparency preview -->
+        <DrawingBrush x:Key="CheckerboardBrush" Viewport="0,0,16,16" ViewportUnits="Absolute" TileMode="Tile">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#1E293B">
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="0,0,16,16"/>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                    <GeometryDrawing Brush="#0F172A">
+                        <GeometryDrawing.Geometry>
+                            <GeometryGroup>
+                                <RectangleGeometry Rect="0,0,8,8"/>
+                                <RectangleGeometry Rect="8,8,8,8"/>
+                            </GeometryGroup>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+
         <!-- Style for Tool Palette Buttons -->
         <Style x:Key="ToolPaletteButtonStyle" TargetType="RadioButton">
-            <Setter Property="Width" Value="46"/>
-            <Setter Property="Height" Value="42"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
-            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="FontSize" Value="17"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="FontFamily" Value="Segoe UI Emoji, Segoe UI"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="RootBorder" CornerRadius="6" Background="Transparent" Padding="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="RootBorder" Property="Background" Value="#2038BDF8"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="RootBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
@@ -157,36 +182,47 @@
         <!-- 3. Work Area: Vertical Tools (Left), Viewport Canvas (Center), Side Panel (Right) -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="62"/>
+                <ColumnDefinition Width="74"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition x:Name="ColSidePanel" Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <!-- Vertical Tool Palette -->
             <Border Grid.Column="0" Background="{DynamicResource SurfaceBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="6,8">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <RadioButton x:Name="ToolPan" GroupName="ToolGroup" Content="✋" ToolTip="Hand / Verschieben"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="4,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel HorizontalAlignment="Center">
+                        <RadioButton x:Name="ToolPan" GroupName="ToolGroup" Content="✋" ToolTip="Hand / Verschieben (Bildelemente auswählen &amp; verschieben oder Bild pannen)"
                                      Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
                         <RadioButton x:Name="ToolCrop" GroupName="ToolGroup" Content="✂️" ToolTip="Zuschneiden (Crop)"
                                      Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
                         <Separator Margin="4,4"/>
-                        <RadioButton x:Name="ToolPixelate" GroupName="ToolGroup" Content="🔲" ToolTip="DSGVO: Verpixeln (Mosaik)"
-                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolPixelate" GroupName="ToolGroup" Content="▦" ToolTip="DSGVO: Verpixeln (Mosaik)"
+                                     FontSize="20" Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
                         <RadioButton x:Name="ToolBlur" GroupName="ToolGroup" Content="💧" ToolTip="DSGVO: Weichzeichnen (Blur)"
                                      Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
-                        <RadioButton x:Name="ToolBlackout" GroupName="ToolGroup" Content="⬛" ToolTip="DSGVO: Schwärzen"
-                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolBlackout" GroupName="ToolGroup" ToolTip="DSGVO: Schwärzen"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Rectangle Width="18" Height="18" RadiusX="3" RadiusY="3" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                        </RadioButton>
                         <Separator Margin="4,4"/>
-                        <RadioButton x:Name="ToolArrow" GroupName="ToolGroup" Content="🏹" ToolTip="Hinweis-Pfeil"
-                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
-                        <RadioButton x:Name="ToolRectangle" GroupName="ToolGroup" Content="▭" ToolTip="Rechteck / Rahmen"
-                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
-                        <RadioButton x:Name="ToolOval" GroupName="ToolGroup" Content="⭕" ToolTip="Kreis / Ellipse"
-                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
-                        <RadioButton x:Name="ToolStepBadge" GroupName="ToolGroup" Content="❶" ToolTip="Schritt-Badge (1, 2, 3...)"
-                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolArrow" GroupName="ToolGroup" Content="➔" ToolTip="Hinweis-Pfeil"
+                                     FontWeight="Bold" FontSize="19" Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolRectangle" GroupName="ToolGroup" ToolTip="Rechteck / Rahmen"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Rectangle Width="19" Height="14" RadiusX="2" RadiusY="2" StrokeThickness="2" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                        </RadioButton>
+                        <RadioButton x:Name="ToolOval" GroupName="ToolGroup" ToolTip="Kreis / Ellipse"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Ellipse Width="18" Height="18" StrokeThickness="2" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                        </RadioButton>
+                        <RadioButton x:Name="ToolStepBadge" GroupName="ToolGroup" ToolTip="Schritt-Badge (1, 2, 3...)"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Grid Width="20" Height="20">
+                                <Ellipse Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                <TextBlock Text="1" Foreground="{DynamicResource SurfaceBackgroundBrush}" FontWeight="ExtraBold" FontSize="11.5" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
+                            </Grid>
+                        </RadioButton>
                         <Separator Margin="4,4"/>
                         <RadioButton x:Name="ToolPen" GroupName="ToolGroup" Content="✏️" ToolTip="Freihand-Stift"
                                      Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
@@ -206,6 +242,7 @@
                 <ScrollViewer x:Name="CanvasScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                               Background="Transparent" MouseWheel="OnCanvasMouseWheel">
                     <Grid x:Name="CanvasContainer" HorizontalAlignment="Center" VerticalAlignment="Center"
+                          Background="{StaticResource CheckerboardBrush}"
                           MouseDown="OnCanvasMouseDown" MouseMove="OnCanvasMouseMove" MouseUp="OnCanvasMouseUp">
                         <Grid.LayoutTransform>
                             <ScaleTransform x:Name="CanvasScaleTransform" ScaleX="1" ScaleY="1"/>

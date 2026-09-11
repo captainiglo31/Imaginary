@@ -1,17 +1,20 @@
-## 🚀 Was ist neu in Version 2.0.3:
+## 🚀 Was ist neu in Version 2.0.4:
 
-### 🐛 Kritische Fehlerbehebungen
-- **Bild-Editor-Absturz behoben:** Beim Klick auf den Button „Bearbeiten“ kam es bisher zu einer unbehandelten Ausnahme (`NullReferenceException`), da Steuerelemente für den Hintergrundmodus noch während der Fenster-Initialisierung Ereignisse auslösten. Dies wurde vollständig behoben; der Bild-Editor öffnet sich nun blitzschnell und stabil.
-- **Autostart-Fensteranzeige behoben:** Wenn Imaginary mit Windows minimiert im Infobereich gestartet wurde, reagierte ein erneuter Klick auf das Desktop-Icon oder die Anwendungsdatei bisher nicht. Das IPC-Aktivierungssignal (Single Instance Pipe) wurde grundlegend überarbeitet: Imaginary erkennt den Aufruf sofort, stellt das Fenster wieder her und bringt es zuverlässig in den Vordergrund.
+### 🎨 Bild-Editor: Elemente nachträglich verschieben & löschen
+- **Interaktives Verschieben-Werkzeug:** Mit dem Werkzeug „Verschieben“ (Hand) können gesetzte Markierungen (Pfeile, Rechtecke, Kreise, Text, Schritt-Badges und Freihandzeichnungen) jederzeit per Klick ausgewählt und an eine neue Position verschoben werden.
+- **Elemente entfernen:** Ein markiertes Element kann einfach mit der Taste `Entf` gelöscht werden.
+- **Canvas-Panning:** Klick und Ziehen auf freier Fläche verschiebt nach wie vor schnell und flexibel den sichtbaren Bildausschnitt.
 
-### ⚙️ Verbesserungen für System & Autostart
-- **Freie Wahl des Autostart-Verhaltens:** In den Einstellungen (*🖥️ System & Hintergrundbetrieb*) kann nun flexibel gewählt werden, ob Imaginary beim Windows-Login:
-  - **Sichtbar** mit dem vollen Hauptfenster geöffnet werden soll (Standard).
-  - Oder **lautlos minimiert** im Windows-Infobereich (System-Tray) startet.
-- **Dezenter Tray-Hinweis:** Beim Start im Infobereich informiert nun eine kurze Windows-Benachrichtigung darüber, dass Imaginary im Hintergrund aktiv ist. Ein Klick darauf öffnet direkt die Oberfläche.
-- **Klick-Aktivierung aus dem Infobereich:** Ein Klick auf Benachrichtigungen aus dem Infobereich stellt das Hauptfenster nun ebenfalls unmittelbar wieder her.
+### 🔍 Mausrad-Zoom bei Hintergrundentfernung & allen Werkzeugen
+- **Flüssiger Mausrad-Zoom:** Das Mausrad zoomt nun in jedem Werkzeugmodus (insbesondere bei der Hintergrundentfernung) direkt zentriert an der Mauszeigerposition in das Bild hinein und heraus.
 
-### 🔄 Automatische Updates im laufenden Betrieb
-- **Periodische Hintergrundprüfung:** Imaginary prüft nun nicht mehr nur beim Start, sondern auch während des laufenden Betriebs (alle 4 Stunden dezent im Hintergrund) auf neue Releases und Aktualisierungen.
-- **Einstellungsoption:** In den Einstellungen unter *🔄 Updates & Info* lässt sich diese automatische periodische Hintergrundsuche jederzeit nach Wunsch aktivieren oder deaktivieren.
-- **Tray-Update-Benachrichtigung:** Wird ein neues Update gefunden während das Fenster minimiert ist, erscheint ein Hinweis im Infobereich, über den das Update sofort bezogen werden kann.
+### ❶ Schritt-Badge: Perfekter Kontrast bei weißem Hintergrund
+- **Automatische Kontrastschrift:** Bei der Auswahl von Weiß oder hellen Farben für das Schritt-Badge wird die Schriftfarbe und Umrandung automatisch auf ein dunkles Anthrazit umgeschaltet. Weiße Schrift auf weißem Grund gehört damit der Vergangenheit an.
+
+### ↔️ Vorher / Nachher-Vergleich: Keine Transparenz-Überlagerung mehr
+- **Saubere Trennung im Split-Slider:** Bei freigestellten Bildern mit transparenten Bereichen scheint das Originalbild unter dem Nachher-Bereich nicht mehr durch. Transparenzen werden nun korrekt auf dem Schachbrettmuster dargestellt.
+
+### 🌙 Dark-Mode & Werkzeugleiste optimiert
+- **Klare Sichtbarkeit im Dark Mode:** Die Werkzeug-Icons und Symbole der Farb- und Werkzeugpalette passen sich nun dynamisch an das aktuelle Theme an und sind im Dunkelmodus gestochen scharf und kontrastreich sichtbar.
+- **Keine abgeschnittenen Buttons mehr:** Die Seitenleiste wurde vergrößert und optimiert, sodass der Scrollbalken keine Schaltflächen mehr überdeckt.
+

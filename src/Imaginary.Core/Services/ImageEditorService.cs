@@ -273,10 +273,17 @@ public class ImageEditorService : IImageEditorService
         };
         canvas.DrawCircle(center, radius, circlePaint);
 
-        // White border
+        // Determine high-contrast text and border color based on relative luminance (ITU-R BT.709)
+        float lum = (0.2126f * badgeColor.Red + 0.7152f * badgeColor.Green + 0.0722f * badgeColor.Blue) / 255f;
+        bool isLight = lum > 0.55f;
+
+        SKColor textColor = isLight ? new SKColor(15, 23, 42) : SKColors.White;
+        SKColor borderColor = isLight ? new SKColor(15, 23, 42, 160) : SKColors.White;
+
+        // High-contrast border
         using var borderPaint = new SKPaint
         {
-            Color = SKColors.White,
+            Color = borderColor,
             StrokeWidth = 2f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true
@@ -286,7 +293,7 @@ public class ImageEditorService : IImageEditorService
         // Step number text
         using var textPaint = new SKPaint
         {
-            Color = SKColors.White,
+            Color = textColor,
             TextSize = radius * 1.15f,
             IsAntialias = true,
             TextAlign = SKTextAlign.Center,

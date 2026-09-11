@@ -112,6 +112,12 @@ public partial class PreviewWindow : Window
 
         double splitX = (SplitSlider.Value / 100.0) * width;
 
+        // Clip OriginalContainer on the left of the split line (0 to splitX)
+        if (OriginalClipGeometry != null)
+        {
+            OriginalClipGeometry.Rect = new Rect(0, 0, Math.Max(0, splitX), height);
+        }
+
         // Clip ProcessedContainer: shows processed image on the right of the split line
         SplitClipGeometry.Rect = new Rect(splitX, 0, Math.Max(0, width - splitX), height);
 
