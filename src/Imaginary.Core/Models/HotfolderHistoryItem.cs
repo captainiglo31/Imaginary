@@ -1,10 +1,11 @@
-﻿namespace Imaginary.Core.Models;
+namespace Imaginary.Core.Models;
 
 public class HotfolderHistoryItem
 {
     public DateTime Timestamp { get; init; } = DateTime.Now;
     public string FileName { get; init; } = string.Empty;
     public string TargetFileName { get; init; } = string.Empty;
+    public string? TargetFilePath { get; init; }
     public long OriginalSizeBytes { get; init; }
     public long FinalSizeBytes { get; init; }
     public double SavingsPercent { get; init; }

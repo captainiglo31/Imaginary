@@ -14,6 +14,12 @@
         Background="{DynamicResource WindowBackgroundBrush}"
         FontFamily="Segoe UI">
 
+    <Window.InputBindings>
+        <KeyBinding Gesture="Ctrl+V" Command="{Binding PasteClipboardCommand}"/>
+        <KeyBinding Key="F10" Command="{Binding CaptureScreenshotCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding CaptureScreenshotCommand}"/>
+    </Window.InputBindings>
+
     <Window.Resources>
         <conv:StatusToBrushConverter x:Key="StatusToBrush"/>
         <conv:InverseBooleanConverter x:Key="InverseBool"/>
@@ -408,11 +414,18 @@
                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                     <DockPanel>
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                            <Button Content="+ Dateien hinzufügen" Command="{Binding AddFilesCommand}"
+                            <Button Content="+ Dateien" Command="{Binding AddFilesCommand}"
                                     Style="{StaticResource ToolbarButtonStyle}"/>
-                            <Button Content="+ Ordner hinzufügen" Command="{Binding AddFolderCommand}"
+                            <Button Content="+ Ordner" Command="{Binding AddFolderCommand}"
                                     Style="{StaticResource ToolbarButtonStyle}"/>
-                            <Button Content="🔍 Vorher / Nachher Vergleich" Command="{Binding OpenPreviewCommand}"
+                            <Button Content="📋 Zwischenablage (Strg+V)" Command="{Binding PasteClipboardCommand}"
+                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    ToolTip="Fügt ein kopiertes Bild oder Bilddateien aus der Windows-Zwischenablage ein (Strg+V)"/>
+                            <Button Content="📸 Screenshot (F10)" Command="{Binding CaptureScreenshotCommand}"
+                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    FontWeight="SemiBold"
+                                    ToolTip="Bereich aufnehmen und direkt hier einfügen (F10 oder Strg+Shift+S)"/>
+                            <Button Content="🔍 Vorher / Nachher" Command="{Binding OpenPreviewCommand}"
                                     IsEnabled="{Binding CanOpenPreview}"
                                     Style="{StaticResource ToolbarButtonStyle}"
                                     FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
@@ -441,6 +454,8 @@
                                            HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 <TextBlock Text="Unterstützt JPEG, PNG, WebP, AVIF, GIF, BMP und TIFF" FontSize="12"
                                            Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                <TextBlock Text="💡 Strg+V für Zwischenablage • F10 für Screenshot • Zeilen per Drag &amp; Drop herausziehen"
+                                           FontSize="11.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
                             </StackPanel>
                         </Border>
 
@@ -454,7 +469,10 @@
                                   HeadersVisibility="Column"
                                   RowHeight="36"
                                   Background="{DynamicResource SurfaceBackgroundBrush}"
-                                  BorderThickness="0">
+                                  BorderThickness="0"
+                                  ToolTip="Fertige Zeilen können direkt per Drag &amp; Drop herausgezogen werden!"
+                                  PreviewMouseLeftButtonDown="OnDataGridPreviewMouseLeftButtonDown"
+                                  PreviewMouseMove="OnDataGridPreviewMouseMove">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="Status" Width="130">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -652,7 +670,10 @@
                                 <DataGrid ItemsSource="{Binding HotfolderHistory}"
                                           AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                                           GridLinesVisibility="None" HeadersVisibility="Column" RowHeight="34"
-                                          Background="{DynamicResource SurfaceBackgroundBrush}" BorderThickness="0">
+                                          Background="{DynamicResource SurfaceBackgroundBrush}" BorderThickness="0"
+                                          ToolTip="Fertige Dateien können direkt per Drag &amp; Drop herausgezogen werden!"
+                                          PreviewMouseLeftButtonDown="OnDataGridPreviewMouseLeftButtonDown"
+                                          PreviewMouseMove="OnDataGridPreviewMouseMove">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Uhrzeit" Binding="{Binding FormattedTime}" Width="75"/>
                                         <DataGridTextColumn Header="Eingangsdatei" Binding="{Binding FileName}" Width="200"/>

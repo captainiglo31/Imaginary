@@ -41,6 +41,7 @@ jobs:
           name: Imaginary ${{ github.ref_name }}
           draft: false
           prerelease: false
+          body_path: RELEASE_CHANGELOG.md
           generate_release_notes: true
           files: |
             dist/Imaginary-Portable/Imaginary.exe

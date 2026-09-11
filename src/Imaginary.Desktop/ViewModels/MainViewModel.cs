@@ -12,6 +12,7 @@ using Microsoft.Win32;
 using CoreResizeMode = Imaginary.Core.Models.ResizeMode;
 
 using Imaginary.Desktop.Services;
+using System.Windows.Media.Imaging;
 
 namespace Imaginary.Desktop.ViewModels;
 
@@ -26,6 +27,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IHotfolderWatcher _hotfolderWatcher;
     private readonly IWatermarkService _watermarkService;
     private readonly IUpdateService _updateService;
+    private readonly IScreenshotService _screenshotService;
     private ITrayService? _trayService;
 
     private UpdateInfo? _latestUpdateInfo;
@@ -231,7 +233,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v1.1.0";
+    public string AppVersionString => "v1.2.0";
 
     // Output & Execution
     [ObservableProperty]
@@ -273,7 +275,8 @@ public partial class MainViewModel : ObservableObject
         IAutostartService autostartService,
         IHotfolderWatcher hotfolderWatcher,
         IWatermarkService watermarkService,
-        IUpdateService updateService)
+        IUpdateService updateService,
+        IScreenshotService screenshotService)
     {
         _batchProcessor = batchProcessor ?? throw new ArgumentNullException(nameof(batchProcessor));
         _formatDetector = formatDetector ?? throw new ArgumentNullException(nameof(formatDetector));
@@ -284,6 +287,7 @@ public partial class MainViewModel : ObservableObject
         _hotfolderWatcher = hotfolderWatcher ?? throw new ArgumentNullException(nameof(hotfolderWatcher));
         _watermarkService = watermarkService ?? throw new ArgumentNullException(nameof(watermarkService));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
+        _screenshotService = screenshotService ?? throw new ArgumentNullException(nameof(screenshotService));
 
         Files.CollectionChanged += (s, e) =>
         {
@@ -722,6 +726,7 @@ public partial class MainViewModel : ObservableObject
                 Timestamp = DateTime.Now,
                 FileName = Path.GetFileName(e.SourceFile),
                 TargetFileName = e.Result.TargetPath != null ? Path.GetFileName(e.Result.TargetPath) : string.Empty,
+                TargetFilePath = e.Result.TargetPath,
                 OriginalSizeBytes = e.Result.OriginalSizeBytes,
                 FinalSizeBytes = e.Result.FinalSizeBytes,
                 SavingsPercent = e.Result.SavingsPercentage,
@@ -860,6 +865,100 @@ public partial class MainViewModel : ObservableObject
                 .ToArray();
 
             AddFilePaths(files);
+        }
+    }
+
+    [RelayCommand]
+    public void PasteClipboard()
+    {
+        try
+        {
+            if (Clipboard.ContainsImage())
+            {
+                var imageSource = Clipboard.GetImage();
+                if (imageSource != null)
+                {
+                    var clipboardDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "Imaginary",
+                        "Clipboard");
+
+                    if (!Directory.Exists(clipboardDir))
+                    {
+                        Directory.CreateDirectory(clipboardDir);
+                    }
+
+                    var filePath = Path.Combine(clipboardDir, $"Clipboard_{DateTime.Now:yyyy-MM-dd_HHmmss}.png");
+
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(imageSource));
+                    using (var stream = File.Create(filePath))
+                    {
+                        encoder.Save(stream);
+                    }
+
+                    AddFilePaths(new[] { filePath });
+                    SelectedTabIndex = 0;
+                    StatusSummary = $"📋 Bild aus Zwischenablage importiert: {Path.GetFileName(filePath)}";
+                    AppLogger.Info("Clipboard", $"Bild aus Zwischenablage importiert: {filePath}");
+                    return;
+                }
+            }
+
+            if (Clipboard.ContainsFileDropList())
+            {
+                var dropList = Clipboard.GetFileDropList();
+                var supportedExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".bmp", ".tif", ".tiff", ".ico"
+                };
+
+                var files = dropList.Cast<string>()
+                    .Where(p => Directory.Exists(p) || (File.Exists(p) && supportedExts.Contains(Path.GetExtension(p))))
+                    .ToArray();
+
+                if (files.Length > 0)
+                {
+                    AddFilePaths(files);
+                    SelectedTabIndex = 0;
+                    StatusSummary = $"📋 {files.Length} Element(e) aus Zwischenablage importiert.";
+                    AppLogger.Info("Clipboard", $"{files.Length} Datei(en) aus Zwischenablage importiert.");
+                    return;
+                }
+            }
+
+            StatusSummary = "Zwischenablage enthält kein unterstütztes Bild oder keine Bilddatei.";
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Clipboard", "Fehler beim Einfügen aus Zwischenablage", ex);
+            StatusSummary = "Fehler beim Einfügen aus der Zwischenablage.";
+        }
+    }
+
+    [RelayCommand]
+    public async Task CaptureScreenshotAsync()
+    {
+        try
+        {
+            StatusSummary = "📸 Screenshot-Modus aktiv...";
+            var filePath = await _screenshotService.CaptureRegionAsync();
+            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+            {
+                AddFilePaths(new[] { filePath });
+                SelectedTabIndex = 0;
+                StatusSummary = $"📸 Screenshot eingefügt und in Zwischenablage kopiert ({Path.GetFileName(filePath)})";
+                AppLogger.Info("Screenshot", $"Screenshot zum Studio hinzugefügt: {filePath}");
+            }
+            else
+            {
+                StatusSummary = "Screenshot abgebrochen.";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Screenshot", "Fehler bei Screenshot-Aufnahme", ex);
+            StatusSummary = "Fehler bei Screenshot-Aufnahme.";
         }
     }
 

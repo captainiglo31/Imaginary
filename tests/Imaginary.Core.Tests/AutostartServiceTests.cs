@@ -22,12 +22,14 @@ public class AutostartServiceTests
             Timestamp = new DateTime(2026, 9, 10, 14, 30, 0),
             FileName = "photo.png",
             TargetFileName = "photo.webp",
+            TargetFilePath = @"C:\converted\photo.webp",
             OriginalSizeBytes = 1024 * 1024, // 1 MB
             FinalSizeBytes = 256 * 1024,    // 256 KB
             SavingsPercent = 75.0,
             Success = true
         };
 
+        item.TargetFilePath.Should().Be(@"C:\converted\photo.webp");
         item.FormattedTime.Should().Be("14:30:00");
         item.FormattedOriginalSize.Should().Contain("MB");
         item.FormattedFinalSize.Should().Contain("KB");

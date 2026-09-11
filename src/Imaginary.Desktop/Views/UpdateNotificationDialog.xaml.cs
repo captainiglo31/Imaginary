@@ -138,27 +138,28 @@ public partial class UpdateNotificationDialog : Window
 
     private void AddNoteItem(string icon, string text)
     {
-        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 4) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         var tbIcon = new TextBlock
         {
             Text = icon,
-            FontSize = 12,
+            FontSize = 13,
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(0, 1, 0, 0)
         };
 
         var tbText = new TextBlock
         {
-            Text = text,
-            FontSize = 12,
+            FontSize = 12.5,
             TextWrapping = TextWrapping.Wrap,
-            LineHeight = 18,
+            LineHeight = 19,
             VerticalAlignment = VerticalAlignment.Center
         };
         tbText.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+
+        AppendFormattedMarkdown(tbText, text);
 
         Grid.SetColumn(tbIcon, 0);
         Grid.SetColumn(tbText, 1);
@@ -167,6 +168,22 @@ public partial class UpdateNotificationDialog : Window
         grid.Children.Add(tbText);
 
         PanelReleaseNotes.Children.Add(grid);
+    }
+
+    private static void AppendFormattedMarkdown(TextBlock tb, string raw)
+    {
+        var parts = raw.Split("**");
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (string.IsNullOrEmpty(parts[i])) continue;
+
+            bool isBold = (i % 2 == 1);
+            var run = new System.Windows.Documents.Run(parts[i])
+            {
+                FontWeight = isBold ? FontWeights.Bold : FontWeights.Normal
+            };
+            tb.Inlines.Add(run);
+        }
     }
 
     private void OnOpenGithubReleaseClicked(object sender, RoutedEventArgs e)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Windows;
@@ -15,14 +15,16 @@ public class TrayService : ITrayService
     private Action? _toggleHotfolder;
     private Func<bool>? _isHotfolderRunning;
     private Action? _openSettings;
+    private Action? _captureScreenshot;
     private bool _isDisposed;
 
-    public void Initialize(Window mainWindow, Action toggleHotfolder, Func<bool> isHotfolderRunning, Action openSettings)
+    public void Initialize(Window mainWindow, Action toggleHotfolder, Func<bool> isHotfolderRunning, Action openSettings, Action? captureScreenshot = null)
     {
         _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
         _toggleHotfolder = toggleHotfolder;
         _isHotfolderRunning = isHotfolderRunning;
         _openSettings = openSettings;
+        _captureScreenshot = captureScreenshot;
 
         try
         {
@@ -76,8 +78,14 @@ public class TrayService : ITrayService
                 System.Windows.Application.Current.Shutdown();
             });
 
+            var screenshotItem = new ToolStripMenuItem("📸 Screenshot aufnehmen", null, (s, e) =>
+            {
+                _captureScreenshot?.Invoke();
+            });
+
             contextMenu.Items.Add(openItem);
             contextMenu.Items.Add(new ToolStripSeparator());
+            contextMenu.Items.Add(screenshotItem);
             contextMenu.Items.Add(_hotfolderMenuItem);
             contextMenu.Items.Add(settingsItem);
             contextMenu.Items.Add(new ToolStripSeparator());
