@@ -442,6 +442,11 @@ public partial class ImageEditorWindow : Window
         {
             _activeFreehandPoints.Clear();
             _activeFreehandPoints.Add(pt);
+            PreviewPolyline.Points.Clear();
+            PreviewPolyline.Points.Add(new WpfPoint(pos.X, pos.Y));
+            PreviewPolyline.Stroke = new SolidColorBrush(WpfColor.FromRgb(_selectedColor.Red, _selectedColor.Green, _selectedColor.Blue));
+            PreviewPolyline.StrokeThickness = _strokeWidth;
+            PreviewPolyline.Visibility = Visibility.Visible;
         }
 
         CanvasContainer.CaptureMouse();
@@ -565,13 +570,7 @@ public partial class ImageEditorWindow : Window
 
             case EditorTool.Pen:
                 _activeFreehandPoints.Add(currentPt);
-                PreviewLine.Visibility = Visibility.Visible;
-                PreviewLine.X1 = _dragStart.X;
-                PreviewLine.Y1 = _dragStart.Y;
-                PreviewLine.X2 = current.X;
-                PreviewLine.Y2 = current.Y;
-                PreviewLine.Stroke = new SolidColorBrush(WpfColor.FromRgb(_selectedColor.Red, _selectedColor.Green, _selectedColor.Blue));
-                PreviewLine.StrokeThickness = _strokeWidth;
+                PreviewPolyline.Points.Add(new WpfPoint(current.X, current.Y));
                 break;
         }
     }
@@ -611,6 +610,8 @@ public partial class ImageEditorWindow : Window
         PreviewRect.Visibility = Visibility.Collapsed;
         PreviewEllipse.Visibility = Visibility.Collapsed;
         PreviewLine.Visibility = Visibility.Collapsed;
+        PreviewPolyline.Visibility = Visibility.Collapsed;
+        PreviewPolyline.Points.Clear();
 
         var end = e.GetPosition(BaseImage);
         int x1 = (int)Math.Min(_dragStart.X, end.X);
@@ -1265,13 +1266,24 @@ public class EditorAnnotation
                 return new SKRect(StartPoint.X - radius - 4, StartPoint.Y - radius - 4, StartPoint.X + radius + 4, StartPoint.Y + radius + 4);
 
             case AnnotationType.Text:
-                using (var paint = new SKPaint { TextSize = FontSize, IsAntialias = true })
+                if (string.IsNullOrEmpty(Text)) return new SKRect(StartPoint.X, StartPoint.Y, StartPoint.X, StartPoint.Y);
+                using (var paint = new SKPaint
+                {
+                    TextSize = FontSize,
+                    IsAntialias = true,
+                    Typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold)
+                })
                 {
                     var textBounds = new SKRect();
-                    paint.MeasureText(Text, ref textBounds);
-                    float w = textBounds.Width + 24;
-                    float h = FontSize + 16;
-                    return new SKRect(StartPoint.X - 6, StartPoint.Y - 6, StartPoint.X + w + 6, StartPoint.Y + h + 6);
+                    float advanceWidth = paint.MeasureText(Text, ref textBounds);
+                    float textWidth = Math.Max(textBounds.Width, advanceWidth);
+                    float padH = 8f;
+                    float padV = 5f;
+                    return new SKRect(
+                        StartPoint.X - padH,
+                        StartPoint.Y + textBounds.Top - padV,
+                        StartPoint.X + textWidth + padH,
+                        StartPoint.Y + Math.Max(textBounds.Bottom, 0) + padV);
                 }
 
             case AnnotationType.Freehand:
@@ -1497,7 +1509,8 @@ public class EditorAnnotation
                 })
                 {
                     var bounds = new SKRect();
-                    textPaint.MeasureText(Text, ref bounds);
+                    float advanceWidth = textPaint.MeasureText(Text, ref bounds);
+                    float textWidth = Math.Max(bounds.Width, advanceWidth);
 
                     using var bgPaint = new SKPaint
                     {
@@ -1505,11 +1518,13 @@ public class EditorAnnotation
                         Style = SKPaintStyle.Fill,
                         IsAntialias = true
                     };
+                    float padH = 8f;
+                    float padV = 5f;
                     var bgRect = new SKRect(
-                        StartPoint.X - 6f,
-                        StartPoint.Y - bounds.Height - 6f,
-                        StartPoint.X + bounds.Width + 6f,
-                        StartPoint.Y + 6f);
+                        StartPoint.X - padH,
+                        StartPoint.Y + bounds.Top - padV,
+                        StartPoint.X + textWidth + padH,
+                        StartPoint.Y + Math.Max(bounds.Bottom, 0) + padV);
 
                     canvas.DrawRoundRect(bgRect, 4f, 4f, bgPaint);
                     canvas.DrawText(Text, StartPoint.X, StartPoint.Y, textPaint);

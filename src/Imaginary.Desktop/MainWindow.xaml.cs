@@ -183,4 +183,17 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
     }
+
+    private void OnDataGridPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject dep)
+        {
+            var row = FindVisualParent<DataGridRow>(dep);
+            if (row != null && !row.IsSelected)
+            {
+                row.IsSelected = true;
+                row.Focus();
+            }
+        }
+    }
 }

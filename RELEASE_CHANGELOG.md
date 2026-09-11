@@ -1,3 +1,22 @@
+## 🚀 Was ist neu in Version 2.2.3 (Studio-Fixes & Dark Mode Kontextmenü):
+
+### ✏️ Quick-Edit & Studio-Fixes
+- **Exakte Text-Auswahlbox:**
+  - Die gestrichelte Auswahlbox und die 4 Ziehgriffe umschließen platzierte Texte und deren Hintergrund-Pille nun pixelgenau.
+  - Typografische Baseline-Berechnung korrigiert, kein Durchschneiden der Schrift oder vertikaler Versatz mehr.
+- **Flüssige Freihand-Vorschau (Stift):**
+  - Beim Zeichnen mit dem Freihandstift folgt nun eine dynamische, runde Pfadvorschau (`PreviewPolyline`) in Echtzeit der Mausbewegung.
+  - Keine starre gerade Linie mehr während des Ziehens.
+
+### 🎨 Dark Mode Kontextmenü
+- **Neues modernes Kontextmenü-Design:**
+  - Rechtsklick auf Bilder in der Liste öffnet nun ein vollständig gestyltes, dunkles Menü (`#151E32`) mit dezentem Schatten und klarem blauem Hover-Effekt.
+  - Kein weißer Kasten mit unlesbarem Text mehr.
+- **Intelligente Zeilenauswahl per Rechtsklick:**
+  - Ein Rechtsklick auf eine beliebige Tabellenzeile wählt diese Datei sofort aktiv aus, sodass Kontextaktionen direkt auf das gewünschte Bild angewendet werden.
+
+---
+
 ## 🚀 Was ist neu in Version 2.2.2 (Dark Mode Kontrast & UI-Optimierungen):
 
 ### 🎨 Dunkles Design (Dark Mode) Perfektionierung & Hoher Kontrast

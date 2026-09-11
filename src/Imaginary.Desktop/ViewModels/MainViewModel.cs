@@ -248,7 +248,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.2.2";
+    public string AppVersionString => "v2.2.3";
 
     public string McpConfigSnippet
     {

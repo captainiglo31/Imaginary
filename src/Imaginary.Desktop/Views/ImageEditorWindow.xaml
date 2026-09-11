@@ -255,6 +255,8 @@
                         <Canvas x:Name="DrawingOverlayCanvas" IsHitTestVisible="False">
                             <!-- Temporary Preview Elements during dragging -->
                             <Line x:Name="PreviewLine" StrokeThickness="3" StrokeDashArray="2 2" Visibility="Collapsed"/>
+                            <Polyline x:Name="PreviewPolyline" StrokeThickness="3" StrokeDashArray="2 2"
+                                      StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"/>
                             <Rectangle x:Name="PreviewRect" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
                             <Ellipse x:Name="PreviewEllipse" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
                         </Canvas>

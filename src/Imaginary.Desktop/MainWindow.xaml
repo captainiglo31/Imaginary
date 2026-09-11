@@ -488,6 +488,7 @@
                                   ToolTip="Doppelklick zum Bearbeiten • Fertige Zeilen per Drag &amp; Drop herausziehen!"
                                   MouseDoubleClick="OnDataGridMouseDoubleClick"
                                   PreviewMouseLeftButtonDown="OnDataGridPreviewMouseLeftButtonDown"
+                                  PreviewMouseRightButtonDown="OnDataGridPreviewMouseRightButtonDown"
                                   PreviewMouseMove="OnDataGridPreviewMouseMove">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
