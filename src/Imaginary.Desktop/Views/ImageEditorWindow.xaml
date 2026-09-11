@@ -137,7 +137,11 @@
                             Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0"/>
 
                     <Button x:Name="ButtonToggleLayers" Content="📑 Ebenen" Click="OnToggleLayersClicked"
-                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,14,0" ToolTip="Ebenen-Panel für platzierte Elemente ein-/ausblenden"/>
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0" ToolTip="Ebenen-Panel für platzierte Elemente ein-/ausblenden"/>
+
+                    <Button x:Name="ButtonSwitchToProfiMode" Content="🎛️ In Profi-Modus wechseln" Click="OnSwitchToProfiModeClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" FontWeight="SemiBold" Foreground="#38BDF8" Margin="0,0,14,0"
+                            ToolTip="Öffnet dieses Bild im professionellen RAW-Entwickler &amp; Color-Grading Studio"/>
 
                     <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
                             BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4,2" Margin="0,0,14,0">

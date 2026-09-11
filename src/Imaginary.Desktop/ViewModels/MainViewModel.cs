@@ -34,6 +34,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IClipboardMonitorService _clipboardMonitor;
     private readonly IImageEditorService _editorService;
     private readonly IBackgroundRemovalService _bgRemovalService;
+    private readonly IProfiDeveloperService _profiDeveloperService;
     private ITrayService? _trayService;
     public ITrayService? TrayService => _trayService;
 
@@ -360,7 +361,8 @@ public partial class MainViewModel : ObservableObject
         IScreenshotService screenshotService,
         IClipboardMonitorService clipboardMonitor,
         IImageEditorService editorService,
-        IBackgroundRemovalService bgRemovalService)
+        IBackgroundRemovalService bgRemovalService,
+        IProfiDeveloperService profiDeveloperService)
     {
         _batchProcessor = batchProcessor ?? throw new ArgumentNullException(nameof(batchProcessor));
         _formatDetector = formatDetector ?? throw new ArgumentNullException(nameof(formatDetector));
@@ -376,6 +378,7 @@ public partial class MainViewModel : ObservableObject
         _clipboardMonitor = clipboardMonitor ?? throw new ArgumentNullException(nameof(clipboardMonitor));
         _editorService = editorService ?? throw new ArgumentNullException(nameof(editorService));
         _bgRemovalService = bgRemovalService ?? throw new ArgumentNullException(nameof(bgRemovalService));
+        _profiDeveloperService = profiDeveloperService ?? throw new ArgumentNullException(nameof(profiDeveloperService));
 
         _clipboardMonitor.ScreenshotDetected += OnScreenshotDetected;
 
@@ -1081,6 +1084,78 @@ public partial class MainViewModel : ObservableObject
             AppLogger.Error("Editor", "Fehler beim Öffnen des Bild-Studios", ex);
             MessageBox.Show(Application.Current.MainWindow,
                 $"Fehler beim Öffnen des Bild-Studios:\n{ex.Message}",
+                "Fehler",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenProfiEditor()
+    {
+        OpenProfiEditorForFile(null);
+    }
+
+    public void OpenProfiEditorForFile(string? pathToOpen = null)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(pathToOpen) && SelectedFile != null)
+            {
+                pathToOpen = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+                    ? SelectedFile.TargetPath
+                    : SelectedFile.FilePath;
+            }
+
+            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen))
+            {
+                var dlg = new OpenFileDialog
+                {
+                    Filter = "RAW- und Bildformate (*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf;*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif;*.tiff)|*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf;*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif;*.tiff|Kamera-RAW (*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf)|*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf|Standard-Bilder (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif)|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif|Alle Dateien (*.*)|*.*",
+                    Title = "Bild im Profi-Modus (RAW-Entwickler) öffnen"
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    pathToOpen = dlg.FileName;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen)) return;
+
+            AppLogger.Info("ProfiEditor", $"Öffne Profi-Modus für: {pathToOpen}");
+            var profiWin = new ProfiEditorWindow(pathToOpen, _profiDeveloperService)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (profiWin.ShowDialog() == true && profiWin.HasChanges)
+            {
+                if (profiWin.ResultFilePath != pathToOpen)
+                {
+                    AddFilePaths(new[] { profiWin.ResultFilePath });
+                    StatusSummary = $"🎛️ Entwickeltes Bild gespeichert: {Path.GetFileName(profiWin.ResultFilePath)}";
+                }
+                else
+                {
+                    if (SelectedFile != null && SelectedFile.FilePath.Equals(pathToOpen, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var fi = new FileInfo(pathToOpen);
+                        SelectedFile.OriginalSizeBytes = fi.Length;
+                        SelectedFile.Status = JobStatus.Pending;
+                        SelectedFile.StatusMessage = "Im Profi-Modus entwickelt";
+                        SelectedFile.FinalSizeBytes = 0;
+                        SelectedFile.SavingsPercentage = 0;
+                        SelectedFile.TargetPath = null;
+                    }
+                    StatusSummary = $"🎛️ Änderungen am Bild gespeichert: {Path.GetFileName(pathToOpen)}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("ProfiEditor", "Fehler beim Öffnen des Profi-Modus", ex);
+            MessageBox.Show(Application.Current.MainWindow,
+                $"Fehler beim Öffnen des Profi-Modus:\n{ex.Message}",
                 "Fehler",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);

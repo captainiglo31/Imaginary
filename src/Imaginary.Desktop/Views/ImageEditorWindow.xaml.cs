@@ -1533,6 +1533,50 @@ public partial class ImageEditorWindow : Window
         Close();
     }
 
+    private void OnSwitchToProfiModeClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string pathForProfi = _filePath;
+            if (HasChanges)
+            {
+                var ask = MessageBox.Show(this,
+                    "Möchtest du die aktuellen Änderungen vor dem Wechsel in den Profi-Modus übernehmen?",
+                    "In Profi-Modus wechseln",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (ask == MessageBoxResult.Cancel) return;
+                if (ask == MessageBoxResult.Yes)
+                {
+                    using var final = GetFinalBitmap();
+                    string tempPath = Path.Combine(Path.GetTempPath(), $"imaginary_profi_prep_{Guid.NewGuid():N}.png");
+                    SaveBitmapToFile(final, tempPath);
+                    pathForProfi = tempPath;
+                }
+            }
+
+            var profiService = new ProfiDeveloperService();
+            var profiWin = new ProfiEditorWindow(pathForProfi, profiService)
+            {
+                Owner = this
+            };
+
+            if (profiWin.ShowDialog() == true && profiWin.HasChanges)
+            {
+                ResultFilePath = profiWin.ResultFilePath;
+                HasChanges = true;
+                DialogResult = true;
+                Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Editor", "Fehler beim Wechsel in den Profi-Modus", ex);
+            MessageBox.Show(this, "Fehler beim Wechsel in den Profi-Modus: " + ex.Message, "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void OnWindowKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)

@@ -9,6 +9,7 @@
     <Authors>Pino Wackers</Authors>
     <Copyright>© 2026 Pino Wackers. Alle Rechte vorbehalten.</Copyright>
     <Version>2.2.5</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

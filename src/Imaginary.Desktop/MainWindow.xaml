@@ -450,9 +450,13 @@
                                     FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
                                     ToolTip="Vorher/Nachher-Vergleich mit synchronisiertem Zoom bis 800%"/>
                             <Button Content="✏️ Bearbeiten / Paint" Command="{Binding OpenEditorCommand}"
-                                    Style="{DynamicResource ToolbarButtonStyle}"
-                                    FontWeight="SemiBold" Foreground="#10B981"
-                                    ToolTip="Öffnet das Bild im integrierten Quick-Edit &amp; Paint Studio (Zuschneiden, DSGVO-Blur, Pfeile, Freistellen)"/>
+                                     Style="{DynamicResource ToolbarButtonStyle}"
+                                     FontWeight="SemiBold" Foreground="#10B981"
+                                     ToolTip="Öffnet das Bild im integrierten Quick-Edit &amp; Paint Studio (Zuschneiden, DSGVO-Blur, Pfeile, Freistellen)"/>
+                            <Button Content="🎛️ Profi-Modus (RAW)" Command="{Binding OpenProfiEditorCommand}"
+                                     Style="{DynamicResource ToolbarButtonStyle}"
+                                     FontWeight="Bold" Foreground="#38BDF8"
+                                     ToolTip="Öffnet das Bild im professionellen RAW-Entwickler &amp; Color-Grading Studio (Belichtung, Weißabgleich, Klarheit, Tonwertkurven, Split-Toning)"/>
                         </StackPanel>
 
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
@@ -476,7 +480,7 @@
                                 <TextBlock Text="📁" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBlock Text="Bilder oder Ordner hier ablegen" FontSize="18" FontWeight="SemiBold"
                                            HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                <TextBlock Text="Unterstützt JPEG, PNG, WebP, AVIF, GIF, BMP und TIFF" FontSize="12"
+                                <TextBlock Text="Unterstützt RAW (CR2, CR3, NEF, ARW, DNG, ORF, RW2, PEF, RAF) sowie JPEG, PNG, WebP, AVIF, GIF, BMP und TIFF" FontSize="12"
                                            Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                                 <TextBlock Text="💡 Strg+V für Zwischenablage • F10 für Screenshot • Zeilen per Drag &amp; Drop herausziehen"
                                            FontSize="11.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
@@ -500,6 +504,7 @@
                                   PreviewMouseMove="OnDataGridPreviewMouseMove">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="🎛️ Im Profi-Modus (RAW) entwickeln..." Command="{Binding OpenProfiEditorCommand}"/>
                                     <MenuItem Header="✏️ In Paint / Quick-Edit bearbeiten" Command="{Binding OpenEditorCommand}"/>
                                     <MenuItem Header="🔍 Vorher / Nachher Vergleich" Command="{Binding OpenPreviewCommand}" IsEnabled="{Binding CanOpenPreview}"/>
                                     <Separator/>

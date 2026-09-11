@@ -10,5 +10,6 @@ public enum ImageFormat
     Webp,
     Tiff,
     Avif,
-    Ico
+    Ico,
+    Raw
 }

@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IUpdateService, UpdateService>();
         services.AddSingleton<IImageEditorService, ImageEditorService>();
         services.AddSingleton<IBackgroundRemovalService, BackgroundRemovalService>();
+        services.AddSingleton<IProfiDeveloperService, ProfiDeveloperService>();
         services.AddTransient<IBatchProcessor, BatchProcessor>();
         return services;
     }

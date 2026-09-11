@@ -116,6 +116,7 @@ public class ImageFormatDetector : IImageFormatDetector
             ".tif" or ".tiff" => ImageFormat.Tiff,
             ".avif" => ImageFormat.Avif,
             ".ico" => ImageFormat.Ico,
+            ".dng" or ".cr2" or ".cr3" or ".nef" or ".arw" or ".orf" or ".rw2" or ".pef" or ".raf" => ImageFormat.Raw,
             _ => ImageFormat.Unknown
         };
     }
@@ -130,7 +131,8 @@ public class ImageFormatDetector : IImageFormatDetector
         ImageFormat.Tiff => ".tiff",
         ImageFormat.Avif => ".avif",
         ImageFormat.Ico => ".ico",
-        _ => ".bin"
+        ImageFormat.Raw => ".dng",
+        _ => ".jpg"
     };
 
     public string GetMimeType(ImageFormat format) => format switch
@@ -143,6 +145,7 @@ public class ImageFormatDetector : IImageFormatDetector
         ImageFormat.Tiff => "image/tiff",
         ImageFormat.Avif => "image/avif",
         ImageFormat.Ico => "image/x-icon",
+        ImageFormat.Raw => "image/x-adobe-dng",
         _ => "application/octet-stream"
     };
 
