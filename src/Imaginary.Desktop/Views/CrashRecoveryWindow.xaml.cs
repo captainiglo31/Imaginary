@@ -43,6 +43,20 @@ public partial class CrashRecoveryWindow : Window
         }
     }
 
+    public bool UserWantsNormalStart { get; private set; }
+
+    private void OnStartAnywayClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            new StartupHealthTracker().Reset();
+        }
+        catch { }
+        UserWantsNormalStart = true;
+        DialogResult = true;
+        Close();
+    }
+
     private void OnRollbackClicked(object sender, RoutedEventArgs e)
     {
         var result = MessageBox.Show(this,
@@ -53,6 +67,12 @@ public partial class CrashRecoveryWindow : Window
 
         if (result == MessageBoxResult.Yes)
         {
+            try
+            {
+                new StartupHealthTracker().Reset();
+            }
+            catch { }
+
             bool ok = _updateService.RollbackToPreviousVersion(restart: true);
             if (ok)
             {
@@ -89,6 +109,7 @@ public partial class CrashRecoveryWindow : Window
                 StatusTextBlock.Text = "Download abgeschlossen. Installiere und starte neu...";
 
                 await Task.Delay(800);
+                try { new StartupHealthTracker().Reset(); } catch { }
                 _updateService.ApplyUpdateAndRestart(tempFile);
                 Application.Current.Shutdown();
             }

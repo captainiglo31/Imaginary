@@ -99,6 +99,82 @@ public class ImageEditorService : IImageEditorService
         return result;
     }
 
+    public SKBitmap ApplyBlurBrush(SKBitmap source, IEnumerable<SKPoint> strokePoints, float brushRadius = 24f, float sigma = 10f)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(strokePoints);
+
+        var pts = strokePoints.ToList();
+        if (pts.Count == 0) return source.Copy();
+
+        var result = source.Copy();
+
+        // Calculate bounding box of the brush stroke
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var p in pts)
+        {
+            if (p.X < minX) minX = p.X;
+            if (p.Y < minY) minY = p.Y;
+            if (p.X > maxX) maxX = p.X;
+            if (p.Y > maxY) maxY = p.Y;
+        }
+
+        float pad = brushRadius + sigma * 2f + 4f;
+        int left = Math.Clamp((int)MathF.Floor(minX - pad), 0, result.Width);
+        int top = Math.Clamp((int)MathF.Floor(minY - pad), 0, result.Height);
+        int right = Math.Clamp((int)MathF.Ceiling(maxX + pad), 0, result.Width);
+        int bottom = Math.Clamp((int)MathF.Ceiling(maxY + pad), 0, result.Height);
+
+        int subW = right - left;
+        int subH = bottom - top;
+        if (subW <= 0 || subH <= 0) return result;
+
+        // Crop the subregion to blur
+        using var subBitmap = Crop(source, new SKRectI(left, top, right, bottom));
+
+        // Create blur filter paint
+        using var blurPaint = new SKPaint
+        {
+            ImageFilter = SKImageFilter.CreateBlur(sigma, sigma),
+            IsAntialias = true
+        };
+
+        // Create clip path for the brush stroke
+        using var clipPath = new SKPath();
+        if (pts.Count == 1)
+        {
+            clipPath.AddCircle(pts[0].X, pts[0].Y, brushRadius);
+        }
+        else
+        {
+            using var rawPath = new SKPath();
+            rawPath.MoveTo(pts[0]);
+            for (int i = 1; i < pts.Count; i++)
+            {
+                rawPath.LineTo(pts[i]);
+            }
+
+            using var strokePaint = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = brushRadius * 2f,
+                StrokeCap = SKStrokeCap.Round,
+                StrokeJoin = SKStrokeJoin.Round
+            };
+            strokePaint.GetFillPath(rawPath, clipPath);
+        }
+
+        using var canvas = new SKCanvas(result);
+        canvas.Save();
+        canvas.ClipPath(clipPath, antialias: true);
+        canvas.DrawBitmap(subBitmap, left, top, blurPaint);
+        canvas.Restore();
+        canvas.Flush();
+
+        return result;
+    }
+
     public SKBitmap ApplyBlackout(SKBitmap source, SKRectI targetRect, SKColor color)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -164,7 +240,29 @@ public class ImageEditorService : IImageEditorService
 
         var result = source.Copy();
         using var canvas = new SKCanvas(result);
-        using var paint = new SKPaint
+
+        float dx = end.X - start.X;
+        float dy = end.Y - start.Y;
+        float len = MathF.Sqrt(dx * dx + dy * dy);
+        if (len < 1f) return result;
+
+        float uX = dx / len;
+        float uY = dy / len;
+        float arrowLen = Math.Max(16f, strokeWidth * 4f);
+        float arrowWidth = arrowLen * 0.55f;
+
+        // Base center where the shaft connects to the arrow head (shaft does NOT poke into tip)
+        float shaftCutoff = Math.Min(arrowLen * 0.85f, len * 0.8f);
+        var baseCenter = new SKPoint(end.X - uX * shaftCutoff, end.Y - uY * shaftCutoff);
+
+        // Perpendicular vector for arrowhead wings
+        float perpX = -uY;
+        float perpY = uX;
+        var wing1 = new SKPoint(baseCenter.X + perpX * arrowWidth, baseCenter.Y + perpY * arrowWidth);
+        var wing2 = new SKPoint(baseCenter.X - perpX * arrowWidth, baseCenter.Y - perpY * arrowWidth);
+
+        // Draw shaft line up to baseCenter
+        using var shaftPaint = new SKPaint
         {
             Color = color,
             StrokeWidth = strokeWidth,
@@ -172,24 +270,14 @@ public class ImageEditorService : IImageEditorService
             StrokeCap = SKStrokeCap.Round,
             IsAntialias = true
         };
+        canvas.DrawLine(start, baseCenter, shaftPaint);
 
-        // Main line
-        canvas.DrawLine(start, end, paint);
-
-        // Arrow head
-        float dx = end.X - start.X;
-        float dy = end.Y - start.Y;
-        float angle = MathF.Atan2(dy, dx);
-        float arrowLen = Math.Max(16f, strokeWidth * 4f);
-        float wingAngle = 28f * (MathF.PI / 180f);
-
-        var wing1 = new SKPoint(
-            end.X - arrowLen * MathF.Cos(angle - wingAngle),
-            end.Y - arrowLen * MathF.Sin(angle - wingAngle));
-
-        var wing2 = new SKPoint(
-            end.X - arrowLen * MathF.Cos(angle + wingAngle),
-            end.Y - arrowLen * MathF.Sin(angle + wingAngle));
+        // Draw sharp arrowhead polygon
+        using var headPath = new SKPath();
+        headPath.MoveTo(end);
+        headPath.LineTo(wing1);
+        headPath.LineTo(wing2);
+        headPath.Close();
 
         using var headPaint = new SKPaint
         {
@@ -197,16 +285,20 @@ public class ImageEditorService : IImageEditorService
             Style = SKPaintStyle.Fill,
             IsAntialias = true
         };
+        canvas.DrawPath(headPath, headPaint);
 
-        using var path = new SKPath();
-        path.MoveTo(end);
-        path.LineTo(wing1);
-        path.LineTo(wing2);
-        path.Close();
+        // Sharp stroke around arrowhead for crisp edges
+        using var headStroke = new SKPaint
+        {
+            Color = color,
+            StrokeWidth = Math.Max(1f, strokeWidth * 0.4f),
+            Style = SKPaintStyle.Stroke,
+            StrokeJoin = SKStrokeJoin.Miter,
+            IsAntialias = true
+        };
+        canvas.DrawPath(headPath, headStroke);
 
-        canvas.DrawPath(path, headPaint);
         canvas.Flush();
-
         return result;
     }
 

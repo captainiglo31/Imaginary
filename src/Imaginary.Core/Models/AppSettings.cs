@@ -39,4 +39,7 @@ public class AppSettings
     public BackgroundRemovalMode PreferredBackgroundRemovalMode { get; set; } = BackgroundRemovalMode.ColorKey;
     public float ColorKeyTolerance { get; set; } = 0.15f;
     public bool AiModelDownloaded { get; set; }
+
+    // Screenshot & Zwischenablage
+    public bool AutoDetectScreenshots { get; set; } = true;
 }

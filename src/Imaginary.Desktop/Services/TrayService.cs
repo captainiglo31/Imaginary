@@ -95,7 +95,13 @@ public class TrayService : ITrayService
 
             // Double Click or Balloon Click -> Restore Window
             _notifyIcon.DoubleClick += (s, e) => RestoreWindow();
-            _notifyIcon.BalloonTipClicked += (s, e) => RestoreWindow();
+            _notifyIcon.BalloonTipClicked += (s, e) =>
+            {
+                RestoreWindow();
+                var cb = _onBalloonTipClicked;
+                _onBalloonTipClicked = null;
+                cb?.Invoke();
+            };
 
             UpdateHotfolderStatus(_isHotfolderRunning?.Invoke() ?? false);
         }
@@ -125,12 +131,15 @@ public class TrayService : ITrayService
         catch { }
     }
 
-    public void ShowNotification(string title, string message, ToolTipIcon icon = ToolTipIcon.Info, int timeoutMs = 3000)
+    private Action? _onBalloonTipClicked;
+
+    public void ShowNotification(string title, string message, ToolTipIcon icon = ToolTipIcon.Info, int timeoutMs = 3000, Action? onClick = null)
     {
         if (_notifyIcon == null || !_notifyIcon.Visible) return;
 
         try
         {
+            _onBalloonTipClicked = onClick;
             _notifyIcon.ShowBalloonTip(timeoutMs, title, message, icon);
         }
         catch (Exception ex)

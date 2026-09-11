@@ -1,3 +1,25 @@
+## 🚀 Was ist neu in Version 2.2.5 (Rollback-Resilienz & Windows-Snipping Integration):
+
+### 🛡️ Crash-Loop & Rollback-Schleife vollständig behoben
+- **Rollback-Garantie:** Bei einem Rollback auf eine vorherige Version wird der Crash-Tracker (`StartupHealthTracker`) nun sauber zurückgesetzt, sodass die Vorgängerversion sofort gesund startet.
+- **Parameter `--after-rollback`:** Wird beim Start zuverlässig erkannt und verhindert das Wiederauftreten der Notfall-Wiederherstellung.
+- **Neuer Button „🚀 Trotzdem normal starten“:** Im Notfall-Dialog (`CrashRecoveryWindow`) kann der Anwender die Warnung jederzeit manuell übersteuern und normal ins Programm starten.
+- **Keine Falsch-Positiv-Schleifen:** Das Öffnen oder Schließen des Notfallfensters hinterlässt keinen blockierenden Absturzzustand mehr in `startup_health.json`.
+
+### 📸 Natives Windows-Snipping (`Win + Shift + S`) & Zwischenablage
+- **100% natives Windows-Erlebnis:** Das alte benutzerdefinierte Screenshot-Overlay wurde entfernt und nahtlos durch das Windows Snipping Tool (`ms-screenclip:` / `Win + Shift + S`) ersetzt.
+- **Echtzeit-Erkennung der Zwischenablage:**
+  - Imaginary registriert einen Windows-Clipboard-Listener (`WM_CLIPBOARDUPDATE`). Sobald ein Screenshot mit `Win + Shift + S`, der Druck-Taste oder Snipping Tool erstellt wird, erkennt Imaginary diesen automatisch.
+  - **In-App Toast-Banner:** Zeigt direkt im Fenster eine dezente Meldung mit Schnellzugriff: *„🎨 Im Editor bearbeiten“*, *„➕ Zu Studio hinzufügen“* oder *„✕ Schließen“*.
+  - **Windows-Benachrichtigung:** Bei minimiertem Fenster oder im Hintergrundbetrieb erscheint ein Info-Balloon – ein Klick darauf öffnet den Screenshot direkt im Bild-Editor.
+- **Einfügen in Studio (`Strg + V`):**
+  - Neuer Button *„📋 Aus Zwischenablage (Strg+V)“* und *„📸 Screenshot (Win+Shift+S)“* im Studio.
+  - Wenn kein Bild in der Zwischenablage liegt, startet ein Klick direkt das Windows Snipping Tool.
+- **Loop-Schutz:** Kopieren aus dem Image-Editor in die Zwischenablage (*„📋 In Zwischenablage“*) unterdrückt automatisch die Selbstauslösung des Listeners.
+- **Einstellung:** In den Einstellungen unter *„📸 Screenshots & Zwischenablage“* kann die automatische Erkennung jederzeit ein- oder ausgeschaltet werden.
+
+---
+
 ## 🚀 Was ist neu in Version 2.2.4 (Startmenü & Windows-Suche Integration):
 
 ### 🔍 Windows-Startmenü & Windows-Suche (`Win + S`)

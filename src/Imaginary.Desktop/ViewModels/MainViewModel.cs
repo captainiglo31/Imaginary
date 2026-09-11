@@ -31,6 +31,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IWatermarkService _watermarkService;
     private readonly IUpdateService _updateService;
     private readonly IScreenshotService _screenshotService;
+    private readonly IClipboardMonitorService _clipboardMonitor;
     private readonly IImageEditorService _editorService;
     private readonly IBackgroundRemovalService _bgRemovalService;
     private ITrayService? _trayService;
@@ -257,7 +258,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.2.4";
+    public string AppVersionString => "v2.2.5";
 
     public string McpConfigSnippet
     {
@@ -316,6 +317,29 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private double _aiModelDownloadProgress;
 
+    // Screenshot & Zwischenablage Monitoring
+    [ObservableProperty]
+    private bool _autoDetectScreenshots = true;
+
+    [ObservableProperty]
+    private bool _isScreenshotBannerVisible;
+
+    [ObservableProperty]
+    private string _screenshotBannerText = string.Empty;
+
+    [ObservableProperty]
+    private string? _latestDetectedScreenshotPath;
+
+    private DispatcherTimer? _screenshotBannerTimer;
+
+    partial void OnAutoDetectScreenshotsChanged(bool value)
+    {
+        var s = _settingsService.Settings;
+        s.AutoDetectScreenshots = value;
+        _settingsService.Save();
+        AppLogger.Info("Settings", $"AutoDetectScreenshots geändert auf: {value}");
+    }
+
     public bool HasFiles => Files.Count > 0;
     public bool CanStart => HasFiles && !IsBusy;
     public bool CanCancel => IsBusy;
@@ -334,6 +358,7 @@ public partial class MainViewModel : ObservableObject
         IWatermarkService watermarkService,
         IUpdateService updateService,
         IScreenshotService screenshotService,
+        IClipboardMonitorService clipboardMonitor,
         IImageEditorService editorService,
         IBackgroundRemovalService bgRemovalService)
     {
@@ -348,8 +373,11 @@ public partial class MainViewModel : ObservableObject
         _watermarkService = watermarkService ?? throw new ArgumentNullException(nameof(watermarkService));
         _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
         _screenshotService = screenshotService ?? throw new ArgumentNullException(nameof(screenshotService));
+        _clipboardMonitor = clipboardMonitor ?? throw new ArgumentNullException(nameof(clipboardMonitor));
         _editorService = editorService ?? throw new ArgumentNullException(nameof(editorService));
         _bgRemovalService = bgRemovalService ?? throw new ArgumentNullException(nameof(bgRemovalService));
+
+        _clipboardMonitor.ScreenshotDetected += OnScreenshotDetected;
 
         Files.CollectionChanged += (s, e) =>
         {
@@ -399,6 +427,7 @@ public partial class MainViewModel : ObservableObject
         _showTrayNotifications = settings.ShowTrayNotifications;
         _checkForUpdatesOnStartup = settings.CheckForUpdatesOnStartup;
         _checkForUpdatesPeriodically = settings.CheckForUpdatesPeriodically;
+        _autoDetectScreenshots = settings.AutoDetectScreenshots;
 
         // Auto-heal autostart path if enabled
         if (_isAutostartEnabled)
@@ -713,6 +742,23 @@ public partial class MainViewModel : ObservableObject
             {
                 MessageBox.Show("Konnte Verknüpfung im Startmenü nicht erstellen.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+    }
+
+    [RelayCommand]
+    private void ShareAppLink()
+    {
+        const string link = "https://github.com/captainiglo31/Imaginary/releases/latest";
+        try
+        {
+            Clipboard.SetText(link);
+            MessageBox.Show(
+                $"Der offizielle Download-Link wurde in die Zwischenablage kopiert:\n\n{link}\n\nDu kannst ihn nun einfach einfügen und mit anderen teilen!",
+                "Link teilen", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Konnte Link nicht in die Zwischenablage kopieren:\n{link}\n\nFehler: {ex.Message}", "Teilen", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -1122,6 +1168,39 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    public void OpenEditorForFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+
+        try
+        {
+            if (Application.Current?.MainWindow != null)
+            {
+                if (!Application.Current.MainWindow.IsVisible) Application.Current.MainWindow.Show();
+                if (Application.Current.MainWindow.WindowState == WindowState.Minimized) Application.Current.MainWindow.WindowState = WindowState.Normal;
+                Application.Current.MainWindow.Activate();
+            }
+
+            AppLogger.Info("Editor", $"Öffne Paint / Bild-Editor für Datei: {filePath}");
+            var editorWin = new ImageEditorWindow(filePath, _editorService, _bgRemovalService)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+
+            if (editorWin.ShowDialog() == true && editorWin.HasChanges)
+            {
+                var resultPath = editorWin.ResultFilePath ?? filePath;
+                AddFilePaths(new[] { resultPath });
+                SelectedTabIndex = 0;
+                StatusSummary = $"✏️ Screenshot/Bild im Studio abgelegt: {Path.GetFileName(resultPath)}";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Editor", "Fehler beim Öffnen des Bild-Editors für Screenshot", ex);
+        }
+    }
+
     [RelayCommand]
     private void OpenLogViewer()
     {
@@ -1235,39 +1314,107 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    private void OnScreenshotDetected(string filePath)
+    {
+        Application.Current?.Dispatcher?.Invoke(() =>
+        {
+            LatestDetectedScreenshotPath = filePath;
+            ScreenshotBannerText = $"Screenshot erfasst: {Path.GetFileName(filePath)}";
+            IsScreenshotBannerVisible = true;
+
+            _screenshotBannerTimer?.Stop();
+            _screenshotBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(14) };
+            _screenshotBannerTimer.Tick += (s, e) =>
+            {
+                _screenshotBannerTimer?.Stop();
+                IsScreenshotBannerVisible = false;
+            };
+            _screenshotBannerTimer.Start();
+
+            if (_trayService != null && ShowTrayNotifications)
+            {
+                _trayService.ShowNotification(
+                    "📸 Screenshot in Imaginary bearbeiten",
+                    $"{Path.GetFileName(filePath)} wurde erfasst. Klicken zum Öffnen im Editor.",
+                    System.Windows.Forms.ToolTipIcon.Info,
+                    4500,
+                    onClick: () =>
+                    {
+                        Application.Current?.Dispatcher?.Invoke(() =>
+                        {
+                            OpenEditorForFile(filePath);
+                        });
+                    });
+            }
+        });
+    }
+
     [RelayCommand]
-    public void PasteClipboard()
+    private void OpenEditorForLatestScreenshot()
+    {
+        IsScreenshotBannerVisible = false;
+        _screenshotBannerTimer?.Stop();
+        if (!string.IsNullOrWhiteSpace(LatestDetectedScreenshotPath) && File.Exists(LatestDetectedScreenshotPath))
+        {
+            OpenEditorForFile(LatestDetectedScreenshotPath);
+        }
+    }
+
+    [RelayCommand]
+    private void AddLatestScreenshotToStudio()
+    {
+        IsScreenshotBannerVisible = false;
+        _screenshotBannerTimer?.Stop();
+        if (!string.IsNullOrWhiteSpace(LatestDetectedScreenshotPath) && File.Exists(LatestDetectedScreenshotPath))
+        {
+            AddFilePaths(new[] { LatestDetectedScreenshotPath });
+            SelectedTabIndex = 0;
+            StatusSummary = $"📸 Screenshot zum Studio hinzugefügt ({Path.GetFileName(LatestDetectedScreenshotPath)})";
+        }
+    }
+
+    [RelayCommand]
+    private void DismissScreenshotBanner()
+    {
+        IsScreenshotBannerVisible = false;
+        _screenshotBannerTimer?.Stop();
+    }
+
+    [RelayCommand]
+    public void TriggerNativeSnipping()
+    {
+        StatusSummary = "📸 Windows Snipping Tool gestartet (Win + Shift + S)...";
+        _screenshotService.TriggerNativeSnipping();
+    }
+
+    [RelayCommand]
+    public async Task CaptureScreenshotAsync()
+    {
+        TriggerNativeSnipping();
+        await Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    public async Task PasteFromClipboardAsync()
+    {
+        await PasteClipboardAsync();
+    }
+
+    [RelayCommand]
+    public async Task PasteClipboardAsync()
     {
         try
         {
             if (Clipboard.ContainsImage())
             {
-                var imageSource = Clipboard.GetImage();
-                if (imageSource != null)
+                StatusSummary = "📋 Lese Bild aus der Windows-Zwischenablage...";
+                var savedPath = await _screenshotService.SaveClipboardImageAsync();
+                if (!string.IsNullOrWhiteSpace(savedPath) && File.Exists(savedPath))
                 {
-                    var clipboardDir = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Imaginary",
-                        "Clipboard");
-
-                    if (!Directory.Exists(clipboardDir))
-                    {
-                        Directory.CreateDirectory(clipboardDir);
-                    }
-
-                    var filePath = Path.Combine(clipboardDir, $"Clipboard_{DateTime.Now:yyyy-MM-dd_HHmmss}.png");
-
-                    var encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(imageSource));
-                    using (var stream = File.Create(filePath))
-                    {
-                        encoder.Save(stream);
-                    }
-
-                    AddFilePaths(new[] { filePath });
+                    AddFilePaths(new[] { savedPath });
                     SelectedTabIndex = 0;
-                    StatusSummary = $"📋 Bild aus Zwischenablage importiert: {Path.GetFileName(filePath)}";
-                    AppLogger.Info("Clipboard", $"Bild aus Zwischenablage importiert: {filePath}");
+                    StatusSummary = $"📋 Bild aus Zwischenablage importiert: {Path.GetFileName(savedPath)}";
+                    AppLogger.Info("Clipboard", $"Bild aus Zwischenablage importiert: {savedPath}");
                     return;
                 }
             }
@@ -1294,38 +1441,14 @@ public partial class MainViewModel : ObservableObject
                 }
             }
 
-            StatusSummary = "Zwischenablage enthält kein unterstütztes Bild oder keine Bilddatei.";
+            // Falls Zwischenablage kein Bild enthält -> Windows Snipping Tool (Win + Shift + S) anbieten/starten
+            StatusSummary = "Kein Bild in Zwischenablage. Starte Windows Snipping Tool (Win + Shift + S)...";
+            _screenshotService.TriggerNativeSnipping();
         }
         catch (Exception ex)
         {
             AppLogger.Error("Clipboard", "Fehler beim Einfügen aus Zwischenablage", ex);
             StatusSummary = "Fehler beim Einfügen aus der Zwischenablage.";
-        }
-    }
-
-    [RelayCommand]
-    public async Task CaptureScreenshotAsync()
-    {
-        try
-        {
-            StatusSummary = "📸 Screenshot-Modus aktiv...";
-            var filePath = await _screenshotService.CaptureRegionAsync();
-            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
-            {
-                AddFilePaths(new[] { filePath });
-                SelectedTabIndex = 0;
-                StatusSummary = $"📸 Screenshot eingefügt und in Zwischenablage kopiert ({Path.GetFileName(filePath)})";
-                AppLogger.Info("Screenshot", $"Screenshot zum Studio hinzugefügt: {filePath}");
-            }
-            else
-            {
-                StatusSummary = "Screenshot abgebrochen.";
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Screenshot", "Fehler bei Screenshot-Aufnahme", ex);
-            StatusSummary = "Fehler bei Screenshot-Aufnahme.";
         }
     }
 

@@ -20,6 +20,11 @@ public interface IImageEditorService
     SKBitmap ApplyGaussianBlur(SKBitmap source, SKRectI targetRect, float sigma = 12f);
 
     /// <summary>
+    /// Applies a smooth Gaussian blur brush along the specified stroke points.
+    /// </summary>
+    SKBitmap ApplyBlurBrush(SKBitmap source, IEnumerable<SKPoint> strokePoints, float brushRadius = 24f, float sigma = 10f);
+
+    /// <summary>
     /// Draws a solid blackout rectangle over sensitive information (IBAN, passwords, tokens).
     /// </summary>
     SKBitmap ApplyBlackout(SKBitmap source, SKRectI targetRect, SKColor color);

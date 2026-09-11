@@ -55,16 +55,19 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
-                    <ComboBox x:Name="ComboLogLevel" Width="170" Margin="0,0,14,0" SelectionChanged="OnFilterChanged" Padding="8,4">
+                    <TextBlock Text="Sitzung:" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold"/>
+                    <ComboBox x:Name="ComboLogSessions" Width="220" Margin="0,0,12,0" SelectionChanged="OnLogSessionChanged" Padding="6,4"/>
+
+                    <TextBlock Text="Filter:" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold"/>
+                    <ComboBox x:Name="ComboLogLevel" Width="150" Margin="0,0,12,0" SelectionChanged="OnFilterChanged" Padding="6,4">
                         <ComboBoxItem Content="Alle Stufen (Debug+)"/>
                         <ComboBoxItem Content="Nur Fehler (Error)"/>
                         <ComboBoxItem Content="Warnungen &amp; Fehler"/>
                         <ComboBoxItem Content="Informationen &amp; höher"/>
                     </ComboBox>
 
-                    <TextBlock Text="Suche:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox x:Name="TextSearch" Width="180" Margin="0,0,14,0" TextChanged="OnSearchTextChanged" Padding="6,4"/>
+                    <TextBlock Text="Suche:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="TextSearch" Width="140" Margin="0,0,12,0" TextChanged="OnSearchTextChanged" Padding="6,4"/>
 
                     <CheckBox x:Name="CheckAutoScroll" Content="Auto-Scroll" IsChecked="True" VerticalAlignment="Center"/>
                 </StackPanel>

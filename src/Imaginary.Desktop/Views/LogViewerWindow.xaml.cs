@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -18,11 +18,15 @@ public partial class LogViewerWindow : Window
     private readonly List<LogEntry> _allEntries = new();
     private readonly object _filterLock = new();
     private bool _isInitialized;
+    private bool _isLiveSession = true;
+    private string _currentSessionName = "Aktuelle Sitzung (Live)";
 
     public LogViewerWindow()
     {
         InitializeComponent();
         GridLogs.ItemsSource = _visibleEntries;
+
+        PopulateLogSessions();
 
         // Load existing entries
         var recents = AppLogger.Instance.GetRecentEntries();
@@ -41,7 +45,7 @@ public partial class LogViewerWindow : Window
 
     private void OnLiveEntryLogged(LogEntry entry)
     {
-        if (!_isInitialized) return;
+        if (!_isInitialized || !_isLiveSession) return;
 
         Dispatcher.InvokeAsync(() =>
         {
@@ -106,13 +110,180 @@ public partial class LogViewerWindow : Window
         return true;
     }
 
+    private void PopulateLogSessions()
+    {
+        ComboLogSessions.Items.Clear();
+
+        var liveItem = new ComboBoxItem { Content = "🟢 Aktuelle Sitzung (Live)", Tag = "live" };
+        ComboLogSessions.Items.Add(liveItem);
+
+        var logDir = GetLogDirectory();
+        if (Directory.Exists(logDir))
+        {
+            var files = Directory.GetFiles(logDir, "imaginary-*.log")
+                                 .Select(f => new FileInfo(f))
+                                 .OrderByDescending(f => f.LastWriteTime)
+                                 .ToList();
+
+            foreach (var fi in files)
+            {
+                string label = fi.Name;
+                if (fi.LastWriteTime.Date == DateTime.Today)
+                    label += " (Heute)";
+                else if (fi.LastWriteTime.Date == DateTime.Today.AddDays(-1))
+                    label += " (Gestern)";
+                else
+                    label += $" ({fi.LastWriteTime:dd.MM.yyyy})";
+
+                var fileItem = new ComboBoxItem { Content = $"📄 {label}", Tag = fi.FullName };
+                ComboLogSessions.Items.Add(fileItem);
+            }
+        }
+
+        var browseItem = new ComboBoxItem { Content = "📁 Externe Logdatei öffnen...", Tag = "browse" };
+        ComboLogSessions.Items.Add(browseItem);
+
+        ComboLogSessions.SelectedIndex = 0;
+    }
+
+    private string GetLogDirectory()
+    {
+        var logFile = AppLogger.Instance.LogFilePath;
+        if (!string.IsNullOrEmpty(logFile))
+        {
+            var dir = Path.GetDirectoryName(logFile);
+            if (!string.IsNullOrEmpty(dir)) return dir;
+        }
+
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var portableLogs = Path.Combine(baseDir, "logs");
+        if (Directory.Exists(portableLogs)) return portableLogs;
+
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Imaginary", "logs");
+    }
+
+    private void OnLogSessionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_isInitialized || ComboLogSessions.SelectedItem is not ComboBoxItem item) return;
+
+        string tag = item.Tag?.ToString() ?? "live";
+
+        if (tag == "live")
+        {
+            _isLiveSession = true;
+            _currentSessionName = "Aktuelle Sitzung (Live)";
+            _allEntries.Clear();
+            _allEntries.AddRange(AppLogger.Instance.GetRecentEntries());
+            ApplyFilter();
+        }
+        else if (tag == "browse")
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Logdatei auswählen",
+                Filter = "Logdateien (*.log;*.txt)|*.log;*.txt|Alle Dateien (*.*)|*.*"
+            };
+
+            if (dlg.ShowDialog(this) == true)
+            {
+                LoadHistoricalLog(dlg.FileName, Path.GetFileName(dlg.FileName));
+            }
+            else
+            {
+                // Revert to live
+                ComboLogSessions.SelectedIndex = 0;
+            }
+        }
+        else
+        {
+            LoadHistoricalLog(tag, item.Content?.ToString()?.Replace("📄 ", "") ?? Path.GetFileName(tag));
+        }
+    }
+
+    private void LoadHistoricalLog(string filePath, string displayName)
+    {
+        _isLiveSession = false;
+        _currentSessionName = displayName;
+        _allEntries.Clear();
+
+        var parsed = ParseLogFile(filePath);
+        _allEntries.AddRange(parsed);
+        ApplyFilter();
+    }
+
+    private static List<LogEntry> ParseLogFile(string filePath)
+    {
+        var result = new List<LogEntry>();
+        if (!File.Exists(filePath)) return result;
+
+        try
+        {
+            var lines = File.ReadAllLines(filePath, Encoding.UTF8);
+            LogEntry? currentEntry = null;
+            var exBuilder = new StringBuilder();
+            var logRegex = new System.Text.RegularExpressions.Regex(@"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\] \[([A-Z ]+)\] \[([^\]]+)\] (.*)$");
+
+            foreach (var line in lines)
+            {
+                var match = logRegex.Match(line);
+                if (match.Success)
+                {
+                    if (currentEntry != null)
+                    {
+                        if (exBuilder.Length > 0)
+                        {
+                            result.Add(currentEntry with { ExceptionDetails = exBuilder.ToString().TrimEnd() });
+                            exBuilder.Clear();
+                        }
+                        else
+                        {
+                            result.Add(currentEntry);
+                        }
+                    }
+
+                    if (DateTime.TryParse(match.Groups[1].Value, out var dt))
+                    {
+                        string levelStr = match.Groups[2].Value.Trim();
+                        var level = levelStr switch
+                        {
+                            "ERROR" => LogLevel.Error,
+                            "WARN" => LogLevel.Warning,
+                            "DEBUG" => LogLevel.Debug,
+                            _ => LogLevel.Information
+                        };
+                        string source = match.Groups[3].Value;
+                        string message = match.Groups[4].Value;
+
+                        currentEntry = new LogEntry(dt, level, source, message);
+                    }
+                }
+                else if (currentEntry != null)
+                {
+                    exBuilder.AppendLine(line);
+                }
+            }
+
+            if (currentEntry != null)
+            {
+                if (exBuilder.Length > 0)
+                {
+                    result.Add(currentEntry with { ExceptionDetails = exBuilder.ToString().TrimEnd() });
+                }
+                else
+                {
+                    result.Add(currentEntry);
+                }
+            }
+        }
+        catch { }
+
+        return result;
+    }
+
     private void UpdateSummary()
     {
         if (!_isInitialized || TextLogSummary == null) return;
-
-        var logFile = AppLogger.Instance.LogFilePath;
-        var fileInfo = !string.IsNullOrEmpty(logFile) ? $" | Datei: {logFile}" : string.Empty;
-        TextLogSummary.Text = $"Einträge: {_visibleEntries.Count} sichtbar von {_allEntries.Count} gesamt{fileInfo}";
+        TextLogSummary.Text = $"Sitzung: {_currentSessionName} | Einträge: {_visibleEntries.Count} sichtbar von {_allEntries.Count} gesamt";
     }
 
     private void OnFilterChanged(object sender, SelectionChangedEventArgs e)

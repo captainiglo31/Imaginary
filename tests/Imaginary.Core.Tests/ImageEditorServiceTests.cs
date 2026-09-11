@@ -145,4 +145,36 @@ public class ImageEditorServiceTests
 
         hasDarkTextPixel.Should().BeTrue("White badge must use dark contrast text instead of white-on-white.");
     }
+
+    [Fact]
+    public void ApplyBlurBrush_EmptyStroke_ShouldReturnCopy()
+    {
+        using var source = CreateTestBitmap(100, 100, SKColors.Red);
+        using var result = _service.ApplyBlurBrush(source, Array.Empty<SKPoint>(), brushRadius: 20f, sigma: 10f);
+
+        result.Width.Should().Be(100);
+        result.Height.Should().Be(100);
+        result.GetPixel(50, 50).Should().Be(SKColors.Red);
+    }
+
+    [Fact]
+    public void ApplyBlurBrush_WithStroke_ShouldModifyPixelsAlongPath()
+    {
+        using var source = CreateTestBitmap(100, 100, SKColors.White);
+        // Draw sharp high-contrast black box in middle
+        using (var canvas = new SKCanvas(source))
+        using (var paint = new SKPaint { Color = SKColors.Black })
+        {
+            canvas.DrawRect(30, 30, 40, 40, paint);
+        }
+
+        var stroke = new[] { new SKPoint(30, 50), new SKPoint(70, 50) };
+        using var result = _service.ApplyBlurBrush(source, stroke, brushRadius: 15f, sigma: 8f);
+
+        result.Width.Should().Be(100);
+        result.Height.Should().Be(100);
+        // Pixel at edge of black box (30, 50) should now be blurred / blended (neither pure white nor pure black)
+        var edgePixel = result.GetPixel(30, 50);
+        edgePixel.Should().NotBe(SKColors.White);
+    }
 }

@@ -60,6 +60,13 @@
 
             <!-- Recovery Actions -->
             <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <!-- Start Anyway Button -->
+                <Button x:Name="StartAnywayButton" Content="🚀 Trotzdem normal starten"
+                        Click="OnStartAnywayClicked"
+                        Background="#10B981" Foreground="White" FontWeight="Bold" FontSize="12.5"
+                        Padding="14,10" Margin="0,0,10,0" BorderThickness="0" Cursor="Hand"
+                        ToolTip="Setzt den Crash-Zähler zurück und startet Imaginary normal"/>
+
                 <!-- Rollback Button -->
                 <Button x:Name="RollbackButton" Content="⏪ Auf vorherige Version zurück (Rollback)"
                         Click="OnRollbackClicked"

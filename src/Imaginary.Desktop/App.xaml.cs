@@ -109,19 +109,6 @@ public partial class App : Application
             return;
         }
 
-        // 1. Startup Health Watchdog (Crash Loop Erkennung)
-        var healthTracker = new StartupHealthTracker();
-        healthTracker.RecordStartup();
-
-        if (healthTracker.IsCrashLoopDetected)
-        {
-            AppLogger.Warn("App", $"Crash-Loop erkannt ({healthTracker.CrashCount} Startabbrüche in Folge). Öffne Notfall-Wiederherstellung.");
-            var recoveryWin = new CrashRecoveryWindow();
-            recoveryWin.ShowDialog();
-            Shutdown();
-            return;
-        }
-
         if (e.Args.Any(a => string.Equals(a, "--mcp", StringComparison.OrdinalIgnoreCase)))
         {
             if (!Console.IsOutputRedirected)
@@ -156,6 +143,41 @@ public partial class App : Application
             }
             Shutdown();
             return;
+        }
+
+        // 1. Startup Health Watchdog (Crash Loop Erkennung für GUI)
+        bool isAfterRollback = e.Args.Any(a => string.Equals(a, "--after-rollback", StringComparison.OrdinalIgnoreCase));
+        var healthTracker = new StartupHealthTracker();
+
+        if (isAfterRollback)
+        {
+            AppLogger.Info("App", "Start nach Rollback erkannt (--after-rollback). Setze StartupHealthTracker zurück.");
+            healthTracker.Reset();
+        }
+        else
+        {
+            healthTracker.RecordStartup();
+        }
+
+        if (!isAfterRollback && healthTracker.IsCrashLoopDetected)
+        {
+            AppLogger.Warn("App", $"Crash-Loop erkannt ({healthTracker.CrashCount} Startabbrüche in Folge). Öffne Notfall-Wiederherstellung.");
+            var recoveryWin = new CrashRecoveryWindow();
+            recoveryWin.ShowDialog();
+
+            if (recoveryWin.UserWantsNormalStart)
+            {
+                AppLogger.Info("App", "Benutzer hat 'Trotzdem normal starten' gewählt. Setze StartupHealthTracker zurück und fahre mit regulärem Start fort.");
+                healthTracker.Reset();
+                healthTracker.RecordStartup();
+            }
+            else
+            {
+                // Schließe ohne IsStarting auf true zu belassen
+                healthTracker.Reset();
+                Shutdown();
+                return;
+            }
         }
 
         bool isFirstInstance = SingleInstanceService.TryRegisterSingleInstance(e.Args, files =>
@@ -270,6 +292,11 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         AppLogger.Info("App", $"=== Imaginary wird beendet (ExitCode: {e.ApplicationExitCode}) ===");
+        try
+        {
+            new StartupHealthTracker().RecordHealthy();
+        }
+        catch { }
         SingleInstanceService.Cleanup();
         base.OnExit(e);
     }

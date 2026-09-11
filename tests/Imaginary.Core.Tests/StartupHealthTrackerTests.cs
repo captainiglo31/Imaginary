@@ -87,4 +87,39 @@ public class StartupHealthTrackerTests
             }
         }
     }
+
+    [Fact]
+    public void StartupHealthTracker_AfterRollback_ShouldStartHealthy()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"imaginary_health_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var healthFile = Path.Combine(tempDir, "startup_health.json");
+
+        try
+        {
+            var tracker = new StartupHealthTracker(healthFile);
+            tracker.RecordStartup();
+            tracker.RecordStartup();
+            tracker.RecordStartup();
+            tracker.IsCrashLoopDetected.Should().BeTrue();
+
+            // Simulate rollback reset:
+            var rollbackTracker = new StartupHealthTracker(healthFile);
+            rollbackTracker.Reset();
+
+            // Next launch (e.g. rolled back executable):
+            var freshTracker = new StartupHealthTracker(healthFile);
+            freshTracker.IsCrashLoopDetected.Should().BeFalse();
+            freshTracker.RecordStartup();
+            freshTracker.CrashCount.Should().Be(0);
+            freshTracker.IsCrashLoopDetected.Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
 }

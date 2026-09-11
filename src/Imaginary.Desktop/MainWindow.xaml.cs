@@ -18,6 +18,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly ITrayService _trayService;
+    private readonly IClipboardMonitorService _clipboardMonitor;
     private Point _dragStartPoint;
     private bool _isDraggingOut;
 
@@ -29,18 +30,21 @@ public partial class MainWindow : Window
         services.AddImaginaryCore();
         services.AddSingleton<ITrayService, TrayService>();
         services.AddSingleton<IScreenshotService, ScreenshotService>();
+        services.AddSingleton<IClipboardMonitorService, ClipboardMonitorService>();
         services.AddSingleton<MainViewModel>();
         var serviceProvider = services.BuildServiceProvider();
 
         _viewModel = serviceProvider.GetRequiredService<MainViewModel>();
         _trayService = serviceProvider.GetRequiredService<ITrayService>();
+        _clipboardMonitor = serviceProvider.GetRequiredService<IClipboardMonitorService>();
+        _clipboardMonitor.StartMonitoring(this);
 
         _trayService.Initialize(
             mainWindow: this,
             toggleHotfolder: () => _viewModel.ToggleHotfolderCommand.Execute(null),
             isHotfolderRunning: () => _viewModel.IsHotfolderActive,
             openSettings: () => _viewModel.SelectTabCommand.Execute(2),
-            captureScreenshot: () => _viewModel.CaptureScreenshotCommand.Execute(null));
+            captureScreenshot: () => _viewModel.TriggerNativeSnippingCommand.Execute(null));
 
         _viewModel.AttachTrayService(_trayService);
         DataContext = _viewModel;
@@ -74,6 +78,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _clipboardMonitor.Dispose();
         _trayService.Dispose();
         base.OnClosing(e);
     }

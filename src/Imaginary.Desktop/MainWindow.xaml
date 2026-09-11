@@ -16,9 +16,9 @@
         FontFamily="Segoe UI">
 
     <Window.InputBindings>
-        <KeyBinding Gesture="Ctrl+V" Command="{Binding PasteClipboardCommand}"/>
-        <KeyBinding Key="F10" Command="{Binding CaptureScreenshotCommand}"/>
-        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding CaptureScreenshotCommand}"/>
+        <KeyBinding Gesture="Ctrl+V" Command="{Binding PasteFromClipboardCommand}"/>
+        <KeyBinding Key="F10" Command="{Binding TriggerNativeSnippingCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+S" Command="{Binding TriggerNativeSnippingCommand}"/>
     </Window.InputBindings>
 
     <Window.Resources>
@@ -109,6 +109,14 @@
                                 Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                                 Cursor="Hand" ToolTip="Model Context Protocol (MCP) &amp; KI-Agenten Konfiguration aufrufen"/>
+
+                        <!-- Teilen Button -->
+                        <Button Content="🔗 Teilen" Command="{Binding ShareAppLinkCommand}"
+                                Padding="12,6" Margin="0,0,10,0"
+                                Background="{DynamicResource SecondaryButtonBackgroundBrush}"
+                                Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                Cursor="Hand" ToolTip="Download-Link kopieren und Imaginary weiterempfehlen"/>
 
                         <!-- Protokoll / Log Viewer Button -->
                         <Button Content="📋 Protokoll" Command="{Binding OpenLogViewerCommand}"
@@ -429,13 +437,13 @@
                                     Style="{DynamicResource ToolbarButtonStyle}"/>
                             <Button Content="+ Ordner" Command="{Binding AddFolderCommand}"
                                     Style="{DynamicResource ToolbarButtonStyle}"/>
-                            <Button Content="📋 Zwischenablage (Strg+V)" Command="{Binding PasteClipboardCommand}"
-                                    Style="{DynamicResource ToolbarButtonStyle}"
-                                    ToolTip="Fügt ein kopiertes Bild oder Bilddateien aus der Windows-Zwischenablage ein (Strg+V)"/>
-                            <Button Content="📸 Screenshot (F10)" Command="{Binding CaptureScreenshotCommand}"
+                            <Button Content="📋 Aus Zwischenablage (Strg+V)" Command="{Binding PasteFromClipboardCommand}"
                                     Style="{DynamicResource ToolbarButtonStyle}"
                                     FontWeight="SemiBold"
-                                    ToolTip="Bereich aufnehmen und direkt hier einfügen (F10 oder Strg+Shift+S)"/>
+                                    ToolTip="Fügt ein kopiertes Bild oder Bilddateien aus der Windows-Zwischenablage ein (Strg+V)"/>
+                            <Button Content="📸 Screenshot (Win+Shift+S)" Command="{Binding TriggerNativeSnippingCommand}"
+                                    Style="{DynamicResource ToolbarButtonStyle}"
+                                    ToolTip="Startet das Windows Snipping Tool (Win + Shift + S). Der Screenshot wird automatisch in Imaginary erkannt."/>
                             <Button Content="🔍 Vorher / Nachher" Command="{Binding OpenPreviewCommand}"
                                     IsEnabled="{Binding CanOpenPreview}"
                                     Style="{DynamicResource ToolbarButtonStyle}"
@@ -495,8 +503,8 @@
                                     <MenuItem Header="✏️ In Paint / Quick-Edit bearbeiten" Command="{Binding OpenEditorCommand}"/>
                                     <MenuItem Header="🔍 Vorher / Nachher Vergleich" Command="{Binding OpenPreviewCommand}" IsEnabled="{Binding CanOpenPreview}"/>
                                     <Separator/>
-                                    <MenuItem Header="📋 Aus Zwischenablage einfügen (Strg+V)" Command="{Binding PasteClipboardCommand}"/>
-                                    <MenuItem Header="📸 Screenshot aufnehmen (F10)" Command="{Binding CaptureScreenshotCommand}"/>
+                                    <MenuItem Header="📋 Aus Zwischenablage einfügen (Strg+V)" Command="{Binding PasteFromClipboardCommand}"/>
+                                    <MenuItem Header="📸 Windows-Screenshot aufnehmen (Win+Shift+S / F10)" Command="{Binding TriggerNativeSnippingCommand}"/>
                                     <Separator/>
                                     <MenuItem Header="🗑️ Aus Liste entfernen" Command="{Binding RemoveSelectedCommand}"/>
                                     <MenuItem Header="🧹 Liste leeren" Command="{Binding ClearFilesCommand}"/>
@@ -831,6 +839,17 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <!-- Screenshots & Zwischenablage -->
+                        <GroupBox Header="📸 Screenshots &amp; Zwischenablage">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding AutoDetectScreenshots, Mode=TwoWay}"
+                                          Content="Screenshots &amp; Bild-Zwischenablage automatisch erkennen (Win + Shift + S)"
+                                          FontWeight="SemiBold" FontSize="13" Margin="0,0,0,2"/>
+                                <TextBlock Text="Erkennt neu erstellte Windows-Screenshots und bietet direkte Bearbeitung im Bild-Editor oder Hinzufügen zum Studio an."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="24,0,0,4" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </GroupBox>
+
                         <!-- KI & Freistell-Studio (Hintergrund entfernen) -->
                         <GroupBox Header="🧠 KI &amp; Freistell-Studio (Hintergrund entfernen)">
                             <StackPanel Margin="0,4,0,0">
@@ -979,6 +998,20 @@
                                                FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </DockPanel>
 
+                                <!-- Weiterempfehlen / Download-Link teilen -->
+                                <Border Background="{DynamicResource CardHeaderBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10" Margin="0,0,0,10">
+                                    <DockPanel LastChildFill="True">
+                                        <Button DockPanel.Dock="Right" Content="🔗 Download-Link kopieren" Command="{Binding ShareAppLinkCommand}"
+                                                Padding="12,6" FontWeight="Bold" FontSize="12" Cursor="Hand" Style="{DynamicResource ToolbarButtonStyle}" VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Imaginary weiterempfehlen" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Kopiert den direkten GitHub-Downloadlink (Releases) in die Zwischenablage."
+                                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+
                                 <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
                                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,4,0,0">
                                     <DockPanel>
@@ -993,6 +1026,30 @@
                 </ScrollViewer>
             </TabItem>
         </TabControl>
+
+        <!-- Screenshot Detected Floating Toast Banner -->
+        <Border Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24"
+                Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource AccentBrush}"
+                BorderThickness="1.5" CornerRadius="8" Padding="16,10"
+                Visibility="{Binding IsScreenshotBannerVisible, Converter={StaticResource BoolToVis}}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.4" Color="#000000"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="📸" FontSize="22" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center" Margin="0,0,20,0">
+                    <TextBlock Text="Neuer Screenshot erkannt!" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding ScreenshotBannerText}" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+                <Button Content="🎨 Im Editor bearbeiten" Command="{Binding OpenEditorForLatestScreenshotCommand}"
+                        Padding="12,6" FontWeight="Bold" Background="{DynamicResource AccentBrush}" Foreground="White"
+                        Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,8,0" Cursor="Hand"/>
+                <Button Content="➕ Zu Studio hinzufügen" Command="{Binding AddLatestScreenshotToStudioCommand}"
+                        Padding="10,6" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,8,0" Cursor="Hand"/>
+                <Button Content="✕" Command="{Binding DismissScreenshotBannerCommand}"
+                        Padding="8,6" Style="{DynamicResource ToolbarButtonStyle}" ToolTip="Schließen" Cursor="Hand"/>
+            </StackPanel>
+        </Border>
 
         <!-- Bottom Status Bar -->
         <Border Grid.Row="2" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="16,8">

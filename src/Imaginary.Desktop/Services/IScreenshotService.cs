@@ -5,9 +5,13 @@ namespace Imaginary.Desktop.Services;
 public interface IScreenshotService
 {
     /// <summary>
-    /// Captures a selected screen region via an interactive snipping overlay.
-    /// Saves the result as PNG and places it onto the clipboard.
-    /// Returns the absolute path to the saved screenshot file, or null if cancelled.
+    /// Startet das native Windows Snipping Tool (ms-screenclip: / Win + Shift + S).
     /// </summary>
-    Task<string?> CaptureRegionAsync();
+    void TriggerNativeSnipping();
+
+    /// <summary>
+    /// Prüft, ob ein Bild in der Windows-Zwischenablage liegt, speichert es
+    /// im lokalen Screenshots-Verzeichnis und gibt den Pfad zurück.
+    /// </summary>
+    Task<string?> SaveClipboardImageAsync();
 }

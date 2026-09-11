@@ -425,6 +425,13 @@ public class UpdateService : IUpdateService
             }
             catch { }
 
+            // 4. Startup-Gesundheitsüberwachung zurücksetzen, damit kein Crash-Loop nach Rollback gemeldet wird
+            try
+            {
+                new StartupHealthTracker().Reset();
+            }
+            catch { }
+
             if (restart)
             {
                 var startInfo = new ProcessStartInfo
