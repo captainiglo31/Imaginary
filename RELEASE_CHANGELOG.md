@@ -1,3 +1,20 @@
+## 🚀 Was ist neu in Version 2.2.1 (Hotfix & Resilienz-Update):
+
+### 🛡️ Robuste Notfall-Wiederherstellung & Automatischer Rollback
+- **Startup Crash behoben:** Ein Argument-Typ-Konflikt (`string` vs `int`) im Navigations-Befehl des Hauptfensters wurde behoben.
+- **🚨 Notfall-Wiederherstellungsfenster (Crash Recovery):**
+  - Fängt Startabstürze oder Crash-Schleifen sicher ab, ohne dass die Anwendung spurlos verschwindet.
+  - **1-Klick Rollback:** Setzt die Installation mit einem Klick auf die zuvor lauffähige Version zurück (`.previous.exe` / `.old`).
+  - **Online-Hotfix-Suche:** Sucht direkt aus dem Notfallfenster nach neuen Updates auf GitHub und installiert sie nahtlos.
+  - **Log-Inspektion:** Direkter Zugriff auf die Diagnose-Logdateien zur Fehleranalyse.
+- **Watchdog für Crash-Loops (`StartupHealthTracker`):** Erkennt aufeinanderfolgende Startabbrüche automatisch und startet präventiv im Rettungsmodus.
+- **Sichere Backup-Verwaltung:** Vorherige Versionen werden beim Update dauerhaft als `.previous.exe` und `.old` gesichert und nicht mehr gelöscht.
+- **CLI-Notfallbefehle:**
+  - `Imaginary.exe --rollback`: Führt sofort einen Rollback zur vorherigen Version durch.
+  - `Imaginary.exe --recovery`: Öffnet das Notfall-Wiederherstellungsfenster.
+
+---
+
 ## 🚀 Was ist neu in Version 2.2.0:
 
 ### 🤖 Model Context Protocol (MCP) Server Integration

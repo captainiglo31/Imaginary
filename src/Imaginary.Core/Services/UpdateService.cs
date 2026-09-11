@@ -269,26 +269,41 @@ public class UpdateService : IUpdateService
 
         var dir = Path.GetDirectoryName(currentExe) ?? AppDomain.CurrentDomain.BaseDirectory;
         var exeName = Path.GetFileNameWithoutExtension(currentExe);
+        var previousExe = Path.Combine(dir, $"{exeName}.previous.exe");
         var oldExe = Path.Combine(dir, $"{exeName}.old");
 
-        // 1. Zuvor verbliebene .old-Dateien aufräumen
-        if (File.Exists(oldExe))
+        // 1. Zuvor verbliebene alte Rollback-Dateien aufräumen
+        try
         {
-            try
-            {
-                File.Delete(oldExe);
-            }
-            catch
-            {
-                oldExe = Path.Combine(dir, $"{exeName}_{Guid.NewGuid():N}.old");
-            }
+            if (File.Exists(oldExe)) { try { File.Delete(oldExe); } catch { } }
+            if (File.Exists(previousExe)) { try { File.Delete(previousExe); } catch { } }
         }
+        catch { }
 
-        // 2. Die aktuell laufende Executable umbenennen.
+        // 2. Metadaten der aktuellen Version sichern
+        try
+        {
+            var metaPath = Path.Combine(dir, $"{exeName}_backup_info.json");
+            var meta = new
+            {
+                previousVersion = _currentVersion.ToString(),
+                backupPath = previousExe,
+                timestamp = DateTime.UtcNow.ToString("O")
+            };
+            File.WriteAllText(metaPath, JsonSerializer.Serialize(meta, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { }
+
+        // 3. Die aktuell laufende Executable umbenennen in .old und .previous.exe.
         // Windows NTFS erlaubt das Umbenennen einer laufenden .exe-Datei im selben Ordner uneingeschränkt!
-        File.Move(currentExe, oldExe);
+        File.Move(currentExe, oldExe, overwrite: true);
+        try
+        {
+            File.Copy(oldExe, previousExe, overwrite: true);
+        }
+        catch { }
 
-        // 3. Die neu heruntergeladene Datei an den ursprünglichen Speicherort der .exe bewegen
+        // 4. Die neu heruntergeladene Datei an den ursprünglichen Speicherort der .exe bewegen
         try
         {
             File.Move(downloadedFilePath, currentExe, overwrite: true);
@@ -304,7 +319,7 @@ public class UpdateService : IUpdateService
             return true;
         }
 
-        // 4. Die aktualisierte Anwendung direkt und nativ starten (keine Shell, keine PowerShell, kein CMD!)
+        // 5. Die aktualisierte Anwendung direkt und nativ starten (keine Shell, keine PowerShell, kein CMD!)
         var startInfo = new ProcessStartInfo
         {
             FileName = currentExe,
@@ -314,5 +329,119 @@ public class UpdateService : IUpdateService
 
         var proc = Process.Start(startInfo);
         return proc != null;
+    }
+
+    public bool CanRollback(out string? previousVersion, out string? backupPath, string? targetExecutablePath = null)
+    {
+        previousVersion = null;
+        backupPath = null;
+
+        var currentExe = targetExecutablePath ?? Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(currentExe) || !File.Exists(currentExe))
+        {
+            currentExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Imaginary.exe");
+        }
+
+        var dir = Path.GetDirectoryName(currentExe) ?? AppDomain.CurrentDomain.BaseDirectory;
+        var exeName = Path.GetFileNameWithoutExtension(currentExe);
+        var primaryBackup = Path.Combine(dir, $"{exeName}.previous.exe");
+        var legacyBackup = Path.Combine(dir, $"{exeName}.old");
+
+        string? foundBackup = null;
+        if (File.Exists(primaryBackup)) foundBackup = primaryBackup;
+        else if (File.Exists(legacyBackup)) foundBackup = legacyBackup;
+
+        if (foundBackup == null) return false;
+
+        backupPath = foundBackup;
+
+        // Versuche Version aus Metadaten zu lesen
+        try
+        {
+            var metaPath = Path.Combine(dir, $"{exeName}_backup_info.json");
+            if (File.Exists(metaPath))
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(metaPath));
+                if (doc.RootElement.TryGetProperty("previousVersion", out var prop))
+                {
+                    previousVersion = prop.GetString();
+                }
+            }
+        }
+        catch { }
+
+        // Fallback: PE File Version Info
+        if (string.IsNullOrWhiteSpace(previousVersion))
+        {
+            try
+            {
+                var fvi = FileVersionInfo.GetVersionInfo(foundBackup);
+                previousVersion = fvi.ProductVersion ?? fvi.FileVersion ?? "Vorherige Version";
+            }
+            catch
+            {
+                previousVersion = "Vorherige Version";
+            }
+        }
+
+        return true;
+    }
+
+    public bool RollbackToPreviousVersion(bool restart = true, string? targetExecutablePath = null)
+    {
+        if (!CanRollback(out _, out var backupPath, targetExecutablePath) || backupPath == null)
+        {
+            return false;
+        }
+
+        var currentExe = targetExecutablePath ?? Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(currentExe))
+        {
+            currentExe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Imaginary.exe");
+        }
+
+        var dir = Path.GetDirectoryName(currentExe) ?? AppDomain.CurrentDomain.BaseDirectory;
+        var exeName = Path.GetFileNameWithoutExtension(currentExe);
+        var brokenBackup = Path.Combine(dir, $"{exeName}.broken_{DateTime.Now:yyyyMMdd_HHmmss}.old");
+
+        try
+        {
+            // 1. Die defekte aktuelle Version aus dem Weg räumen
+            if (File.Exists(currentExe))
+            {
+                File.Move(currentExe, brokenBackup, overwrite: true);
+            }
+
+            // 2. Das Backup wieder als aktuelle Executable herstellen
+            File.Move(backupPath, currentExe, overwrite: true);
+
+            // 3. Verbleibende Kopie des Backups bereinigen
+            var primaryBackup = Path.Combine(dir, $"{exeName}.previous.exe");
+            var legacyBackup = Path.Combine(dir, $"{exeName}.old");
+            try
+            {
+                if (backupPath == primaryBackup && File.Exists(legacyBackup)) File.Delete(legacyBackup);
+                else if (backupPath == legacyBackup && File.Exists(primaryBackup)) File.Delete(primaryBackup);
+            }
+            catch { }
+
+            if (restart)
+            {
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = currentExe,
+                    Arguments = "--after-rollback",
+                    UseShellExecute = true,
+                    WorkingDirectory = dir
+                };
+                Process.Start(startInfo);
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

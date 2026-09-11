@@ -11,6 +11,7 @@ using Imaginary.Core.Logging;
 using Imaginary.Core.Mcp;
 using Imaginary.Core.Services;
 using Imaginary.Desktop.Services;
+using Imaginary.Desktop.Views;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Imaginary.Desktop;
@@ -36,7 +37,22 @@ public partial class App : Application
         DispatcherUnhandledException += (s, args) =>
         {
             AppLogger.Error("Dispatcher", "Unbehandelte UI-Dispatcher-Ausnahme: " + args.Exception.Message, args.Exception);
-            // Don't swallow fatal exceptions, but ensure they are logged
+            args.Handled = true;
+
+            try
+            {
+                var recoveryWin = new CrashRecoveryWindow(args.Exception);
+                recoveryWin.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("App", "Fehler beim Anzeigen des Notfall-Dialogs", ex);
+                MessageBox.Show($"Schwerwiegender Fehler beim Ausführen von Imaginary:\n\n{args.Exception.Message}\n\nStacktrace:\n{args.Exception.StackTrace}\n\n(Notfall-Dialog Fehler: {ex.Message})", "Kritischer Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                Shutdown();
+            }
         };
 
         TaskScheduler.UnobservedTaskException += (s, args) =>
@@ -53,6 +69,43 @@ public partial class App : Application
         if (e.Args.Length > 0)
         {
             AppLogger.Info("App", $"Startargumente ({e.Args.Length}): {string.Join(", ", e.Args)}");
+        }
+
+        // 0. CLI Notfallschalter: Rollback oder Recovery
+        if (e.Args.Any(a => string.Equals(a, "--rollback", StringComparison.OrdinalIgnoreCase)))
+        {
+            var updateSvc = new UpdateService();
+            if (updateSvc.CanRollback(out string? prevVer, out _))
+            {
+                updateSvc.RollbackToPreviousVersion(restart: true);
+            }
+            else
+            {
+                MessageBox.Show("Keine vorherige Version auf der Festplatte gefunden.", "Rollback nicht möglich", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            Shutdown();
+            return;
+        }
+
+        if (e.Args.Any(a => string.Equals(a, "--recovery", StringComparison.OrdinalIgnoreCase)))
+        {
+            var recoveryWin = new CrashRecoveryWindow();
+            recoveryWin.ShowDialog();
+            Shutdown();
+            return;
+        }
+
+        // 1. Startup Health Watchdog (Crash Loop Erkennung)
+        var healthTracker = new StartupHealthTracker();
+        healthTracker.RecordStartup();
+
+        if (healthTracker.IsCrashLoopDetected)
+        {
+            AppLogger.Warn("App", $"Crash-Loop erkannt ({healthTracker.CrashCount} Startabbrüche in Folge). Öffne Notfall-Wiederherstellung.");
+            var recoveryWin = new CrashRecoveryWindow();
+            recoveryWin.ShowDialog();
+            Shutdown();
+            return;
         }
 
         if (e.Args.Any(a => string.Equals(a, "--mcp", StringComparison.OrdinalIgnoreCase)))
@@ -126,80 +179,77 @@ public partial class App : Application
             return;
         }
 
-        // Ggf. verbliebene .old-Dateien aus vorherigen Updates im Hintergrund bereinigen
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(2000);
-                var exePath = Environment.ProcessPath;
-                if (!string.IsNullOrEmpty(exePath))
-                {
-                    var dir = Path.GetDirectoryName(exePath);
-                    if (dir != null && Directory.Exists(dir))
-                    {
-                        foreach (var oldFile in Directory.EnumerateFiles(dir, "*.old"))
-                        {
-                            try { File.Delete(oldFile); } catch { }
-                        }
-                    }
-                }
-            }
-            catch { }
-        });
-
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
         bool startInTray = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase) ||
                                            string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase));
 
-        if (startInTray)
-        {
-            AppLogger.Info("App", "Startparameter --tray / --minimized erkannt – Starte lautlos im Hintergrund.");
-            var mainWindow = new MainWindow();
-            MainWindow = mainWindow;
-
-            if (mainWindow.DataContext is ViewModels.MainViewModel vm && vm.ShowTrayNotifications)
-            {
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(2000);
-                    Current.Dispatcher.Invoke(() =>
-                    {
-                        vm.TrayService?.ShowNotification(
-                            "Imaginary ist aktiv",
-                            "Imaginary läuft minimiert im Infobereich. Klicke auf das Symbol oder die Benachrichtigung, um das Fenster zu öffnen.",
-                            System.Windows.Forms.ToolTipIcon.Info);
-                    });
-                });
-            }
-            return;
-        }
-
-        Views.SplashScreenWindow? splash = null;
         try
         {
-            splash = new Views.SplashScreenWindow();
-            splash.Show();
+            if (startInTray)
+            {
+                AppLogger.Info("App", "Startparameter --tray / --minimized erkannt – Starte lautlos im Hintergrund.");
+                var mainWindow = new MainWindow();
+                MainWindow = mainWindow;
+
+                if (mainWindow.DataContext is ViewModels.MainViewModel vm && vm.ShowTrayNotifications)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(2000);
+                        Current.Dispatcher.Invoke(() =>
+                        {
+                            vm.TrayService?.ShowNotification(
+                                "Imaginary ist aktiv",
+                                "Imaginary läuft minimiert im Infobereich. Klicke auf das Symbol oder die Benachrichtigung, um das Fenster zu öffnen.",
+                                System.Windows.Forms.ToolTipIcon.Info);
+                        });
+                    });
+                }
+            }
+            else
+            {
+                Views.SplashScreenWindow? splash = null;
+                try
+                {
+                    splash = new Views.SplashScreenWindow();
+                    splash.Show();
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("App", "Splash Screen konnte nicht angezeigt werden", ex);
+                }
+
+                // Zeige Splash Screen für ca. 1.1s für einen flüssigen Start
+                if (splash != null)
+                {
+                    await Task.Delay(1100);
+                }
+
+                var mainWindowNormal = new MainWindow();
+                MainWindow = mainWindowNormal;
+                mainWindowNormal.Show();
+
+                if (splash != null)
+                {
+                    await splash.FadeOutAndCloseAsync();
+                }
+            }
+
+            // Nach 5 Sekunden stabiler Laufzeit als gesunder Start markieren
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(5000);
+                healthTracker.RecordHealthy();
+            });
         }
         catch (Exception ex)
         {
-            AppLogger.Warn("App", "Splash Screen konnte nicht angezeigt werden", ex);
-        }
-
-        // Zeige Splash Screen für ca. 1.1s für einen flüssigen, coolen Start
-        if (splash != null)
-        {
-            await Task.Delay(1100);
-        }
-
-        var mainWindowNormal = new MainWindow();
-        MainWindow = mainWindowNormal;
-        mainWindowNormal.Show();
-
-        if (splash != null)
-        {
-            await splash.FadeOutAndCloseAsync();
+            AppLogger.Error("App", "Kritischer Fehler beim Starten des Hauptfensters", ex);
+            var recoveryWin = new CrashRecoveryWindow(ex);
+            recoveryWin.ShowDialog();
+            Shutdown();
+            return;
         }
     }
 

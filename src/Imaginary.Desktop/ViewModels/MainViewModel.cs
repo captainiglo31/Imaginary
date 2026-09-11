@@ -243,7 +243,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.2.0";
+    public string AppVersionString => "v2.2.1";
 
     public string McpConfigSnippet
     {
@@ -755,9 +755,16 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void SelectTab(int tabIndex)
+    public void SelectTab(object? parameter)
     {
-        SelectedTabIndex = tabIndex;
+        if (parameter is int i)
+        {
+            SelectedTabIndex = i;
+        }
+        else if (parameter != null && int.TryParse(parameter.ToString(), out int parsed))
+        {
+            SelectedTabIndex = parsed;
+        }
     }
 
     [RelayCommand]

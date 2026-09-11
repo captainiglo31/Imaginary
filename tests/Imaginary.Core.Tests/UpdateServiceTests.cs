@@ -153,4 +153,83 @@ public class UpdateServiceTests
             }
         }
     }
+
+    [Fact]
+    public void CanRollback_ShouldDetectBackupCorrectly()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"imaginary_test_rollback_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var currentExe = Path.Combine(tempDir, "Imaginary.exe");
+            File.WriteAllText(currentExe, "Current Version 2.2.0");
+
+            var service = new UpdateService();
+
+            // No backup exists yet
+            service.CanRollback(out var ver, out var path, currentExe).Should().BeFalse();
+            path.Should().BeNull();
+
+            // Create a backup file
+            var prevExe = Path.Combine(tempDir, "Imaginary.previous.exe");
+            File.WriteAllText(prevExe, "Previous Version 2.1.0");
+
+            // Write metadata
+            var metaPath = Path.Combine(tempDir, "Imaginary_backup_info.json");
+            File.WriteAllText(metaPath, """{"previousVersion": "2.1.0"}""");
+
+            service.CanRollback(out var foundVer, out var foundPath, currentExe).Should().BeTrue();
+            foundVer.Should().Be("2.1.0");
+            foundPath.Should().Be(prevExe);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RollbackToPreviousVersion_ShouldRestoreBackupAndMarkBroken()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"imaginary_test_rollback_exec_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var currentExe = Path.Combine(tempDir, "Imaginary.exe");
+            var prevExe = Path.Combine(tempDir, "Imaginary.previous.exe");
+
+            File.WriteAllText(currentExe, "Broken Version 2.2.0");
+            File.WriteAllText(prevExe, "Working Version 2.1.0");
+
+            var service = new UpdateService();
+
+            var result = service.RollbackToPreviousVersion(restart: false, targetExecutablePath: currentExe);
+            result.Should().BeTrue();
+
+            // currentExe should now contain the restored working version
+            File.Exists(currentExe).Should().BeTrue();
+            File.ReadAllText(currentExe).Should().Be("Working Version 2.1.0");
+
+            // previousExe should no longer exist (it was moved to currentExe)
+            File.Exists(prevExe).Should().BeFalse();
+
+            // A broken backup should have been created
+            var brokenFiles = Directory.GetFiles(tempDir, "Imaginary.broken_*.old");
+            brokenFiles.Should().NotBeEmpty();
+            File.ReadAllText(brokenFiles[0]).Should().Be("Broken Version 2.2.0");
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
 }
+

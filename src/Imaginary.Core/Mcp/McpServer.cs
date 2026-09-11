@@ -21,7 +21,7 @@ public class McpServer
         WriteIndented = false
     };
 
-    public McpServer(McpRegistry registry, string serverName = "imaginary-mcp", string serverVersion = "2.2.0")
+    public McpServer(McpRegistry registry, string serverName = "imaginary-mcp", string serverVersion = "2.2.1")
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _serverName = serverName;
