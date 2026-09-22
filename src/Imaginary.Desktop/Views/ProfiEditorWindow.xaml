@@ -119,11 +119,11 @@
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                     <!-- Before/After & Split controls -->
                     <ToggleButton x:Name="ToggleBeforeAfter" Content="👁️ Vorher (Taste \)"
-                                  Click="OnToggleBeforeAfterClicked" Style="{DynamicResource ToolbarButtonStyle}"
+                                  Click="OnToggleBeforeAfterClicked" Style="{DynamicResource ToolbarToggleButtonStyle}"
                                   Padding="10,5" Margin="0,0,6,0"
                                   ToolTip="Zeigt das unbehandelte Originalbild zum Direktvergleich"/>
                     <ToggleButton x:Name="ToggleSplitView" Content="🪟 Split-Vergleich"
-                                  Click="OnToggleSplitViewClicked" Style="{DynamicResource ToolbarButtonStyle}"
+                                  Click="OnToggleSplitViewClicked" Style="{DynamicResource ToolbarToggleButtonStyle}"
                                   Padding="10,5" Margin="0,0,12,0"
                                   ToolTip="Teilt das Bild für den Vorher/Nachher-Vergleich mit interaktivem Schieberegler"/>
 
@@ -249,7 +249,7 @@
                                 <DockPanel Margin="0,0,0,8">
                                     <!-- Shadow Clipping Indicator (Left) -->
                                     <ToggleButton x:Name="ToggleShadowClipping" ToolTip="Schatten-Clipping (Unterbelichtung / Reines Schwarz) hervorheben"
-                                                  Click="OnToggleClippingClicked" Style="{DynamicResource ToolbarButtonStyle}"
+                                                  Click="OnToggleClippingClicked" Style="{DynamicResource ToolbarToggleButtonStyle}"
                                                   Padding="4,2" DockPanel.Dock="Left">
                                         <StackPanel Orientation="Horizontal">
                                             <Ellipse x:Name="DotShadowClipping" Width="8" Height="8" Fill="#334155" Margin="0,0,4,0"/>
@@ -259,7 +259,7 @@
 
                                     <!-- Highlight Clipping Indicator (Right) -->
                                     <ToggleButton x:Name="ToggleHighlightClipping" ToolTip="Lichter-Clipping (Überbelichtung / Reines Weiß) hervorheben"
-                                                  Click="OnToggleClippingClicked" Style="{DynamicResource ToolbarButtonStyle}"
+                                                  Click="OnToggleClippingClicked" Style="{DynamicResource ToolbarToggleButtonStyle}"
                                                   Padding="4,2" DockPanel.Dock="Right">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="Lichter ▲" FontSize="10" FontWeight="SemiBold" Margin="0,0,4,0"/>
