@@ -108,6 +108,11 @@ public partial class ImageEditorWindow : Window
         {
             ComboBgMode.SelectedIndex = 0;
         }
+
+        Loaded += (s, e) =>
+        {
+            OnZoomFitClicked(this, new RoutedEventArgs());
+        };
     }
 
     private void UpdateImageDisplay()
@@ -408,6 +413,37 @@ public partial class ImageEditorWindow : Window
             e.Handled = true;
             return;
         }
+
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            if (e.Key == Key.OemPlus || e.Key == Key.Add)
+            {
+                OnZoomInClicked(sender, e);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.OemMinus || e.Key == Key.Subtract)
+            {
+                OnZoomOutClicked(sender, e);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.D0 || e.Key == Key.NumPad0)
+            {
+                OnZoomFitClicked(sender, e);
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.D1 || e.Key == Key.NumPad1)
+            {
+                OnZoomResetClicked(sender, e);
+                e.Handled = true;
+                return;
+            }
+        }
     }
 
     private void OnWindowPreviewKeyUp(object sender, KeyEventArgs e)
@@ -483,6 +519,52 @@ public partial class ImageEditorWindow : Window
         if (SidePanel != null)
         {
             SidePanel.Visibility = Visibility.Collapsed;
+        }
+        if (_currentTool == EditorTool.BackgroundRemoval && ToolPan != null)
+        {
+            ToolPan.IsChecked = true;
+        }
+    }
+
+    private void OnToggleBgRemoveClicked(object sender, RoutedEventArgs e)
+    {
+        if (SidePanel == null) return;
+        if (SidePanel.Visibility == Visibility.Visible && TabSideBgRemove?.IsChecked == true)
+        {
+            SidePanel.Visibility = Visibility.Collapsed;
+            if (_currentTool == EditorTool.BackgroundRemoval && ToolPan != null)
+            {
+                ToolPan.IsChecked = true;
+            }
+        }
+        else
+        {
+            SidePanel.Visibility = Visibility.Visible;
+            if (TabSideBgRemove != null) TabSideBgRemove.IsChecked = true;
+            OnSideTabChanged(null, null);
+            if (ToolBgRemove != null) ToolBgRemove.IsChecked = true;
+        }
+    }
+
+    private void OnToolBgRemovePreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (ToolBgRemove.IsChecked == true)
+        {
+            if (SidePanel != null)
+            {
+                if (SidePanel.Visibility == Visibility.Collapsed || TabSideBgRemove?.IsChecked != true)
+                {
+                    SidePanel.Visibility = Visibility.Visible;
+                    if (TabSideBgRemove != null) TabSideBgRemove.IsChecked = true;
+                    OnSideTabChanged(null, null);
+                }
+                else
+                {
+                    SidePanel.Visibility = Visibility.Collapsed;
+                    if (ToolPan != null) ToolPan.IsChecked = true;
+                }
+            }
+            e.Handled = true;
         }
     }
 
@@ -606,13 +688,14 @@ public partial class ImageEditorWindow : Window
 
     private void OnCanvasMouseDown(object sender, MouseButtonEventArgs e)
     {
-        // Middle mouse button or Spacebar + Left button always pans the canvas regardless of active tool
-        if (e.ChangedButton == MouseButton.Middle || (e.ChangedButton == MouseButton.Left && _isSpaceDown))
+        // Middle mouse button or Right mouse button or Spacebar + Left button always pans the canvas regardless of active tool
+        if (e.ChangedButton == MouseButton.Middle || e.ChangedButton == MouseButton.Right || (e.ChangedButton == MouseButton.Left && _isSpaceDown))
         {
             _isPanningCanvas = true;
             _panMouseStart = e.GetPosition(CanvasScrollViewer);
             _panScrollStart = new WpfPoint(CanvasScrollViewer.HorizontalOffset, CanvasScrollViewer.VerticalOffset);
             CanvasContainer.CaptureMouse();
+            Mouse.OverrideCursor = Cursors.SizeAll;
             return;
         }
 
@@ -1179,36 +1262,63 @@ public partial class ImageEditorWindow : Window
         }
 
         double factor = e.Delta > 0 ? 1.15 : (1.0 / 1.15);
-        var mousePos = e.GetPosition(CanvasScrollViewer);
         double oldScale = CanvasScaleTransform.ScaleX;
         double newScale = Math.Clamp(oldScale * factor, 0.1, 8.0);
 
         if (Math.Abs(newScale - oldScale) > 0.001)
         {
-            double relX = (mousePos.X + CanvasScrollViewer.HorizontalOffset) / oldScale;
-            double relY = (mousePos.Y + CanvasScrollViewer.VerticalOffset) / oldScale;
+            var mousePos = e.GetPosition(CanvasScrollViewer);
+
+            double contentLeft = Math.Max(0, (CanvasScrollViewer.ViewportWidth - CanvasContainer.ActualWidth) / 2.0);
+            double contentTop = Math.Max(0, (CanvasScrollViewer.ViewportHeight - CanvasContainer.ActualHeight) / 2.0);
+
+            double contentX = (CanvasScrollViewer.ScrollableWidth > 0)
+                ? (mousePos.X + CanvasScrollViewer.HorizontalOffset)
+                : Math.Max(0, mousePos.X - contentLeft);
+
+            double contentY = (CanvasScrollViewer.ScrollableHeight > 0)
+                ? (mousePos.Y + CanvasScrollViewer.VerticalOffset)
+                : Math.Max(0, mousePos.Y - contentTop);
+
+            double relX = contentX / oldScale;
+            double relY = contentY / oldScale;
 
             SetZoom(newScale);
+            CanvasScrollViewer.UpdateLayout();
 
-            CanvasScrollViewer.ScrollToHorizontalOffset(relX * newScale - mousePos.X);
-            CanvasScrollViewer.ScrollToVerticalOffset(relY * newScale - mousePos.Y);
+            double targetOffsetX = relX * newScale - mousePos.X;
+            double targetOffsetY = relY * newScale - mousePos.Y;
+
+            CanvasScrollViewer.ScrollToHorizontalOffset(Math.Max(0, targetOffsetX));
+            CanvasScrollViewer.ScrollToVerticalOffset(Math.Max(0, targetOffsetY));
         }
         e.Handled = true;
     }
 
-    private void OnZoomInClicked(object sender, RoutedEventArgs e) => SetZoom(CanvasScaleTransform.ScaleX * 1.25);
-    private void OnZoomOutClicked(object sender, RoutedEventArgs e) => SetZoom(CanvasScaleTransform.ScaleX * 0.8);
-    private void OnZoomResetClicked(object sender, RoutedEventArgs e) => SetZoom(1.0);
+    private void OnZoomInClicked(object sender, RoutedEventArgs e) => SetZoom(Math.Clamp(CanvasScaleTransform.ScaleX * 1.25, 0.1, 8.0));
+    private void OnZoomOutClicked(object sender, RoutedEventArgs e) => SetZoom(Math.Clamp(CanvasScaleTransform.ScaleX * 0.8, 0.1, 8.0));
+    private void OnZoomResetClicked(object sender, RoutedEventArgs e)
+    {
+        SetZoom(1.0);
+        CanvasScrollViewer.ScrollToHorizontalOffset(0);
+        CanvasScrollViewer.ScrollToVerticalOffset(0);
+    }
 
     private void OnZoomFitClicked(object sender, RoutedEventArgs e)
     {
+        if (_currentBitmap == null) return;
         double viewportW = CanvasScrollViewer.ActualWidth - 40;
         double viewportH = CanvasScrollViewer.ActualHeight - 40;
         if (viewportW <= 0 || viewportH <= 0) return;
 
         double scaleX = viewportW / _currentBitmap.Width;
         double scaleY = viewportH / _currentBitmap.Height;
-        SetZoom(Math.Min(scaleX, scaleY));
+        double fitScale = Math.Min(scaleX, scaleY);
+        if (fitScale > 1.0) fitScale = 1.0;
+
+        SetZoom(fitScale);
+        CanvasScrollViewer.ScrollToHorizontalOffset(0);
+        CanvasScrollViewer.ScrollToVerticalOffset(0);
     }
 
     private void SetZoom(double scale)

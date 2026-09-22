@@ -137,7 +137,9 @@
                             Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0"/>
 
                     <Button x:Name="ButtonToggleLayers" Content="📑 Ebenen" Click="OnToggleLayersClicked"
-                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0" ToolTip="Ebenen-Panel für platzierte Elemente ein-/ausblenden"/>
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0" ToolTip="Ebenen-Panel für platzierte Elemente ein-/ausblenden"/>
+                    <Button x:Name="ButtonToggleBgRemove" Content="🪄 Freistellen" Click="OnToggleBgRemoveClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0" ToolTip="Hintergrund entfernen &amp; Freistell-Panel ein-/ausblenden"/>
 
                     <Button x:Name="ButtonSwitchToProfiMode" Content="🎛️ In Profi-Modus wechseln" Click="OnSwitchToProfiModeClicked"
                             Style="{DynamicResource ToolbarButtonStyle}" FontWeight="SemiBold" Foreground="#38BDF8" Margin="0,0,14,0"
@@ -282,7 +284,8 @@
                                      Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
                         <Separator Margin="4,4"/>
                         <RadioButton x:Name="ToolBgRemove" GroupName="ToolGroup" Content="🪄" ToolTip="Hintergrund entfernen (Magic Wand &amp; KI)"
-                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                                     Checked="OnToolSelected" PreviewMouseLeftButtonDown="OnToolBgRemovePreviewMouseDown"
+                                     Style="{StaticResource ToolPaletteButtonStyle}"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -290,7 +293,7 @@
             <!-- Center Viewport & Interactive Canvas -->
             <Border Grid.Column="1" Background="#111827" ClipToBounds="True">
                 <ScrollViewer x:Name="CanvasScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                              Background="Transparent" MouseWheel="OnCanvasMouseWheel">
+                              Background="Transparent" PreviewMouseWheel="OnCanvasMouseWheel">
                     <Grid x:Name="CanvasContainer" HorizontalAlignment="Center" VerticalAlignment="Center"
                           Background="{StaticResource CheckerboardBrush}"
                           MouseDown="OnCanvasMouseDown" MouseMove="OnCanvasMouseMove" MouseUp="OnCanvasMouseUp">

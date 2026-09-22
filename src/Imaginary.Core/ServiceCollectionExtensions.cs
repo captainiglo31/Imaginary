@@ -19,7 +19,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IOutputPathResolver, OutputPathResolver>();
         services.AddSingleton<IPresetManager, PresetManager>();
         services.AddSingleton<ISettingsService, SettingsService>();
-        services.AddSingleton<IExplorerIntegration, ExplorerIntegration>();
         services.AddSingleton<IStartMenuIntegration, StartMenuIntegration>();
         services.AddSingleton<IAutostartService, AutostartService>();
         services.AddSingleton<IHotfolderWatcher, HotfolderWatcher>();
@@ -27,7 +26,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IImageEditorService, ImageEditorService>();
         services.AddSingleton<IBackgroundRemovalService, BackgroundRemovalService>();
         services.AddSingleton<IProfiDeveloperService, ProfiDeveloperService>();
-        services.AddSingleton<IFileAssociationService, FileAssociationService>();
+        if (OperatingSystem.IsWindows())
+        {
+            services.AddSingleton<IExplorerIntegration, ExplorerIntegration>();
+            services.AddSingleton<IFileAssociationService, FileAssociationService>();
+        }
         services.AddTransient<IBatchProcessor, BatchProcessor>();
         return services;
     }
