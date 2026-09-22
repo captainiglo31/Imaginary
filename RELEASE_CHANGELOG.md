@@ -1,3 +1,62 @@
+## 🚀 Was ist neu in Version 2.3.0 (Profi-Modus RAW-Entwickler, Windows-Integration & Feinschliff):
+
+### 🎛️ Neuer Profi-Modus (Kamera-RAW-Entwickler & Color-Grading Studio)
+- **Umfassende RAW-Unterstützung:**
+  - Direkte Erkennung und Dekodierung aller gängigen Kamera-RAW-Formate: Canon (`.cr2`, `.cr3`), Nikon (`.nef`), Sony (`.arw`), Adobe DNG (`.dng`), Olympus (`.orf`), Panasonic (`.rw2`), Pentax (`.pef`) und Fujifilm (`.raf`).
+  - Funktioniert natürlich auch mit allen Standard-Formaten: JPEG, PNG, WebP, AVIF, TIFF und BMP.
+- **60 FPS SkiaSharp Multi-Core LUT-Engine:**
+  - Sämtliche Tonwert- und Farbanpassungen werden in vorberechneten 1D/3D-Lookup-Tabellen (LUTs) zusammengefasst.
+  - Transformationen auf 1080p-Arbeitskopien benötigen nur 2–5 ms. Butterweiche Echtzeit-Vorschau beim Ziehen an Schiebereglern ohne Ruckeln.
+  - Beim Speichern und Exportieren wird das Grading verlustfrei auf die volle native Sensorauflösung angewendet.
+- **Echtzeit-Histogramm & Farbmischung:**
+  - Echtes 256-Kanal RGB- und Luminanz-Histogramm mit additiver Farbmischung (Rot, Grün, Blau, Gelb, Cyan, Magenta, Weiß).
+  - Dynamische Clipping-Indikatoren warnen visuell bei absaufenden Tiefen (Blau) oder ausfressenden Lichtern (Rot) mit genauer Pixel- und Prozentangabe.
+- **Vollständige Werkzeugpalette:**
+  - **Licht & Belichtung:** Belichtung (-3 bis +3 EV), Kontrast, Lichter/Highlights, Tiefen/Shadows, Weiß- und Schwarztöne.
+  - **Farbe & Weißabgleich:** Farbtemperatur, Tönung, Dynamik (Vibrance mit automatischem Hautton-Schutz), Sättigung (-100 bis +100) und Farbton-Verschiebung (Hue Shift).
+  - **Schärfe & Details:** Klarheit (Clarity), Dunst entfernen (Dehaze), Unsharp-Mask Schärfung und sanfte Rauschreduzierung.
+  - **Color-Grading / Split-Toning:** Getrennte Farbton- und Sättigungssteuerung für Schatten und Lichter inklusive Balance-Regler.
+  - **Effekte & Vignette:** Vignettierung mit weichem Auslauf sowie filmisches Korn (Grain) mit Luminanz-Maskierung.
+  - **Tonwertkurve:** Parametrische 4-Zonen-Kurve für Tiefen, dunkle Mitten, helle Mitten und Lichter.
+- **Workflow & Bedienkomfort:**
+  - **10 professionelle 1-Klick-Looks (Presets):** Vivid Pop, Teal & Orange, Moody Urban, Golden Hour, Cold Fade, Vintage 35mm, Dramatisch B&W, HDR Landschaft, Porträt Sanft und Neutral.
+  - **Vorher/Nachher-Vergleich:** Sofortige Vorschau des Originals per Taste `\` oder Klick auf `👁️ Vorher` sowie interaktiver Split-Vergleich (`🪟`) mit verschiebbarer Trennlinie.
+  - **Rezept-Zwischenablage:** Einstellungen kopieren & einfügen (`Strg+C` / `Strg+V`) für schnelle Serienbearbeitung.
+  - **Reset:** Doppelklick auf jeden Slider oder Klick auf die Beschriftung setzt den Wert auf `0` zurück; einzelne Sektionen lassen sich separat per `↺` zurücksetzen.
+  - **Pixel-Inspektor:** Lupe mit RGB-, Hex- und Koordinatenanzeige unter dem Cursor.
+
+---
+
+### 🗂️ Windows Explorer Multi-Verb Kontextmenü & Standard-App Registrierung
+- **Erweitertes Windows-Explorer-Kontextmenü:**
+  - Rechtsklick auf Bilddateien bietet nun 3 dedizierte Aktionen:
+    - `⚡ Mit Imaginary konvertieren` (Batch-Konvertierung)
+    - `✏️ Mit Imaginary bearbeiten` (Paint / Quick-Edit Studio)
+    - `🎛️ Im Profi-Modus (RAW) entwickeln` (RAW-Entwickler & Color-Grading)
+  - Ordner-Kontextmenü: `⚡ Ordner mit Imaginary konvertieren`.
+  - Unterstützt sowohl den Kaltstart als auch die nahtlose Übergabe an bereits geöffnete Instanzen via Single-Instance IPC.
+- **Windows „Standard-App“ (Default App) & Dateizuordnungen:**
+  - Offizielle Windows-Registrierung für 18 Dateiformate nach Microsoft-Spezifikation (`ProgID`, `OpenWithProgids`, `Capabilities`).
+  - Imaginary erscheint nun offiziell in Windows unter *„Öffnen mit...“* und in der Liste der Standard-Bildbetrachter.
+  - Direkter 1-Klick-Button in den Einstellungen unter *System & Hintergrundbetrieb* zum Öffnen der Windows Standard-Apps (`ms-settings:defaultapps`).
+  - Konfigurierbare Standard-Aktion beim Doppelklick auf Bilder (Konvertier-Studio, Profi-Modus oder Quick-Edit).
+
+---
+
+### 🎨 Bugfixes & Detailverbesserungen im Bild-Editor
+- **Zoom im normalen Bearbeiten-Fenster:**
+  - Stufenloses Zoomen mit dem Mausrad direkt auf den Mauszeiger (`PreviewMouseWheel`).
+  - Shortcuts: `Strg + Plus` (Vergrößern), `Strg + Minus` (Verkleinern), `Strg + 0` (Fenster einpassen), `Strg + 1` (100% 1:1).
+  - Panning: Verschieben des Bildes mit gedrückter **rechter Maustaste**, mittlerer Maustaste oder `Leertaste + linke Maustaste`.
+  - Intelligentes Auto-Fit beim ersten Öffnen großer Bilder.
+- **Hintergrund-Entfernen Seitenleiste:**
+  - Reaktivierung behoben: Nach dem Schließen des Seitenpanels über `✕` lässt sich das Freistellen-Menü nun problemlos wieder öffnen.
+  - Neuer Umschalt-Button `🪄 Freistellen` in der Kopfleiste.
+- **DataGrid Zeilenauswahl:**
+  - Rechtsklick auf eine Datei in der Tabellenansicht selektiert diese Datei nun sofort und zuverlässig, sodass Kontextaktionen immer exakt das gewünschte Bild bearbeiten.
+
+---
+
 ## 🚀 Was ist neu in Version 2.2.5 (Rollback-Resilienz & Windows-Snipping Integration):
 
 ### 🛡️ Crash-Loop & Rollback-Schleife vollständig behoben
