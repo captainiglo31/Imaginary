@@ -40,6 +40,7 @@ public partial class ProfiEditorWindow : Window
     private readonly Stack<ProfiAdjustmentSettings> _undoStack = new();
     private readonly Stack<ProfiAdjustmentSettings> _redoStack = new();
 
+    private bool _isInitialized;
     private bool _isUpdatingSliders;
     private bool _isShowingOriginal;
     private bool _isSplitView;
@@ -66,7 +67,10 @@ public partial class ProfiEditorWindow : Window
 
     public ProfiEditorWindow(string filePath, IProfiDeveloperService developerService)
     {
+        _isUpdatingSliders = true;
         InitializeComponent();
+        _isUpdatingSliders = false;
+        _isInitialized = true;
 
         _filePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
         _developerService = developerService ?? throw new ArgumentNullException(nameof(developerService));
@@ -430,7 +434,7 @@ public partial class ProfiEditorWindow : Window
 
     private void OnSliderAdjustmentChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_isUpdatingSliders) return;
+        if (!_isInitialized || _isUpdatingSliders) return;
 
         // Read all values from sliders into _settings
         _settings.Exposure = (float)SliderExposure.Value;
@@ -691,6 +695,7 @@ public partial class ProfiEditorWindow : Window
 
     private void OnSplitPositionChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
+        if (!_isInitialized || SliderSplitPosition == null) return;
         _splitPosition = SliderSplitPosition.Value / 100.0;
         if (_isSplitView)
         {
