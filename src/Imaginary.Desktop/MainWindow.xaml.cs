@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Imaginary.Core;
 using Imaginary.Core.Models;
+using Imaginary.Core.Services;
 using Imaginary.Desktop.Models;
 using Imaginary.Desktop.Services;
 using Imaginary.Desktop.ViewModels;
@@ -19,6 +20,9 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly ITrayService _trayService;
     private readonly IClipboardMonitorService _clipboardMonitor;
+    private readonly IImageEditorService _editorService;
+    private readonly IBackgroundRemovalService _bgRemovalService;
+    private readonly IProfiDeveloperService _profiDeveloperService;
     private Point _dragStartPoint;
     private bool _isDraggingOut;
 
@@ -37,16 +41,65 @@ public partial class MainWindow : Window
         _viewModel = serviceProvider.GetRequiredService<MainViewModel>();
         _trayService = serviceProvider.GetRequiredService<ITrayService>();
         _clipboardMonitor = serviceProvider.GetRequiredService<IClipboardMonitorService>();
+        _editorService = serviceProvider.GetRequiredService<IImageEditorService>();
+        _bgRemovalService = serviceProvider.GetRequiredService<IBackgroundRemovalService>();
+        _profiDeveloperService = serviceProvider.GetRequiredService<IProfiDeveloperService>();
+
         _clipboardMonitor.StartMonitoring(this);
 
         _trayService.Initialize(
             mainWindow: this,
             toggleHotfolder: () => _viewModel.ToggleHotfolderCommand.Execute(null),
             isHotfolderRunning: () => _viewModel.IsHotfolderActive,
-            openSettings: () => _viewModel.SelectTabCommand.Execute(2),
+            openSettings: () => _viewModel.SelectTabCommand.Execute(3),
             captureScreenshot: () => _viewModel.TriggerNativeSnippingCommand.Execute(null));
 
         _viewModel.AttachTrayService(_trayService);
+
+        // Wire up Studio Workspace events
+        _viewModel.StudioImageLoadRequested += (filePath, subMode) =>
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (subMode == 1)
+                {
+                    StudioProfiEditorControl.Initialize(filePath, _profiDeveloperService);
+                }
+                else
+                {
+                    StudioImageEditorControl.Initialize(filePath, _editorService, _bgRemovalService);
+                }
+            });
+        };
+
+        StudioImageEditorControl.FileSaved += (s, path) =>
+        {
+            _viewModel.ApplyStudioChangesToBatch(path);
+        };
+
+        StudioImageEditorControl.Cancelled += (s, e) =>
+        {
+            _viewModel.CloseStudioImageCommand.Execute(null);
+        };
+
+        StudioImageEditorControl.SwitchToProfiRequested += (s, path) =>
+        {
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            {
+                _viewModel.LoadFileInStudio(path, subMode: 1, _viewModel.StudioSourceBatchItem);
+            }
+        };
+
+        StudioProfiEditorControl.FileSaved += (s, path) =>
+        {
+            _viewModel.ApplyStudioChangesToBatch(path);
+        };
+
+        StudioProfiEditorControl.Cancelled += (s, e) =>
+        {
+            _viewModel.CloseStudioImageCommand.Execute(null);
+        };
+
         DataContext = _viewModel;
 
         Loaded += (s, e) =>
@@ -107,6 +160,18 @@ public partial class MainWindow : Window
             if (files != null && files.Length > 0)
             {
                 _viewModel.AddFilePaths(files);
+            }
+        }
+    }
+
+    private void OnStudioDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files != null && files.Length > 0 && File.Exists(files[0]))
+            {
+                _viewModel.LoadFileInStudio(files[0], _viewModel.StudioSubMode);
             }
         }
     }

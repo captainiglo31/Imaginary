@@ -166,10 +166,42 @@ public partial class MainViewModel : ObservableObject
 
     // Active Tab Navigation
     [ObservableProperty]
-    private int _selectedTabIndex = 0; // 0 = Studio, 1 = Hotfolder, 2 = Einstellungen
+    private int _selectedTabIndex = 0; // 0 = Stapelverarbeitung, 1 = Studio, 2 = Hotfolder, 3 = Einstellungen
+
+    // Studio Workspace Properties
+    [ObservableProperty]
+    private string? _studioFilePath;
+
+    [ObservableProperty]
+    private string? _studioFileName;
+
+    [ObservableProperty]
+    private string? _studioFileSize;
+
+    [ObservableProperty]
+    private string? _studioDimensions;
+
+    [ObservableProperty]
+    private bool _isStudioImageLoaded;
+
+    [ObservableProperty]
+    private int _studioSubMode = 0; // 0 = Paint / Quick-Editor, 1 = RAW-Entwickler & Color-Grading
+
+    [ObservableProperty]
+    private bool _isStudioFromBatch;
+
+    [ObservableProperty]
+    private FileItemViewModel? _studioSourceBatchItem;
+
+    public string ThemeToggleIcon => IsDarkMode ? "☀️" : "🌙";
+    public string ThemeToggleToolTip => IsDarkMode ? "Zu hellem Design wechseln" : "Zu dunklem Design wechseln";
+
+    public event Action<string, int>? StudioImageLoadRequested;
 
     // Dark Mode & Settings
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ThemeToggleIcon))]
+    [NotifyPropertyChangedFor(nameof(ThemeToggleToolTip))]
     private bool _isDarkMode;
 
     [ObservableProperty]
@@ -245,6 +277,13 @@ public partial class MainViewModel : ObservableObject
             if (HotfolderTodaySavedBytes < 1024 * 1024) return $"{HotfolderTodaySavedBytes / 1024.0:F1} KB";
             return $"{HotfolderTodaySavedBytes / (1024.0 * 1024.0):F2} MB";
         }
+    }
+
+    public static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F2} MB";
     }
 
     public ObservableCollection<HotfolderHistoryItem> HotfolderHistory { get; } = new();
@@ -565,6 +604,14 @@ public partial class MainViewModel : ObservableObject
         App.SetTheme(value);
         _settingsService.Settings.IsDarkMode = value;
         _settingsService.Save();
+    }
+
+    partial void OnStudioSubModeChanged(int value)
+    {
+        if (IsStudioImageLoaded && !string.IsNullOrWhiteSpace(StudioFilePath) && File.Exists(StudioFilePath))
+        {
+            StudioImageLoadRequested?.Invoke(StudioFilePath, value);
+        }
     }
 
     private void ApplyPresetOptions(ConversionOptions opts)
@@ -1098,105 +1145,101 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void ToggleTheme()
+    {
+        IsDarkMode = !IsDarkMode;
+    }
+
+    [RelayCommand]
+    public void OpenStudioFileDialog()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "Bilder und RAW (*.jpg;*.jpeg;*.png;*.webp;*.avif;*.cr2;*.cr3;*.nef;*.arw;*.dng;*.bmp;*.tif)|*.jpg;*.jpeg;*.png;*.webp;*.avif;*.cr2;*.cr3;*.nef;*.arw;*.dng;*.bmp;*.tif|RAW-Kameraformate (*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf)|*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf|Standard-Bilder (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif)|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif|Alle Dateien (*.*)|*.*",
+            Title = "Bild im Einzelbild-Studio öffnen"
+        };
+        if (dlg.ShowDialog() == true)
+        {
+            LoadFileInStudio(dlg.FileName, StudioSubMode);
+        }
+    }
+
+    [RelayCommand]
+    public void OpenSelectedInStudio()
+    {
+        if (SelectedFile != null)
+        {
+            var path = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+                ? SelectedFile.TargetPath
+                : SelectedFile.FilePath;
+
+            var subMode = (_settingsService.Settings.DefaultFileOpenAction == DefaultFileOpenAction.OpenInProfiMode) ? 1 : 0;
+            LoadFileInStudio(path, subMode, SelectedFile);
+        }
+        else
+        {
+            OpenStudioFileDialog();
+        }
+    }
+
+    [RelayCommand]
+    public void OpenSelectedInProfiStudio()
+    {
+        if (SelectedFile != null)
+        {
+            var path = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+                ? SelectedFile.TargetPath
+                : SelectedFile.FilePath;
+            LoadFileInStudio(path, 1, SelectedFile);
+        }
+        else
+        {
+            OpenStudioFileDialog();
+        }
+    }
+
+    [RelayCommand]
     private void OpenEditor()
     {
-        try
-        {
-            string? pathToOpen = null;
-            if (SelectedFile != null)
-            {
-                pathToOpen = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
-                    ? SelectedFile.TargetPath
-                    : SelectedFile.FilePath;
-            }
-
-            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen))
-            {
-                var dlg = new OpenFileDialog
-                {
-                    Filter = "Bilder (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|Alle Dateien (*.*)|*.*",
-                    Title = "Bild im Paint / Freistell-Studio öffnen"
-                };
-                if (dlg.ShowDialog() == true)
-                {
-                    pathToOpen = dlg.FileName;
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen)) return;
-
-            AppLogger.Info("Editor", $"Öffne Paint / Bild-Editor für: {pathToOpen}");
-            var editorWin = new ImageEditorWindow(pathToOpen, _editorService, _bgRemovalService)
-            {
-                Owner = Application.Current.MainWindow
-            };
-
-            if (editorWin.ShowDialog() == true && editorWin.HasChanges)
-            {
-                if (editorWin.ResultFilePath != pathToOpen)
-                {
-                    AddFilePaths(new[] { editorWin.ResultFilePath });
-                    StatusSummary = $"✏️ Bearbeitetes Bild als Kopie gespeichert: {Path.GetFileName(editorWin.ResultFilePath)}";
-                }
-                else
-                {
-                    if (SelectedFile != null && SelectedFile.FilePath.Equals(pathToOpen, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var fi = new FileInfo(pathToOpen);
-                        SelectedFile.OriginalSizeBytes = fi.Length;
-                        SelectedFile.Status = JobStatus.Pending;
-                        SelectedFile.StatusMessage = "Bearbeitet (Original ersetzt)";
-                        SelectedFile.FinalSizeBytes = 0;
-                        SelectedFile.SavingsPercentage = 0;
-                        SelectedFile.TargetPath = null;
-                    }
-                    StatusSummary = $"✏️ Änderungen am Bild gespeichert: {Path.GetFileName(pathToOpen)}";
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Editor", "Fehler beim Öffnen des Bild-Studios", ex);
-            MessageBox.Show(Application.Current.MainWindow,
-                $"Fehler beim Öffnen des Bild-Studios:\n{ex.Message}",
-                "Fehler",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
-        }
+        OpenSelectedInStudio();
     }
 
     [RelayCommand]
     private void OpenProfiEditor()
     {
-        OpenProfiEditorForFile(null);
+        OpenSelectedInProfiStudio();
+    }
+
+    public void OpenEditorForFile(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+        LoadFileInStudio(filePath, subMode: 0);
     }
 
     public void OpenProfiEditorForFile(string? pathToOpen = null)
     {
+        if (string.IsNullOrWhiteSpace(pathToOpen) && SelectedFile != null)
+        {
+            pathToOpen = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+                ? SelectedFile.TargetPath
+                : SelectedFile.FilePath;
+        }
+
+        if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen))
+        {
+            OpenStudioFileDialog();
+            return;
+        }
+
+        LoadFileInStudio(pathToOpen, subMode: 1);
+    }
+
+    public void LoadFileInStudio(string filePath, int subMode = 0, FileItemViewModel? sourceItem = null)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+
         try
         {
-            if (string.IsNullOrWhiteSpace(pathToOpen) && SelectedFile != null)
-            {
-                pathToOpen = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
-                    ? SelectedFile.TargetPath
-                    : SelectedFile.FilePath;
-            }
-
-            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen))
-            {
-                var dlg = new OpenFileDialog
-                {
-                    Filter = "RAW- und Bildformate (*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf;*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif;*.tiff)|*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf;*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif;*.tiff|Kamera-RAW (*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf)|*.cr2;*.cr3;*.nef;*.arw;*.dng;*.orf;*.rw2;*.pef;*.raf|Standard-Bilder (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif)|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.tif|Alle Dateien (*.*)|*.*",
-                    Title = "Bild im Profi-Modus (RAW-Entwickler) öffnen"
-                };
-                if (dlg.ShowDialog() == true)
-                {
-                    pathToOpen = dlg.FileName;
-                }
-            }
-
-            if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen)) return;
-
             if (Application.Current?.MainWindow != null)
             {
                 if (!Application.Current.MainWindow.IsVisible) Application.Current.MainWindow.Show();
@@ -1204,43 +1247,118 @@ public partial class MainViewModel : ObservableObject
                 Application.Current.MainWindow.Activate();
             }
 
-            AppLogger.Info("ProfiEditor", $"Öffne Profi-Modus für: {pathToOpen}");
-            var profiWin = new ProfiEditorWindow(pathToOpen, _profiDeveloperService)
-            {
-                Owner = Application.Current?.MainWindow
-            };
+            StudioFilePath = filePath;
+            StudioFileName = Path.GetFileName(filePath);
+            StudioSubMode = subMode;
+            StudioSourceBatchItem = sourceItem;
+            IsStudioFromBatch = (sourceItem != null);
 
-            if (profiWin.ShowDialog() == true && profiWin.HasChanges)
+            try
             {
-                if (profiWin.ResultFilePath != pathToOpen)
+                var fi = new FileInfo(filePath);
+                StudioFileSize = FormatBytes(fi.Length);
+            }
+            catch
+            {
+                StudioFileSize = string.Empty;
+            }
+
+            IsStudioImageLoaded = true;
+            SelectedTabIndex = 1; // 🎨 Einzelbild-Studio
+            StatusSummary = $"🎨 Studio geladen: {StudioFileName}";
+
+            StudioImageLoadRequested?.Invoke(filePath, subMode);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Studio", $"Fehler beim Laden im Studio: {filePath}", ex);
+        }
+    }
+
+    [RelayCommand]
+    public void CloseStudioImage()
+    {
+        StudioFilePath = null;
+        StudioFileName = null;
+        StudioFileSize = null;
+        StudioDimensions = null;
+        IsStudioImageLoaded = false;
+        StudioSourceBatchItem = null;
+        IsStudioFromBatch = false;
+        StatusSummary = "Bereit";
+    }
+
+    [RelayCommand]
+    public void ApplyStudioChangesToBatch(string? resultPath = null)
+    {
+        var targetPath = resultPath ?? StudioFilePath;
+        if (string.IsNullOrWhiteSpace(targetPath) || !File.Exists(targetPath)) return;
+
+        if (StudioSourceBatchItem != null)
+        {
+            var fi = new FileInfo(targetPath);
+            StudioSourceBatchItem.OriginalSizeBytes = fi.Length;
+            StudioSourceBatchItem.Status = JobStatus.Pending;
+            StudioSourceBatchItem.StatusMessage = "Im Studio bearbeitet";
+            StudioSourceBatchItem.FinalSizeBytes = 0;
+            StudioSourceBatchItem.SavingsPercentage = 0;
+            StudioSourceBatchItem.TargetPath = null;
+            StatusSummary = $"✓ Änderungen für '{StudioFileName}' in Stapelverarbeitung übernommen.";
+        }
+        else
+        {
+            AddFilePaths(new[] { targetPath });
+            StatusSummary = $"✓ Bild aus Studio zur Stapelverarbeitung hinzugefügt: {Path.GetFileName(targetPath)}";
+        }
+
+        SelectedTabIndex = 0; // Return to Batch
+    }
+
+    [RelayCommand]
+    public void OpenDetachedEditor()
+    {
+        try
+        {
+            var path = StudioFilePath;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                if (SelectedFile != null)
                 {
-                    AddFilePaths(new[] { profiWin.ResultFilePath });
-                    StatusSummary = $"🎛️ Entwickeltes Bild gespeichert: {Path.GetFileName(profiWin.ResultFilePath)}";
+                    path = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+                        ? SelectedFile.TargetPath
+                        : SelectedFile.FilePath;
                 }
-                else
+            }
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
+
+            if (StudioSubMode == 1)
+            {
+                var profiWin = new ProfiEditorWindow(path, _profiDeveloperService)
                 {
-                    if (SelectedFile != null && SelectedFile.FilePath.Equals(pathToOpen, StringComparison.OrdinalIgnoreCase))
-                    {
-                        var fi = new FileInfo(pathToOpen);
-                        SelectedFile.OriginalSizeBytes = fi.Length;
-                        SelectedFile.Status = JobStatus.Pending;
-                        SelectedFile.StatusMessage = "Im Profi-Modus entwickelt";
-                        SelectedFile.FinalSizeBytes = 0;
-                        SelectedFile.SavingsPercentage = 0;
-                        SelectedFile.TargetPath = null;
-                    }
-                    StatusSummary = $"🎛️ Änderungen am Bild gespeichert: {Path.GetFileName(pathToOpen)}";
+                    Owner = Application.Current?.MainWindow
+                };
+                if (profiWin.ShowDialog() == true && profiWin.HasChanges)
+                {
+                    var res = profiWin.ResultFilePath ?? path;
+                    ApplyStudioChangesToBatch(res);
+                }
+            }
+            else
+            {
+                var editorWin = new ImageEditorWindow(path, _editorService, _bgRemovalService)
+                {
+                    Owner = Application.Current?.MainWindow
+                };
+                if (editorWin.ShowDialog() == true && editorWin.HasChanges)
+                {
+                    var res = editorWin.ResultFilePath ?? path;
+                    ApplyStudioChangesToBatch(res);
                 }
             }
         }
         catch (Exception ex)
         {
-            AppLogger.Error("ProfiEditor", "Fehler beim Öffnen des Profi-Modus", ex);
-            MessageBox.Show(Application.Current.MainWindow,
-                $"Fehler beim Öffnen des Profi-Modus:\n{ex.Message}",
-                "Fehler",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            AppLogger.Error("Studio", "Fehler beim Ausdocken des Studios", ex);
         }
     }
 
@@ -1322,39 +1440,6 @@ public partial class MainViewModel : ObservableObject
         {
             AppLogger.Error("AI", "Fehler beim Löschen des KI-Modells", ex);
             MessageBox.Show(Application.Current.MainWindow, $"Fehler beim Löschen: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    public void OpenEditorForFile(string filePath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
-
-        try
-        {
-            if (Application.Current?.MainWindow != null)
-            {
-                if (!Application.Current.MainWindow.IsVisible) Application.Current.MainWindow.Show();
-                if (Application.Current.MainWindow.WindowState == WindowState.Minimized) Application.Current.MainWindow.WindowState = WindowState.Normal;
-                Application.Current.MainWindow.Activate();
-            }
-
-            AppLogger.Info("Editor", $"Öffne Paint / Bild-Editor für Datei: {filePath}");
-            var editorWin = new ImageEditorWindow(filePath, _editorService, _bgRemovalService)
-            {
-                Owner = Application.Current?.MainWindow
-            };
-
-            if (editorWin.ShowDialog() == true && editorWin.HasChanges)
-            {
-                var resultPath = editorWin.ResultFilePath ?? filePath;
-                AddFilePaths(new[] { resultPath });
-                SelectedTabIndex = 0;
-                StatusSummary = $"✏️ Screenshot/Bild im Studio abgelegt: {Path.GetFileName(resultPath)}";
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Editor", "Fehler beim Öffnen des Bild-Editors für Screenshot", ex);
         }
     }
 
@@ -1719,15 +1804,12 @@ public partial class MainViewModel : ObservableObject
     public void OpenDefaultActionForSelected()
     {
         if (SelectedFile == null) return;
+        var path = (!string.IsNullOrWhiteSpace(SelectedFile.TargetPath) && File.Exists(SelectedFile.TargetPath))
+            ? SelectedFile.TargetPath
+            : SelectedFile.FilePath;
         var action = _settingsService.Settings.DefaultFileOpenAction;
-        if (action == DefaultFileOpenAction.OpenInProfiMode)
-        {
-            OpenProfiEditorCommand.Execute(null);
-        }
-        else
-        {
-            OpenEditorCommand.Execute(null);
-        }
+        var subMode = (action == DefaultFileOpenAction.OpenInProfiMode) ? 1 : 0;
+        LoadFileInStudio(path, subMode, SelectedFile);
     }
 
     [RelayCommand]

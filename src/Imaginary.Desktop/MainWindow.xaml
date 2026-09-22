@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Imaginary.Desktop.ViewModels"
         xmlns:conv="clr-namespace:Imaginary.Desktop.Converters"
+        xmlns:views="clr-namespace:Imaginary.Desktop.Views"
         mc:Ignorable="d"
         Title="Imaginary – Bild-Konvertierung &amp; Optimierung"
         Height="840" Width="1240"
@@ -93,7 +94,7 @@
                 </Grid.RowDefinitions>
 
                 <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,12">
-                    <!-- Right Actions (Updates & Protokoll) -->
+                    <!-- Right Actions (Updates, Theme Toggle & Protokoll) -->
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                         <!-- Update Available Banner Button -->
                         <Button Content="{Binding UpdateBadgeText}" Command="{Binding ShowUpdateDialogCommand}"
@@ -102,21 +103,11 @@
                                 Padding="12,6" Margin="0,0,10,0" BorderThickness="0" Cursor="Hand"
                                 ToolTip="Klicken, um das neue Update herunterzuladen und zu installieren"/>
 
-                        <!-- MCP / KI Button -->
-                        <Button Content="🤖 MCP / KI" Command="{Binding SelectTabCommand}" CommandParameter="2"
-                                Padding="12,6" Margin="0,0,10,0"
-                                Background="{DynamicResource SecondaryButtonBackgroundBrush}"
-                                Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                Cursor="Hand" ToolTip="Model Context Protocol (MCP) &amp; KI-Agenten Konfiguration aufrufen"/>
-
-                        <!-- Teilen Button -->
-                        <Button Content="🔗 Teilen" Command="{Binding ShareAppLinkCommand}"
-                                Padding="12,6" Margin="0,0,10,0"
-                                Background="{DynamicResource SecondaryButtonBackgroundBrush}"
-                                Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
-                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                Cursor="Hand" ToolTip="Download-Link kopieren und Imaginary weiterempfehlen"/>
+                        <!-- 1-Click Theme Toggle Button (Dark / Light) -->
+                        <Button Content="{Binding ThemeToggleIcon}" Command="{Binding ToggleThemeCommand}"
+                                ToolTip="{Binding ThemeToggleToolTip}" FontSize="13"
+                                Padding="10,5" Margin="0,0,10,0"
+                                Style="{DynamicResource ToolbarButtonStyle}" Cursor="Hand"/>
 
                         <!-- Protokoll / Log Viewer Button -->
                         <Button Content="📋 Protokoll" Command="{Binding OpenLogViewerCommand}"
@@ -152,14 +143,17 @@
                                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="3"
                                 VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
-                                <RadioButton Content="⚡ Studio &amp; Batch"
+                                <RadioButton Content="⚡ Stapelverarbeitung"
                                              IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=0, Mode=TwoWay}"
                                              Style="{StaticResource TabNavigationRadioButtonStyle}"/>
-                                <RadioButton Content="📁 Hotfolder &amp; Automation"
+                                <RadioButton Content="🎨 Einzelbild-Studio"
                                              IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=1, Mode=TwoWay}"
                                              Style="{StaticResource TabNavigationRadioButtonStyle}"/>
-                                <RadioButton Content="⚙️ Einstellungen"
+                                <RadioButton Content="📁 Hotfolder &amp; Automation"
                                              IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=2, Mode=TwoWay}"
+                                             Style="{StaticResource TabNavigationRadioButtonStyle}"/>
+                                <RadioButton Content="⚙️ Einstellungen"
+                                             IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=3, Mode=TwoWay}"
                                              Style="{StaticResource TabNavigationRadioButtonStyle}"/>
                             </StackPanel>
                         </Border>
@@ -428,41 +422,44 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Toolbar -->
-                <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,0,10"
+                <!-- Streamlined Batch Toolbar (3 logical groups) -->
+                <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6" Padding="8,6" Margin="0,0,0,10"
                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                     <DockPanel>
+                        <!-- Group 1: Import Actions -->
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                            <Button Content="+ Dateien" Command="{Binding AddFilesCommand}"
+                            <Button Content="➕ Dateien" Command="{Binding AddFilesCommand}"
+                                    Style="{DynamicResource ToolbarButtonStyle}" FontWeight="SemiBold"/>
+                            <Button Content="📁 Ordner" Command="{Binding AddFolderCommand}"
                                     Style="{DynamicResource ToolbarButtonStyle}"/>
-                            <Button Content="+ Ordner" Command="{Binding AddFolderCommand}"
-                                    Style="{DynamicResource ToolbarButtonStyle}"/>
-                            <Button Content="📋 Aus Zwischenablage (Strg+V)" Command="{Binding PasteFromClipboardCommand}"
+                            <Button Content="📋 Einfügen" Command="{Binding PasteFromClipboardCommand}"
                                     Style="{DynamicResource ToolbarButtonStyle}"
-                                    FontWeight="SemiBold"
-                                    ToolTip="Fügt ein kopiertes Bild oder Bilddateien aus der Windows-Zwischenablage ein (Strg+V)"/>
-                            <Button Content="📸 Screenshot (Win+Shift+S)" Command="{Binding TriggerNativeSnippingCommand}"
+                                    ToolTip="Aus Zwischenablage einfügen (Strg+V)"/>
+                            <Button Content="📸 Screenshot" Command="{Binding TriggerNativeSnippingCommand}"
                                     Style="{DynamicResource ToolbarButtonStyle}"
-                                    ToolTip="Startet das Windows Snipping Tool (Win + Shift + S). Der Screenshot wird automatisch in Imaginary erkannt."/>
+                                    ToolTip="Windows Snipping Tool starten (Win+Shift+S / F10)"/>
+
+                            <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="6,2"/>
+
+                            <!-- Group 2: Selected Item Studio Actions -->
+                            <Button Content="🎨 Im Studio bearbeiten" Command="{Binding OpenSelectedInStudioCommand}"
+                                    IsEnabled="{Binding CanOpenEditor}"
+                                    Style="{DynamicResource ToolbarButtonStyle}"
+                                    FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
+                                    ToolTip="Öffnet das ausgewählte Bild im fokussierten Einzelbild-Studio"/>
                             <Button Content="🔍 Vorher / Nachher" Command="{Binding OpenPreviewCommand}"
                                     IsEnabled="{Binding CanOpenPreview}"
                                     Style="{DynamicResource ToolbarButtonStyle}"
-                                    FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"
                                     ToolTip="Vorher/Nachher-Vergleich mit synchronisiertem Zoom bis 800%"/>
-                            <Button Content="✏️ Bearbeiten / Paint" Command="{Binding OpenEditorCommand}"
-                                     Style="{DynamicResource ToolbarButtonStyle}"
-                                     FontWeight="SemiBold" Foreground="#10B981"
-                                     ToolTip="Öffnet das Bild im integrierten Quick-Edit &amp; Paint Studio (Zuschneiden, DSGVO-Blur, Pfeile, Freistellen)"/>
-                            <Button Content="🎛️ Profi-Modus (RAW)" Command="{Binding OpenProfiEditorCommand}"
-                                     Style="{DynamicResource ToolbarButtonStyle}"
-                                     FontWeight="Bold" Foreground="#38BDF8"
-                                     ToolTip="Öffnet das Bild im professionellen RAW-Entwickler &amp; Color-Grading Studio (Belichtung, Weißabgleich, Klarheit, Tonwertkurven, Split-Toning)"/>
                         </StackPanel>
 
+                        <!-- Group 3: Queue Management -->
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                            <Button Content="Auswahl entfernen" Command="{Binding RemoveSelectedCommand}"
+                            <Button Content="🗑️ Entfernen" Command="{Binding RemoveSelectedCommand}"
+                                    IsEnabled="{Binding CanOpenEditor}"
                                     Style="{DynamicResource ToolbarButtonStyle}"/>
-                            <Button Content="Liste leeren" Command="{Binding ClearFilesCommand}"
+                            <Button Content="🧹 Leeren" Command="{Binding ClearFilesCommand}"
+                                    IsEnabled="{Binding HasFiles}"
                                     Style="{DynamicResource ToolbarButtonStyle}" Margin="0"/>
                         </StackPanel>
                     </DockPanel>
@@ -555,7 +552,126 @@
         </Grid>
             </TabItem>
 
-            <!-- Tab 1: 📁 Hotfolder & Automation -->
+            <!-- Tab 1: 🎨 Einzelbild-Studio -->
+            <TabItem>
+                <Grid>
+                    <!-- State A: Empty Dropzone (No image loaded) -->
+                    <Border Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="8"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="4"
+                            Visibility="{Binding IsStudioImageLoaded, Converter={StaticResource InverseBoolToVis}}"
+                            AllowDrop="True" Drop="OnStudioDrop" DragOver="OnGridDragOver">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="600">
+                            <Border Width="80" Height="80" CornerRadius="20" Background="{DynamicResource ToolbarBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" HorizontalAlignment="Center" Margin="0,0,0,16">
+                                <TextBlock Text="🎨" FontSize="44" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Einzelbild-Studio" FontSize="22" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="Kreative Bildbearbeitung, Retusche, Zensur &amp; professionelle RAW-Entwicklung"
+                                       FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center" Margin="0,6,0,24" TextAlignment="Center"/>
+
+                            <!-- Action Buttons -->
+                            <WrapPanel HorizontalAlignment="Center" Margin="0,0,0,20">
+                                <Button Content="📂 Bild öffnen..." Command="{Binding OpenStudioFileDialogCommand}"
+                                        Style="{StaticResource ActionButtonStyle}"
+                                        Background="{DynamicResource ActionButtonGradientBrush}" Foreground="White"
+                                        Padding="18,10" Margin="6" Cursor="Hand"/>
+                                <Button Content="📋 Aus Zwischenablage (Strg+V)" Command="{Binding PasteFromClipboardCommand}"
+                                        Style="{DynamicResource ToolbarButtonStyle}"
+                                        Padding="14,10" Margin="6" Cursor="Hand" FontWeight="SemiBold"/>
+                                <Button Content="📸 Screenshot (Win+Shift+S)" Command="{Binding TriggerNativeSnippingCommand}"
+                                        Style="{DynamicResource ToolbarButtonStyle}"
+                                        Padding="14,10" Margin="6" Cursor="Hand"/>
+                            </WrapPanel>
+
+                            <TextBlock Text="💡 Unterstützt alle gängigen Kamera-RAW Formate (CR2, CR3, NEF, ARW, DNG, etc.) sowie JPEG, PNG, WebP, AVIF und TIFF"
+                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,14"/>
+
+                            <!-- Quick picker from Batch Queue if items exist -->
+                            <StackPanel Visibility="{Binding HasFiles, Converter={StaticResource BoolToVis}}" Margin="0,10,0,0">
+                                <TextBlock Text="Oder wähle ein Bild aus der aktuellen Stapelverarbeitung:" FontSize="12" FontWeight="SemiBold"
+                                           HorizontalAlignment="Center" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,8"/>
+                                <Button Content="⚡ Aktuell ausgewähltes Bild im Studio laden" Command="{Binding OpenSelectedInStudioCommand}"
+                                        Style="{DynamicResource ToolbarButtonStyle}" HorizontalAlignment="Center" Padding="12,6"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- State B: Active Studio (Image loaded) -->
+                    <Grid Visibility="{Binding IsStudioImageLoaded, Converter={StaticResource BoolToVis}}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Studio Header Toolbar -->
+                        <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10,6" Margin="0,0,0,8">
+                            <DockPanel LastChildFill="True">
+                                <!-- Left: File Info & Submode Switcher -->
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                    <Button Content="⮌ Stapelverarbeitung" Command="{Binding SelectTabCommand}" CommandParameter="0"
+                                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,12,0" Padding="8,4"
+                                            ToolTip="Zur Stapelverarbeitung wechseln"/>
+
+                                    <Border Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="4" Padding="8,4" Margin="0,0,14,0"
+                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="🖼️ " FontSize="12" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding StudioFileName}" FontWeight="Bold" FontSize="12.5"
+                                                       VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       MaxWidth="240" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding StudioFileSize}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Submode Toggle: Quick-Editor / Paint vs RAW / Color-Grading -->
+                                    <Border Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="6"
+                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="2" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <RadioButton Content="✏️ Schnell-Editor &amp; Paint"
+                                                         IsChecked="{Binding StudioSubMode, Converter={StaticResource IntToBool}, ConverterParameter=0, Mode=TwoWay}"
+                                                         Style="{StaticResource TabNavigationRadioButtonStyle}" FontSize="11.5" Padding="10,4"/>
+                                            <RadioButton Content="🎛️ RAW &amp; Color-Grading"
+                                                         IsChecked="{Binding StudioSubMode, Converter={StaticResource IntToBool}, ConverterParameter=1, Mode=TwoWay}"
+                                                         Style="{StaticResource TabNavigationRadioButtonStyle}" FontSize="11.5" Padding="10,4"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Right: Bridge & Popout & Close Actions -->
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <!-- Bridge back to Batch queue -->
+                                    <Button Content="✓ In Stapelverarbeitung übernehmen" Command="{Binding ApplyStudioChangesToBatchCommand}"
+                                            Visibility="{Binding IsStudioFromBatch, Converter={StaticResource BoolToVis}}"
+                                            Background="#10B981" Foreground="White" FontWeight="Bold"
+                                            Padding="12,6" Margin="0,0,8,0" BorderThickness="0" Cursor="Hand"
+                                            ToolTip="Speichert die Änderungen und kehrt mit diesem Bild direkt zur Stapelverarbeitung zurück"/>
+
+                                    <Button Content="🗗 Ausdocken" Command="{Binding OpenDetachedEditorCommand}"
+                                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,8,0" Padding="8,4"
+                                            ToolTip="Öffnet dieses Studio in einem separaten Fenster (ideal für Multi-Monitor Setups)"/>
+
+                                    <Button Content="✕ Bild schließen" Command="{Binding CloseStudioImageCommand}"
+                                            Style="{DynamicResource ToolbarButtonStyle}" Padding="8,4"
+                                            ToolTip="Schließt das aktuelle Bild im Studio"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Studio Controls Container (Paint & RAW) -->
+                        <Grid Grid.Row="1">
+                            <views:ImageEditorControl x:Name="StudioImageEditorControl"
+                                                      Visibility="{Binding StudioSubMode, Converter={StaticResource IntToVis}, ConverterParameter=0}"/>
+                            <views:ProfiEditorControl x:Name="StudioProfiEditorControl"
+                                                      Visibility="{Binding StudioSubMode, Converter={StaticResource IntToVis}, ConverterParameter=1}"/>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 2: 📁 Hotfolder & Automation -->
             <TabItem>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -746,7 +862,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- Tab 2: ⚙️ Einstellungen -->
+            <!-- Tab 3: ⚙️ Einstellungen -->
             <TabItem>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxWidth="820" HorizontalAlignment="Left">
                     <StackPanel Margin="8,0,0,16">
@@ -1130,14 +1246,14 @@
 
                 <TextBlock Grid.Column="0" Text="{Binding StatusSummary}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
 
-                <!-- Hotfolder Status Badge & Attribution & Updates Link -->
+                <!-- Hotfolder Status Badge & Attribution -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0">
                     <!-- Live Hotfolder Badge -->
                     <Border Background="#10B981" CornerRadius="4" Padding="8,3" Margin="0,0,12,0"
                             Visibility="{Binding IsHotfolderActive, Converter={StaticResource BoolToVis}}"
                             Cursor="Hand" ToolTip="Hotfolder ist aktiv. Klicken zum Öffnen des Hotfolder-Tabs.">
                         <Border.InputBindings>
-                            <MouseBinding MouseAction="LeftClick" Command="{Binding SelectTabCommand}" CommandParameter="1"/>
+                            <MouseBinding MouseAction="LeftClick" Command="{Binding SelectTabCommand}" CommandParameter="2"/>
                         </Border.InputBindings>
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="8" Height="8" Fill="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -1145,13 +1261,7 @@
                         </StackPanel>
                     </Border>
 
-                    <TextBlock Text="Entwickelt von Pino Wackers" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <Button Content="🔄 Updates" Command="{Binding CheckForUpdatesManualCommand}"
-                            Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0"
-                            ToolTip="Online nach neuen Versionen von Imaginary suchen"/>
-                    <Button Content="📋 Protokoll" Command="{Binding OpenLogViewerCommand}"
-                            Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0"
-                            ToolTip="Echtzeit-System- &amp; Fehler-Protokoll öffnen"/>
+                    <TextBlock Text="Entwickelt von Pino Wackers" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0"/>
                 </StackPanel>
 
                 <ProgressBar Grid.Column="2" Value="{Binding ProgressValue}" Minimum="0" Maximum="100"

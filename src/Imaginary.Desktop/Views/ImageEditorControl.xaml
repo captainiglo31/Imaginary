@@ -1,0 +1,562 @@
+<UserControl x:Class="Imaginary.Desktop.Views.ImageEditorControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource WindowBackgroundBrush}"
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             FontFamily="Segoe UI"
+             Focusable="True"
+             PreviewKeyDown="OnWindowPreviewKeyDown"
+             PreviewKeyUp="OnWindowPreviewKeyUp">
+
+    <UserControl.Resources>
+        <!-- Style for Color Selection RadioButtons -->
+        <Style x:Key="ColorRadioStyle" TargetType="RadioButton">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Width="22" Height="22" CornerRadius="11" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1.5">
+                            <Ellipse x:Name="CheckDot" Width="8" Height="8" Fill="White" Visibility="Collapsed"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckDot" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Checkerboard brush for transparency preview -->
+        <DrawingBrush x:Key="CheckerboardBrush" Viewport="0,0,16,16" ViewportUnits="Absolute" TileMode="Tile">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#1E293B">
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="0,0,16,16"/>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                    <GeometryDrawing Brush="#0F172A">
+                        <GeometryDrawing.Geometry>
+                            <GeometryGroup>
+                                <RectangleGeometry Rect="0,0,8,8"/>
+                                <RectangleGeometry Rect="8,8,8,8"/>
+                            </GeometryGroup>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+
+        <!-- Style for Tool Palette Buttons -->
+        <Style x:Key="ToolPaletteButtonStyle" TargetType="RadioButton">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="FontSize" Value="17"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="FontFamily" Value="Segoe UI Emoji, Segoe UI"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="RootBorder" CornerRadius="6" Background="Transparent" Padding="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RootBorder" Property="Background" Value="#2038BDF8"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="RootBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Style for Side Panel Mode Switcher RadioButtons -->
+        <Style x:Key="SideTabRadioStyle" TargetType="RadioButton">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="TabBorder" CornerRadius="6" Background="Transparent" Padding="10,4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Top App Header -->
+            <RowDefinition Height="Auto"/> <!-- Sub-Toolbar / Tool Options -->
+            <RowDefinition Height="*"/>    <!-- Work Area (Tools + Canvas + Side Panel) -->
+            <RowDefinition Height="Auto"/> <!-- Bottom Status & Action Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Top Header -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,10">
+            <DockPanel LastChildFill="True">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <Button x:Name="ButtonUndo" Content="↩️ Rückgängig (Strg+Z)" Click="OnUndoClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0"/>
+                    <Button x:Name="ButtonRedo" Content="↪️ Wiederholen (Strg+Y)" Click="OnRedoClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0"/>
+
+                    <Button x:Name="ButtonToggleLayers" Content="📑 Ebenen" Click="OnToggleLayersClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0" ToolTip="Ebenen-Panel für platzierte Elemente ein-/ausblenden"/>
+                    <Button x:Name="ButtonToggleBgRemove" Content="🪄 Freistellen" Click="OnToggleBgRemoveClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0" ToolTip="Hintergrund entfernen &amp; Freistell-Panel ein-/ausblenden"/>
+
+                    <Button x:Name="ButtonSwitchToProfiMode" Content="🎛️ In Profi-Modus wechseln" Click="OnSwitchToProfiModeClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" FontWeight="SemiBold" Foreground="#38BDF8" Margin="0,0,14,0"
+                            ToolTip="Öffnet dieses Bild im professionellen RAW-Entwickler &amp; Color-Grading Studio"/>
+
+                    <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4,2" Margin="0,0,14,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="-" Click="OnZoomOutClicked" Width="26" Height="26" Padding="0" Style="{DynamicResource ToolbarButtonStyle}"/>
+                            <TextBlock x:Name="TextZoomLevel" Text="100%" FontWeight="Bold" FontSize="11.5"
+                                       VerticalAlignment="Center" Margin="8,0" Foreground="{DynamicResource AccentBrush}"/>
+                            <Button Content="+" Click="OnZoomInClicked" Width="26" Height="26" Padding="0" Style="{DynamicResource ToolbarButtonStyle}"/>
+                            <Button Content="1:1" Click="OnZoomResetClicked" Padding="6,2" FontSize="10.5" Style="{DynamicResource ToolbarButtonStyle}" Margin="4,0,0,0"/>
+                            <Button Content="Einpassen" Click="OnZoomFitClicked" Padding="6,2" FontSize="10.5" Style="{DynamicResource ToolbarButtonStyle}" Margin="2,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="32" Height="32" CornerRadius="8" Background="#0A0E1A"
+                            BorderBrush="{DynamicResource BorderFocusBrush}" BorderThickness="1" Margin="0,0,12,0">
+                        <Image Source="pack://application:,,,/Assets/logo.png" Stretch="Uniform" Margin="2"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="TextFileName" Text="Bildname.png" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="TextDimensions" Text="1920 × 1080 px" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- 2. Tool Options Bar -->
+        <Border Grid.Row="1" Background="{DynamicResource ToolbarBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,8">
+            <DockPanel LastChildFill="True">
+                <!-- Color & Stroke Palette -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <TextBlock Text="Farbe:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <RadioButton x:Name="ColorRed" GroupName="ColorGroup" Tag="#EF4444" IsChecked="True" Checked="OnColorSelectionChanged" Style="{StaticResource ColorRadioStyle}" Background="#EF4444"/>
+                        <RadioButton x:Name="ColorCyan" GroupName="ColorGroup" Tag="#00D2FF" Checked="OnColorSelectionChanged" Style="{StaticResource ColorRadioStyle}" Background="#00D2FF"/>
+                        <RadioButton x:Name="ColorYellow" GroupName="ColorGroup" Tag="#FBBF24" Checked="OnColorSelectionChanged" Style="{StaticResource ColorRadioStyle}" Background="#FBBF24"/>
+                        <RadioButton x:Name="ColorGreen" GroupName="ColorGroup" Tag="#10B981" Checked="OnColorSelectionChanged" Style="{StaticResource ColorRadioStyle}" Background="#10B981"/>
+                        <RadioButton x:Name="ColorWhite" GroupName="ColorGroup" Tag="#FFFFFF" Checked="OnColorSelectionChanged" Style="{StaticResource ColorRadioStyle}" Background="#FFFFFF"/>
+                        <RadioButton x:Name="ColorBlack" GroupName="ColorGroup" Tag="#0F172A" Checked="OnColorSelectionChanged" Style="{StaticResource ColorRadioStyle}" Background="#0F172A"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Stärke / Pinsel:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Slider x:Name="SliderStrokeWidth" Minimum="1" Maximum="64" Value="4" Width="85" VerticalAlignment="Center" ValueChanged="OnStrokeSliderChanged" Margin="0,0,6,0"/>
+                    <TextBlock x:Name="TextStrokeWidthVal" Text="4 px" FontWeight="Bold" FontSize="11.5" Width="36" VerticalAlignment="Center" Margin="0,0,14,0" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                </StackPanel>
+
+                <!-- Tool Specific Options (Crop / Background / Blur / StepBadge) -->
+                <StackPanel x:Name="PanelCropOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
+                    <TextBlock Text="Format:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <ComboBox x:Name="ComboCropAspect" SelectedIndex="0" SelectionChanged="OnCropAspectChanged" Width="110" Padding="6,3" FontSize="11.5" Margin="0,0,10,0">
+                        <ComboBoxItem Content="Frei"/>
+                        <ComboBoxItem Content="1:1 (Quadrat)"/>
+                        <ComboBoxItem Content="16:9 (Display)"/>
+                        <ComboBoxItem Content="4:3 (Foto)"/>
+                        <ComboBoxItem Content="9:16 (Story)"/>
+                    </ComboBox>
+                    <Button Content="✂️ Zuschnitt anwenden" Click="OnApplyCropClicked" FontWeight="Bold"
+                            Background="{DynamicResource AccentBrush}" Foreground="White" Padding="12,4" Style="{DynamicResource ToolbarButtonStyle}"/>
+                </StackPanel>
+
+                <StackPanel x:Name="PanelBlurOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
+                    <TextBlock Text="DSGVO-Verpixelung Blockgröße:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Slider x:Name="SliderPixelSize" Minimum="6" Maximum="32" Value="16" Width="110" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ElementName=SliderPixelSize, Path=Value, StringFormat='{}{0:0} px'}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+
+                <!-- Blur Brush Options -->
+                <StackPanel x:Name="PanelBlurBrushOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
+                    <TextBlock Text="Weichzeichner-Radius:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Slider x:Name="SliderBlurRadius" Minimum="6" Maximum="60" Value="24" Width="90" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ElementName=SliderBlurRadius, Path=Value, StringFormat='{}{0:0} px'}" FontSize="11" Margin="6,0,12,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="Intensität:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Slider x:Name="SliderBlurSigma" Minimum="3" Maximum="25" Value="10" Width="75" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ElementName=SliderBlurSigma, Path=Value, StringFormat='{}{0:0}'}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+
+                <!-- Step Badge Options -->
+                <StackPanel x:Name="PanelStepBadgeOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
+                    <TextBlock Text="Nächste Nummer:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBox x:Name="TextStepBadgeNumber" Text="1" Width="40" Padding="4,2" TextAlignment="Center" FontSize="11.5" Margin="0,0,8,0" TextChanged="OnStepBadgeNumberChanged"/>
+                    <Button Content="↺ Auf 1 zurücksetzen" Click="OnResetStepBadgeClicked" Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- 3. Work Area: Vertical Tools (Left), Viewport Canvas (Center), Side Panel (Right) -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="74"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition x:Name="ColSidePanel" Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Vertical Tool Palette -->
+            <Border Grid.Column="0" Background="{DynamicResource SurfaceBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Padding="4,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel HorizontalAlignment="Center">
+                        <RadioButton x:Name="ToolPan" GroupName="ToolGroup" Content="✋" ToolTip="Hand / Verschieben (Bildelemente auswählen &amp; verschieben oder Bild pannen)"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolCrop" GroupName="ToolGroup" Content="✂️" ToolTip="Zuschneiden (Crop)"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <Separator Margin="4,4"/>
+                        <RadioButton x:Name="ToolPixelate" GroupName="ToolGroup" Content="▦" ToolTip="DSGVO: Verpixeln (Mosaik)"
+                                     FontSize="20" Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolBlur" GroupName="ToolGroup" Content="💧" ToolTip="DSGVO: Weichzeichnen (Blur)"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolBlackout" GroupName="ToolGroup" ToolTip="DSGVO: Schwärzen"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Rectangle Width="18" Height="18" RadiusX="3" RadiusY="3" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                        </RadioButton>
+                        <Separator Margin="4,4"/>
+                        <RadioButton x:Name="ToolArrow" GroupName="ToolGroup" Content="➔" ToolTip="Hinweis-Pfeil"
+                                     FontWeight="Bold" FontSize="19" Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolRectangle" GroupName="ToolGroup" ToolTip="Rechteck / Rahmen"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Rectangle Width="19" Height="14" RadiusX="2" RadiusY="2" StrokeThickness="2" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                        </RadioButton>
+                        <RadioButton x:Name="ToolOval" GroupName="ToolGroup" ToolTip="Kreis / Ellipse"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Ellipse Width="18" Height="18" StrokeThickness="2" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                        </RadioButton>
+                        <RadioButton x:Name="ToolStepBadge" GroupName="ToolGroup" ToolTip="Schritt-Badge (1, 2, 3...)"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}">
+                            <Grid Width="20" Height="20">
+                                <Ellipse Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                <TextBlock Text="1" Foreground="{DynamicResource SurfaceBackgroundBrush}" FontWeight="ExtraBold" FontSize="11.5" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
+                            </Grid>
+                        </RadioButton>
+                        <Separator Margin="4,4"/>
+                        <RadioButton x:Name="ToolPen" GroupName="ToolGroup" Content="✏️" ToolTip="Freihand-Stift"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolHighlighter" GroupName="ToolGroup" Content="🖍️" ToolTip="Textmarker"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <RadioButton x:Name="ToolText" GroupName="ToolGroup" Content="🔤" ToolTip="Text einfügen"
+                                     Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
+                        <Separator Margin="4,4"/>
+                        <RadioButton x:Name="ToolBgRemove" GroupName="ToolGroup" Content="🪄" ToolTip="Hintergrund entfernen (Magic Wand &amp; KI)"
+                                     Checked="OnToolSelected" PreviewMouseLeftButtonDown="OnToolBgRemovePreviewMouseDown"
+                                     Style="{StaticResource ToolPaletteButtonStyle}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Center Viewport & Interactive Canvas -->
+            <Border Grid.Column="1" Background="#111827" ClipToBounds="True">
+                <ScrollViewer x:Name="CanvasScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                              Background="Transparent" PreviewMouseWheel="OnCanvasMouseWheel">
+                    <Grid x:Name="CanvasContainer" HorizontalAlignment="Center" VerticalAlignment="Center"
+                          Background="{StaticResource CheckerboardBrush}"
+                          MouseDown="OnCanvasMouseDown" MouseMove="OnCanvasMouseMove" MouseUp="OnCanvasMouseUp">
+                        <Grid.LayoutTransform>
+                            <ScaleTransform x:Name="CanvasScaleTransform" ScaleX="1" ScaleY="1"/>
+                        </Grid.LayoutTransform>
+
+                        <!-- Base Image -->
+                        <Image x:Name="BaseImage" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                        <!-- Interactive Vector Overlay Canvas -->
+                        <Canvas x:Name="DrawingOverlayCanvas" IsHitTestVisible="False">
+                            <!-- Temporary Preview Elements during dragging -->
+                            <Line x:Name="PreviewLine" StrokeThickness="3" Visibility="Collapsed"/>
+                            <Polygon x:Name="PreviewArrowHead" StrokeThickness="1" Visibility="Collapsed"/>
+                            <Polyline x:Name="PreviewPolyline" StrokeThickness="3"
+                                      StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"/>
+                            <Rectangle x:Name="PreviewRect" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
+                            <Ellipse x:Name="PreviewEllipse" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
+                        </Canvas>
+
+                        <!-- Interactive AI Brush Stroke Canvas -->
+                        <Canvas x:Name="InteractiveStrokeCanvas" IsHitTestVisible="False"/>
+                    </Grid>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Right Side Panel: Layers & Background Removal -->
+            <Border x:Name="SidePanel" Grid.Column="2" Width="320" Background="{DynamicResource SurfaceBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Visibility="Collapsed">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Side Panel Header with Tab Switcher & Close Button -->
+                    <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <RadioButton x:Name="TabSideLayers" Grid.Column="0" Content="📑 Ebenen"
+                                         GroupName="SidePanelTabs" Style="{StaticResource SideTabRadioStyle}"
+                                         IsChecked="True" Checked="OnSideTabChanged" Margin="0,0,3,0"/>
+                            <RadioButton x:Name="TabSideBgRemove" Grid.Column="1" Content="🪄 Freistellen"
+                                         GroupName="SidePanelTabs" Style="{StaticResource SideTabRadioStyle}"
+                                         Checked="OnSideTabChanged" Margin="3,0,0,0"/>
+                            <Button Grid.Column="2" Content="✕" Click="OnCloseSidePanelClicked"
+                                    Width="26" Height="26" Margin="6,0,0,0" Style="{DynamicResource ToolbarButtonStyle}"
+                                    ToolTip="Panel schließen"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Tab 1: Layers (Ebenen) -->
+                    <Grid x:Name="PanelLayersView" Grid.Row="1" Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Layers Info -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                            <TextBlock x:Name="TextLayerCount" Text="0 Ebenen" DockPanel.Dock="Right"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Ebenen (Z-Reihenfolge)" FontWeight="SemiBold" FontSize="12"/>
+                        </DockPanel>
+
+                        <!-- Layers List -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock x:Name="TextNoLayers" Text="Keine Annotationen vorhanden.&#x0a;Platziere Pfeile, Formen oder Texte im Bild."
+                                           FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextAlignment="Center" Margin="0,40,0,0" LineHeight="18"/>
+                                <ItemsControl x:Name="ItemsControlLayers">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="6" BorderThickness="1" Margin="0,0,0,4" Padding="6,4"
+                                                    Background="{Binding LayerBgBrush}" BorderBrush="{Binding LayerBorderBrush}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/> <!-- Visibility Toggle -->
+                                                        <ColumnDefinition Width="Auto"/> <!-- Icon/Color -->
+                                                        <ColumnDefinition Width="*"/>    <!-- Name -->
+                                                        <ColumnDefinition Width="Auto"/> <!-- Move Up -->
+                                                        <ColumnDefinition Width="Auto"/> <!-- Move Down -->
+                                                        <ColumnDefinition Width="Auto"/> <!-- Delete -->
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Button Grid.Column="0" Content="{Binding VisibilityIcon}"
+                                                            Click="OnToggleLayerVisibilityClicked" Tag="{Binding Id}"
+                                                            Width="24" Height="24" Padding="0" Margin="0,0,4,0"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" ToolTip="Sichtbarkeit umschalten"/>
+
+                                                    <Border Grid.Column="1" Width="18" Height="18" CornerRadius="3" Margin="0,0,6,0"
+                                                            Background="{Binding LayerColorBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                                            VerticalAlignment="Center"/>
+
+                                                    <TextBlock Grid.Column="2" Text="{Binding LayerDisplayName}"
+                                                               FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis" Cursor="Hand"
+                                                               PreviewMouseDown="OnSelectLayerClicked" Tag="{Binding Id}"/>
+
+                                                    <Button Grid.Column="3" Content="▲" Click="OnMoveLayerUpClicked" Tag="{Binding Id}"
+                                                            Width="22" Height="22" Padding="0" Margin="2,0" FontSize="9"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" ToolTip="Nach vorne (höherer Z-Index)"/>
+
+                                                    <Button Grid.Column="4" Content="▼" Click="OnMoveLayerDownClicked" Tag="{Binding Id}"
+                                                            Width="22" Height="22" Padding="0" Margin="2,0" FontSize="9"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" ToolTip="Nach hinten (niedrigerer Z-Index)"/>
+
+                                                    <Button Grid.Column="5" Content="🗑" Click="OnDeleteLayerItemClicked" Tag="{Binding Id}"
+                                                            Width="22" Height="22" Padding="0" Margin="2,0,0,0" FontSize="11"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" ToolTip="Ebene löschen"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Bottom Action Buttons for Layers -->
+                        <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="🗑 Gewählte löschen" Click="OnDeleteSelectedLayerClicked"
+                                        FontSize="11" Padding="6,4" Margin="0,0,4,0" Style="{DynamicResource ToolbarButtonStyle}"
+                                        ToolTip="Löscht die aktuell markierte Ebene (Entf)"/>
+                                <Button Grid.Column="1" Content="Alle leeren" Click="OnClearAllLayersClicked"
+                                        FontSize="11" Padding="6,4" Margin="4,0,0,0" Style="{DynamicResource ToolbarButtonStyle}"
+                                        ToolTip="Entfernt alle Annotationen"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Tab 2: Background Removal -->
+                    <ScrollViewer x:Name="PanelBgRemovalView" Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="12" Visibility="Collapsed">
+                        <StackPanel>
+                            <!-- Background Removal Card -->
+                            <GroupBox Header="🪄 Hintergrund entfernen">
+                                <StackPanel Margin="0,6,0,0">
+                                    <TextBlock Text="Methode wählen:" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,6"/>
+                                    <ComboBox x:Name="ComboBgMode" SelectionChanged="OnBgModeChanged" Margin="0,0,0,12" Padding="6,4">
+                                        <ComboBoxItem Content="🎨 Klassisch (Farbe / Magic Wand)"/>
+                                        <ComboBoxItem Content="🧠 KI-Modell (U-2-Net Deep Learning)"/>
+                                        <ComboBoxItem Content="🎯 KI-Pinsel &amp; Objektauswahl"/>
+                                    </ComboBox>
+
+                                    <!-- Panel for Color Keying -->
+                                    <StackPanel x:Name="PanelColorKeyOptions">
+                                        <TextBlock Text="Hintergrundfarbe wählen:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                        <DockPanel Margin="0,0,0,10">
+                                            <Border x:Name="BorderPickedColor" Width="32" Height="28" CornerRadius="4" Background="#FFFFFF" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Margin="0,0,8,0"/>
+                                            <Button Content="🎯 Pipette (Klick ins Bild)" Click="OnPickColorClicked" Style="{DynamicResource ToolbarButtonStyle}" Margin="0"/>
+                                        </DockPanel>
+
+                                        <TextBlock Text="Farbtoleranz:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,2"/>
+                                        <DockPanel Margin="0,0,0,14">
+                                            <TextBlock Text="{Binding ElementName=SliderTolerance, Path=Value, StringFormat='{}{0:0} %'}" DockPanel.Dock="Right" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                            <Slider x:Name="SliderTolerance" Minimum="1" Maximum="60" Value="15" VerticalAlignment="Center"/>
+                                        </DockPanel>
+
+                                        <Button Content="🪄 Farbe entfernen (Transparent)" Click="OnExecuteColorRemovalClicked"
+                                                FontWeight="Bold" Background="{DynamicResource AccentBrush}" Foreground="White" Padding="10,6" Style="{DynamicResource ToolbarButtonStyle}"/>
+                                    </StackPanel>
+
+                                    <!-- Panel for AI Model -->
+                                    <StackPanel x:Name="PanelAiOptions" Visibility="Collapsed">
+                                        <TextBlock Text="Deep-Learning Segmentierung erkennt Personen, Tiere &amp; Objekte automatisch."
+                                                   FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                        <Border x:Name="BorderAiDownloadStatus" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,0,12">
+                                            <StackPanel>
+                                                <TextBlock x:Name="TextAiStatus" Text="Modell nicht installiert" FontWeight="SemiBold" FontSize="12"/>
+                                                <ProgressBar x:Name="ProgressAiDownload" Height="8" Margin="0,8,0,0" Visibility="Collapsed"/>
+                                                <Button x:Name="ButtonDownloadAiModel" Content="⬇️ KI-Modell herunterladen (4,7 MB)" Click="OnDownloadAiModelClicked"
+                                                        Margin="0,8,0,0" Padding="8,4" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Button x:Name="ButtonExecuteAiRemoval" Content="🧠 Mit KI freistellen" Click="OnExecuteAiRemovalClicked"
+                                                FontWeight="Bold" Background="#10B981" Foreground="White" Padding="10,6" Style="{DynamicResource ToolbarButtonStyle}"/>
+                                    </StackPanel>
+
+                                    <!-- Panel for Interactive AI Brush & Object Selection -->
+                                    <StackPanel x:Name="PanelInteractiveAiOptions" Visibility="Collapsed">
+                                        <TextBlock Text="🎯 Objekt mit dem Pinsel übermalen, um es gezielt durch KI freizustellen, oder Kanten manuell korrigieren."
+                                                   FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                        <!-- AI Model Status in Interactive Panel -->
+                                        <Border x:Name="BorderInteractiveAiStatus" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                            <StackPanel>
+                                                <TextBlock x:Name="TextInteractiveAiStatus" Text="Modell bereit" FontWeight="SemiBold" FontSize="11.5"/>
+                                                <Button x:Name="ButtonDownloadInteractiveAi" Content="⬇️ KI-Modell herunterladen" Click="OnDownloadAiModelClicked"
+                                                        Margin="0,6,0,0" Padding="8,4" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Mode Selector -->
+                                        <TextBlock Text="Pinsel-Funktion:" FontWeight="SemiBold" FontSize="11.5" Margin="0,0,0,4"/>
+                                        <StackPanel Margin="0,0,0,10">
+                                            <RadioButton x:Name="RadioBrushSelectObject" GroupName="InteractiveBrushMode" IsChecked="True"
+                                                         Content="🎯 Objekt markieren (KI schneidet aus)" Margin="0,0,0,4"
+                                                         Checked="OnInteractiveBrushModeChanged"/>
+                                            <RadioButton x:Name="RadioBrushRestore" GroupName="InteractiveBrushMode"
+                                                         Content="🟢 Kanten wiederherstellen (Original)" Margin="0,0,0,4"
+                                                         Checked="OnInteractiveBrushModeChanged"/>
+                                            <RadioButton x:Name="RadioBrushErase" GroupName="InteractiveBrushMode"
+                                                         Content="🔴 Kanten radieren (Transparent)" Margin="0,0,0,4"
+                                                         Checked="OnInteractiveBrushModeChanged"/>
+                                        </StackPanel>
+
+                                        <!-- Brush Size -->
+                                        <DockPanel Margin="0,0,0,2">
+                                            <TextBlock Text="Pinselgröße:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding ElementName=SliderInteractiveBrushSize, Path=Value, StringFormat='{}{0:0} px'}"
+                                                       DockPanel.Dock="Right" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                        </DockPanel>
+                                        <Slider x:Name="SliderInteractiveBrushSize" Minimum="6" Maximum="120" Value="32" Margin="0,0,0,12"/>
+
+                                        <!-- Object Cutout Action Buttons -->
+                                        <StackPanel x:Name="PanelCutoutButtons" Margin="0,0,0,4">
+                                            <Button x:Name="ButtonExecuteInteractiveAiCutout" Content="✂️ Markiertes Objekt freistellen"
+                                                    Click="OnExecuteInteractiveAiCutoutClicked" FontWeight="Bold"
+                                                    Background="#10B981" Foreground="White" Padding="10,8" Margin="0,0,0,6"
+                                                    Style="{DynamicResource ToolbarButtonStyle}"/>
+                                            <Button x:Name="ButtonResetInteractiveStroke" Content="🔄 Pinselauswahl zurücksetzen"
+                                                    Click="OnResetInteractiveStrokeClicked" Padding="8,4" FontSize="11"
+                                                    Style="{DynamicResource ToolbarButtonStyle}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </GroupBox>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 4. Bottom Action Bar -->
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,10">
+            <DockPanel LastChildFill="True">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="Abbrechen" Click="OnCancelClicked" Padding="14,6" Margin="0,0,10,0"
+                            Style="{DynamicResource ToolbarButtonStyle}"/>
+                    <Button Content="📋 In Zwischenablage" Click="OnCopyToClipboardClicked" Padding="14,6" Margin="0,0,10,0"
+                            Style="{DynamicResource ToolbarButtonStyle}" ToolTip="Kopiert das aktuelle bearbeitete Bild in die Windows-Zwischenablage"/>
+                    <Button Content="💾 Als neue Datei sichern" Click="OnSaveAsCopyClicked" Padding="14,6" Margin="0,0,10,0"
+                            Style="{DynamicResource ToolbarButtonStyle}"/>
+                    <Button Content="💾 Speichern (Ersetzen)" Click="OnSaveAndReplaceClicked" Padding="16,6" FontWeight="Bold"
+                            Background="{DynamicResource AccentBrush}" Foreground="White" Style="{DynamicResource ToolbarButtonStyle}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="TextStatusHint" Text="Wähle links ein Werkzeug aus, um dein Bild zu bearbeiten oder DSGVO-konform zu schwärzen."
+                               FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>
