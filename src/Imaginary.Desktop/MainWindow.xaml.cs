@@ -49,14 +49,17 @@ public partial class MainWindow : Window
         _viewModel.AttachTrayService(_trayService);
         DataContext = _viewModel;
 
-        if (App.StartupArgs.Length > 0)
+        Loaded += (s, e) =>
         {
-            _viewModel.AddFilePaths(App.StartupArgs);
-        }
+            if (App.StartupArgs.Length > 0)
+            {
+                _viewModel.HandleIncomingArguments(App.StartupArgs);
+            }
+        };
 
         App.FilesReceivedViaIpc += files =>
         {
-            _viewModel.AddFilePaths(files);
+            _viewModel.HandleIncomingArguments(files);
         };
     }
 
@@ -184,7 +187,7 @@ public partial class MainWindow : Window
     {
         if (sender is DataGrid dg && dg.SelectedItem is FileItemViewModel)
         {
-            _viewModel.OpenEditorCommand.Execute(null);
+            _viewModel.OpenDefaultActionForSelected();
             e.Handled = true;
         }
     }
@@ -194,8 +197,10 @@ public partial class MainWindow : Window
         if (e.OriginalSource is DependencyObject dep)
         {
             var row = FindVisualParent<DataGridRow>(dep);
-            if (row != null && !row.IsSelected)
+            if (row != null && sender is DataGrid dg && row.Item is FileItemViewModel item)
             {
+                dg.SelectedItem = item;
+                _viewModel.SelectedFile = item;
                 row.IsSelected = true;
                 row.Focus();
             }

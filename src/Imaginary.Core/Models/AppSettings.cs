@@ -42,4 +42,8 @@ public class AppSettings
 
     // Screenshot & Zwischenablage
     public bool AutoDetectScreenshots { get; set; } = true;
+
+    // Dateizuordnungen & Standard-App
+    public DefaultFileOpenAction DefaultFileOpenAction { get; set; } = DefaultFileOpenAction.AddToBatchList;
+    public bool FileAssociationsRegistered { get; set; } = false;
 }

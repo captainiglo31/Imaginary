@@ -35,6 +35,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IImageEditorService _editorService;
     private readonly IBackgroundRemovalService _bgRemovalService;
     private readonly IProfiDeveloperService _profiDeveloperService;
+    private readonly IFileAssociationService _fileAssociationService;
     private ITrayService? _trayService;
     public ITrayService? TrayService => _trayService;
 
@@ -186,6 +187,24 @@ public partial class MainViewModel : ObservableObject
 
     public string StartMenuIntegrationButtonText => IsStartMenuIntegrationEnabled ? "Deaktivieren" : "Aktivieren";
     public string StartMenuIntegrationStatusText => IsStartMenuIntegrationEnabled ? "Registriert" : "Nicht registriert";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FileAssociationButtonText))]
+    [NotifyPropertyChangedFor(nameof(FileAssociationStatusText))]
+    private bool _isFileAssociationEnabled;
+
+    public string FileAssociationButtonText => IsFileAssociationEnabled ? "Deaktivieren" : "Aktivieren";
+    public string FileAssociationStatusText => IsFileAssociationEnabled ? "Registriert (18 Bildformate)" : "Nicht registriert";
+
+    [ObservableProperty]
+    private int _selectedDefaultFileOpenActionIndex = 0;
+
+    partial void OnSelectedDefaultFileOpenActionIndexChanged(int value)
+    {
+        _settingsService.Settings.DefaultFileOpenAction = (DefaultFileOpenAction)value;
+        _settingsService.Save();
+        AppLogger.Info("Settings", $"Standard-Aktion beim Öffnen geändert auf: {(DefaultFileOpenAction)value}");
+    }
 
     // Hotfolder Settings & State
     [ObservableProperty]
@@ -362,7 +381,8 @@ public partial class MainViewModel : ObservableObject
         IClipboardMonitorService clipboardMonitor,
         IImageEditorService editorService,
         IBackgroundRemovalService bgRemovalService,
-        IProfiDeveloperService profiDeveloperService)
+        IProfiDeveloperService profiDeveloperService,
+        IFileAssociationService fileAssociationService)
     {
         _batchProcessor = batchProcessor ?? throw new ArgumentNullException(nameof(batchProcessor));
         _formatDetector = formatDetector ?? throw new ArgumentNullException(nameof(formatDetector));
@@ -379,6 +399,7 @@ public partial class MainViewModel : ObservableObject
         _editorService = editorService ?? throw new ArgumentNullException(nameof(editorService));
         _bgRemovalService = bgRemovalService ?? throw new ArgumentNullException(nameof(bgRemovalService));
         _profiDeveloperService = profiDeveloperService ?? throw new ArgumentNullException(nameof(profiDeveloperService));
+        _fileAssociationService = fileAssociationService ?? throw new ArgumentNullException(nameof(fileAssociationService));
 
         _clipboardMonitor.ScreenshotDetected += OnScreenshotDetected;
 
@@ -400,6 +421,8 @@ public partial class MainViewModel : ObservableObject
             _startMenuIntegration.Synchronize(true, Environment.ProcessPath);
             _isStartMenuIntegrationEnabled = _startMenuIntegration.IsRegistered();
         }
+        _isFileAssociationEnabled = _fileAssociationService.IsRegistered();
+        _selectedDefaultFileOpenActionIndex = (int)settings.DefaultFileOpenAction;
         _outputDirectory = settings.LastOutputDirectory ?? string.Empty;
 
         // Hotfolder settings
@@ -711,7 +734,7 @@ public partial class MainViewModel : ObservableObject
                 IsExplorerIntegrationEnabled = true;
                 _settingsService.Settings.ExplorerIntegrationEnabled = true;
                 _settingsService.Save();
-                MessageBox.Show("Windows Explorer Kontextmenü erfolgreich aktiviert!\nRechtsklick auf Bilder oder Ordner zeigt nun 'Mit Imaginary konvertieren...'.", "Explorer Integration", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Windows Explorer Kontextmenü erfolgreich aktiviert!\nRechtsklick auf Bilder zeigt nun '⚡ Mit Imaginary konvertieren', '✏️ Mit Imaginary bearbeiten' und '🎛️ Im Profi-Modus (RAW) entwickeln'.", "Explorer Integration", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
@@ -745,6 +768,58 @@ public partial class MainViewModel : ObservableObject
             {
                 MessageBox.Show("Konnte Verknüpfung im Startmenü nicht erstellen.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleFileAssociation()
+    {
+        if (IsFileAssociationEnabled)
+        {
+            _fileAssociationService.Unregister();
+            IsFileAssociationEnabled = false;
+            _settingsService.Settings.FileAssociationsRegistered = false;
+            _settingsService.Save();
+            MessageBox.Show("Dateizuordnungen und Windows Standard-App-Registrierung erfolgreich entfernt.", "Standard-App & Dateizuordnungen", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            var exePath = Environment.ProcessPath;
+            if (_fileAssociationService.Register(exePath))
+            {
+                IsFileAssociationEnabled = true;
+                _settingsService.Settings.FileAssociationsRegistered = true;
+                _settingsService.Save();
+                var res = MessageBox.Show(
+                    "Imaginary wurde erfolgreich für 18 Bildformate (inkl. Kamera-RAW) in Windows registriert!\n\n" +
+                    "Möchtest du jetzt die Windows-Einstellungen 'Standard-Apps' öffnen, um Imaginary als Standard-Bildanzeige festzulegen?",
+                    "Standard-App & Dateizuordnungen",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+
+                if (res == MessageBoxResult.Yes)
+                {
+                    _fileAssociationService.OpenWindowsDefaultAppsSettings();
+                }
+            }
+            else
+            {
+                MessageBox.Show("Konnte Windows Dateizuordnungen nicht registrieren.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void OpenWindowsDefaultAppsSettings()
+    {
+        try
+        {
+            _fileAssociationService.OpenWindowsDefaultAppsSettings();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Settings", "Fehler beim Öffnen der Windows-Einstellungen", ex);
+            MessageBox.Show($"Konnte Windows-Einstellungen nicht öffnen: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -1122,10 +1197,17 @@ public partial class MainViewModel : ObservableObject
 
             if (string.IsNullOrWhiteSpace(pathToOpen) || !File.Exists(pathToOpen)) return;
 
+            if (Application.Current?.MainWindow != null)
+            {
+                if (!Application.Current.MainWindow.IsVisible) Application.Current.MainWindow.Show();
+                if (Application.Current.MainWindow.WindowState == WindowState.Minimized) Application.Current.MainWindow.WindowState = WindowState.Normal;
+                Application.Current.MainWindow.Activate();
+            }
+
             AppLogger.Info("ProfiEditor", $"Öffne Profi-Modus für: {pathToOpen}");
             var profiWin = new ProfiEditorWindow(pathToOpen, _profiDeveloperService)
             {
-                Owner = Application.Current.MainWindow
+                Owner = Application.Current?.MainWindow
             };
 
             if (profiWin.ShowDialog() == true && profiWin.HasChanges)
@@ -1572,6 +1654,80 @@ public partial class MainViewModel : ObservableObject
         }
         StatusSummary = $"{Files.Count} Datei(en) geladen";
         AppLogger.Info("UI", $"{addedCount} Datei(en) hinzugefügt. Aktuelle Gesamtliste: {Files.Count} Datei(en).");
+    }
+
+    public void HandleIncomingArguments(string[] args)
+    {
+        if (args == null || args.Length == 0) return;
+
+        AppLogger.Info("CLI", $"Verarbeite eingehende Argumente ({args.Length}): {string.Join(", ", args)}");
+
+        // 1. Check for explicit verb --edit
+        var editIndex = Array.FindIndex(args, a => string.Equals(a, "--edit", StringComparison.OrdinalIgnoreCase));
+        if (editIndex >= 0 && editIndex + 1 < args.Length)
+        {
+            var targetPath = args[editIndex + 1].Trim('\"');
+            if (File.Exists(targetPath))
+            {
+                OpenEditorForFile(targetPath);
+                return;
+            }
+        }
+
+        // 2. Check for explicit verb --profi
+        var profiIndex = Array.FindIndex(args, a => string.Equals(a, "--profi", StringComparison.OrdinalIgnoreCase));
+        if (profiIndex >= 0 && profiIndex + 1 < args.Length)
+        {
+            var targetPath = args[profiIndex + 1].Trim('\"');
+            if (File.Exists(targetPath))
+            {
+                OpenProfiEditorForFile(targetPath);
+                return;
+            }
+        }
+
+        // 3. Filter out switches like --tray, --minimized, etc.
+        var fileList = args
+            .Select(a => a.Trim('\"'))
+            .Where(a => !a.StartsWith("--", StringComparison.Ordinal) && !a.StartsWith("__", StringComparison.Ordinal))
+            .ToArray();
+
+        if (fileList.Length == 0) return;
+
+        // 4. Single file passed without explicit switch (e.g. Explorer default app double-click / Open With)
+        if (fileList.Length == 1 && File.Exists(fileList[0]))
+        {
+            var singlePath = fileList[0];
+            var action = _settingsService.Settings.DefaultFileOpenAction;
+            if (action == DefaultFileOpenAction.OpenInProfiMode)
+            {
+                OpenProfiEditorForFile(singlePath);
+                return;
+            }
+            else if (action == DefaultFileOpenAction.OpenInImageEditor)
+            {
+                OpenEditorForFile(singlePath);
+                return;
+            }
+        }
+
+        // 5. Default action: Add to batch processing list
+        AddFilePaths(fileList);
+        SelectedTabIndex = 0;
+    }
+
+    public void OpenDefaultActionForSelected()
+    {
+        if (SelectedFile == null) return;
+        var action = _settingsService.Settings.DefaultFileOpenAction;
+        if (action == DefaultFileOpenAction.OpenInProfiMode)
+        {
+            OpenProfiEditorCommand.Execute(null);
+        }
+        else
+        {
+            OpenEditorCommand.Execute(null);
+        }
     }
 
     [RelayCommand]
