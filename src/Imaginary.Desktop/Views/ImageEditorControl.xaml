@@ -279,7 +279,7 @@
                         <RadioButton x:Name="ToolText" GroupName="ToolGroup" Content="🔤" ToolTip="Text einfügen"
                                      Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
                         <Separator Margin="4,4"/>
-                        <RadioButton x:Name="ToolBgRemove" GroupName="ToolGroup" Content="✨" ToolTip="Hintergrund entfernen (Magic Wand &amp; KI)"
+                        <RadioButton x:Name="ToolBgRemove" GroupName="ToolGroup" Content="✨" ToolTip="✨ Freistellen &amp; KI-Pinsel (Hintergrund entfernen &amp; Objekt mit Pinsel auswählen)"
                                      Checked="OnToolSelected" PreviewMouseLeftButtonDown="OnToolBgRemovePreviewMouseDown"
                                      Style="{StaticResource ToolPaletteButtonStyle}"/>
                     </StackPanel>
@@ -292,7 +292,8 @@
                               Background="Transparent" PreviewMouseWheel="OnCanvasMouseWheel">
                     <Grid x:Name="CanvasContainer" HorizontalAlignment="Center" VerticalAlignment="Center"
                           Background="{StaticResource CheckerboardBrush}"
-                          MouseDown="OnCanvasMouseDown" MouseMove="OnCanvasMouseMove" MouseUp="OnCanvasMouseUp">
+                          MouseDown="OnCanvasMouseDown" MouseMove="OnCanvasMouseMove" MouseUp="OnCanvasMouseUp"
+                          MouseEnter="OnCanvasMouseEnter" MouseLeave="OnCanvasMouseLeave">
                         <Grid.LayoutTransform>
                             <ScaleTransform x:Name="CanvasScaleTransform" ScaleX="1" ScaleY="1"/>
                         </Grid.LayoutTransform>
@@ -309,6 +310,10 @@
                                       StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"/>
                             <Rectangle x:Name="PreviewRect" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
                             <Ellipse x:Name="PreviewEllipse" StrokeThickness="2" StrokeDashArray="3 2" Visibility="Collapsed"/>
+
+                            <!-- Live interactive brush cursor circle -->
+                            <Ellipse x:Name="BrushCursorCircle" Stroke="#38BDF8" StrokeThickness="1.5" StrokeDashArray="3 2"
+                                     IsHitTestVisible="False" Visibility="Collapsed"/>
                         </Canvas>
 
                         <!-- Interactive AI Brush Stroke Canvas -->
@@ -496,6 +501,23 @@
                                             </StackPanel>
                                         </Border>
 
+                                        <!-- Dedicated Brush Activation Button -->
+                                        <Border x:Name="BorderBrushActivation" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6" Padding="8" Margin="0,0,0,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                            <StackPanel>
+                                                <Button x:Name="ButtonActivateAiBrush" Click="OnActivateAiBrushClicked"
+                                                        Padding="10,8" FontWeight="Bold" FontSize="12"
+                                                        Style="{DynamicResource ToolbarButtonStyle}"
+                                                        Cursor="Hand">
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                        <TextBlock x:Name="IconActivateAiBrush" Text="🖌️" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                        <TextBlock x:Name="TextActivateAiBrush" Text="KI-Freistellpinsel aktivieren" FontSize="12" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Button>
+                                                <TextBlock x:Name="TextBrushActiveIndicator" Text="Pinsel ist bereit zum Zeichnen im Bild"
+                                                           FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+
                                         <!-- Mode Selector -->
                                         <TextBlock Text="Pinsel-Funktion:" FontWeight="SemiBold" FontSize="11.5" Margin="0,0,0,4"/>
                                         <StackPanel Margin="0,0,0,10">
@@ -516,7 +538,8 @@
                                             <TextBlock Text="{Binding ElementName=SliderInteractiveBrushSize, Path=Value, StringFormat='{}{0:0} px'}"
                                                        DockPanel.Dock="Right" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right"/>
                                         </DockPanel>
-                                        <Slider x:Name="SliderInteractiveBrushSize" Minimum="6" Maximum="120" Value="32" Margin="0,0,0,12"/>
+                                        <Slider x:Name="SliderInteractiveBrushSize" Minimum="6" Maximum="120" Value="32" Margin="0,0,0,12"
+                                                ValueChanged="OnInteractiveBrushSizeChanged"/>
 
                                         <!-- Object Cutout Action Buttons -->
                                         <StackPanel x:Name="PanelCutoutButtons" Margin="0,0,0,4">

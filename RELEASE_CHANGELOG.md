@@ -1,3 +1,39 @@
+## 🚀 Was ist neu in Version 2.4.1 (Performance-Boost bei großen Bildern, KI-Pinsel Usability & Skalierbare Schritt-Badges):
+
+### ⚡ Massiver Performance-Boost im Schnell-Editor
+- **Beseitigung von Lags und Freezes bei hochauflösenden Bildern (4K, 12MP+):**
+  - **Direktes Speicher-Blitting (`WriteableBitmap`):** SkiaSharp überträgt Pixeldaten nun direkt per `WritePixels` in unter **1 ms** in den DirectX-Grafikspeicher – über 500-mal schneller als die bisherige CPU-PNG-Kodierung.
+  - **Gedrosselte Bildschirmaktualisierung (`DispatcherPriority.Render`):** Render-Aufrufe bei schnellen Pinselstrichen werden an die Monitor-Bildwiederholfrequenz gebunden; Mikrobewegungen unter 2 px werden gefiltert.
+  - **Intelligente Undo-Speicherverwaltung:** Platzieren, Verschieben oder Löschen von Annotationen (Pfeile, Formen, Text, Badges) dupliziert keine 50MB+ Skia-Bitmaps mehr. Begrenzung auf 20 Undo-Schritte mit automatischer Speicherfreigabe (`Dispose()`) verhindert Out-Of-Memory-Abstürze.
+  - **`unsafe`-Pointer-Optimierung:** Schnelle Pointerschleife für Hintergrundentfernung per Farbauswahl.
+
+---
+
+### 🎯 Intuitive KI-Pinsel & Freistell-Bedienung
+- **Automatische Werkzeug-Aktivierung:**
+  - Beim Wechseln auf *„🎯 KI-Pinsel & Objektauswahl“* oder beim Anklicken der Pinselfunktionen (*Objekt markieren*, *Kanten wiederherstellen*, *Kanten radieren*) wird der KI-Pinsel automatisch scharf geschaltet.
+  - Zuvor aktive Werkzeuge (wie DSGVO-Verpixeln oder Schwärzen) werden sofort sauber deaktiviert – kein versehentliches Verpixeln mehr!
+- **Prominenter Aktivierungs-Button in der Seitenleiste:**
+  - Neuer Status-Button: Zeigt unübersehbar an, ob der Pinsel aktiv ist (`✓ KI-Freistellpinsel ist aktiv` in Smaragdgrün) oder reaktiviert werden kann (`🖌️ KI-Freistellpinsel aktivieren`).
+- **Live-Pinselkreis auf der Leinwand:**
+  - Ein dynamischer Vorschaukreis folgt dem Mauszeiger auf der Leinwand und visualisiert exakt die gewählte Pinselgröße und Farbe (Cyan = Markieren, Grün = Wiederherstellen, Rot = Radieren).
+
+---
+
+### ❶ Dynamisch skalierbare Schritt-Badges
+- **Stufenlose Größenanpassung:** Die Schritt-Badges (1, 2, 3...) skalieren nun proportional mit dem Regler *Stärke / Pinsel*.
+- **Proportionale Schriftgröße:** Die Badge-Ziffer wächst mit und bleibt immer gestochen scharf und exakt zentriert.
+- **Echtzeit-Anpassung:** Im Verschieben-Modus (Pan) kann jedes bereits platzierte Badge angeklickt und über den Regler nachträglich in seiner Größe angepasst werden.
+
+---
+
+### 🎨 Theme- & Kontrast-Politur
+- **Perfekte Lesbarkeit im Hellen Design:** Hover-Tooltips und 1-Klick-Look-Vorschauboxen bieten optimalen Kontrast.
+- **Moderne Vektor-Icons:** Saubere Sonne-/Mond-Vektor-Icons für den Theme-Umschalter sowie korrekte Symbole im gesamten Studio.
+- **Flüssige Startanimation:** Sanfte Ladeübergänge beim Starten der Anwendung.
+
+---
+
 ## 🚀 Was ist neu in Version 2.4.0 (UI-Architektur 2.0: Workspace-Trennung, Einzelbild-Studio & Interface-Redesign):
 
 ### 🧭 UI-Architektur 2.0: Klares 4-Workspace-Navigationskonzept
