@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource WindowBackgroundBrush}"
              Foreground="{DynamicResource TextPrimaryBrush}"
-             FontFamily="Segoe UI"
+             FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
              Focusable="True"
              PreviewKeyDown="OnWindowPreviewKeyDown">
 
@@ -29,11 +29,11 @@
             </DrawingBrush.Drawing>
         </DrawingBrush>
 
-        <!-- Style for preset pill buttons -->
+        <!-- Style for preset pill buttons (Dynamic Theme Brushes for Perfect Readability) -->
         <Style x:Key="PresetPillButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#1E293B"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="Background" Value="{DynamicResource SecondaryButtonBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Margin" Value="0,0,6,6"/>
@@ -47,12 +47,14 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="12" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="PillBorder" Property="Background" Value="#2A3B53"/>
+                                <Setter TargetName="PillBorder" Property="Background" Value="{DynamicResource SecondaryButtonHoverBrush}"/>
                                 <Setter TargetName="PillBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="PillBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
@@ -81,7 +83,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ResBorder" Property="Background" Value="#223049"/>
+                                <Setter TargetName="ResBorder" Property="Background" Value="{DynamicResource SecondaryButtonHoverBrush}"/>
                                 <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -114,11 +116,11 @@
                 <!-- Right Controls: Zoom & Viewport -->
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                     <!-- Before/After & Split controls -->
-                    <ToggleButton x:Name="ToggleBeforeAfter" Content="👁️ Vorher (Taste \)"
+                    <ToggleButton x:Name="ToggleBeforeAfter" Content="👁 Vorher (Taste \)"
                                   Click="OnToggleBeforeAfterClicked" Style="{DynamicResource ToolbarToggleButtonStyle}"
                                   Padding="10,5" Margin="0,0,6,0"
                                   ToolTip="Zeigt das unbehandelte Originalbild zum Direktvergleich"/>
-                    <ToggleButton x:Name="ToggleSplitView" Content="🪟 Split-Vergleich"
+                    <ToggleButton x:Name="ToggleSplitView" Content="◫ Split-Vergleich"
                                   Click="OnToggleSplitViewClicked" Style="{DynamicResource ToolbarToggleButtonStyle}"
                                   Padding="10,5" Margin="0,0,12,0"
                                   ToolTip="Teilt das Bild für den Vorher/Nachher-Vergleich mit interaktivem Schieberegler"/>

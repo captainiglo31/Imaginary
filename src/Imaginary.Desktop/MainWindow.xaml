@@ -14,7 +14,8 @@
         Icon="pack://application:,,,/app.ico"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}"
-        FontFamily="Segoe UI">
+        FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
+        Loaded="OnWindowLoaded">
 
     <Window.InputBindings>
         <KeyBinding Gesture="Ctrl+V" Command="{Binding PasteFromClipboardCommand}"/>
@@ -78,7 +79,10 @@
         </Style>
     </Window.Resources>
 
-    <Grid>
+    <Grid x:Name="RootWindowGrid" Opacity="0">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="WindowTranslateTransform" Y="14"/>
+        </Grid.RenderTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -103,11 +107,24 @@
                                 Padding="12,6" Margin="0,0,10,0" BorderThickness="0" Cursor="Hand"
                                 ToolTip="Klicken, um das neue Update herunterzuladen und zu installieren"/>
 
-                        <!-- 1-Click Theme Toggle Button (Dark / Light) -->
-                        <Button Content="{Binding ThemeToggleIcon}" Command="{Binding ToggleThemeCommand}"
-                                ToolTip="{Binding ThemeToggleToolTip}" FontSize="13"
-                                Padding="10,5" Margin="0,0,10,0"
-                                Style="{DynamicResource ToolbarButtonStyle}" Cursor="Hand"/>
+                        <!-- 1-Click Theme Toggle Button (Dark / Light) with Crisp Vector Icons -->
+                        <Button Command="{Binding ToggleThemeCommand}"
+                                ToolTip="{Binding ThemeToggleToolTip}"
+                                Padding="10,6" Margin="0,0,10,0"
+                                Style="{DynamicResource ToolbarButtonStyle}" Cursor="Hand">
+                            <Grid Width="16" Height="16">
+                                <!-- Clean Sun Icon (Active when Dark, switches to Light) -->
+                                <Path Width="14" Height="14" Stretch="Uniform"
+                                      Fill="{DynamicResource SecondaryButtonForegroundBrush}"
+                                      Visibility="{Binding IsDarkMode, Converter={StaticResource BoolToVis}}"
+                                      Data="M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5S14.76,7,12,7z M12,15c-1.65,0-3-1.35-3-3s1.35-3,3-3s3,1.35,3,3 S13.65,15,12,15z M11,1h2v3h-2V1z M11,20h2v3h-2V20z M3.51,4.93l1.41-1.41l2.12,2.12L5.64,7.05L3.51,4.93z M16.95,18.36l1.41-1.41 l2.12,2.12l-1.41,1.41L16.95,18.36z M1,11h3v2H1V11z M20,11h3v2h-3V11z M5.64,16.95l1.41,1.41l-2.12,2.12l-1.41-1.41L5.64,16.95z M18.36,5.64l1.41-1.41l2.12,2.12l-1.41,1.41L18.36,5.64z"/>
+                                <!-- Clean Crescent Moon Icon (Active when Light, switches to Dark) -->
+                                <Path Width="13" Height="13" Stretch="Uniform"
+                                      Fill="{DynamicResource SecondaryButtonForegroundBrush}"
+                                      Visibility="{Binding IsDarkMode, Converter={StaticResource InverseBoolToVis}}"
+                                      Data="M12.3,2a10,10,0,0,0-.19,14a10,10,0,0,0,11.58,2.37a1,1,0,0,0,.4-1.44a1,1,0,0,0-1.14-.46A8,8,0,0,1,12.55,6.07a1,1,0,0,0-.46-1.14A1,1,0,0,0,12.3,2z"/>
+                            </Grid>
+                        </Button>
 
                         <!-- Protokoll / Log Viewer Button -->
                         <Button Content="📋 Protokoll" Command="{Binding OpenLogViewerCommand}"
@@ -165,8 +182,9 @@
             </Grid>
         </Border>
 
-        <!-- Main Content Area with 3 Tabs -->
-        <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+        <!-- Main Content Area with 4 Workspaces -->
+        <TabControl Grid.Row="1" x:Name="MainTabControl" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                    SelectionChanged="OnMainTabControlSelectionChanged"
                     BorderThickness="0" Background="Transparent" Margin="16,12,16,12">
             <TabControl.ItemContainerStyle>
                 <Style TargetType="TabItem">
@@ -458,7 +476,7 @@
                             <Button Content="🗑️ Entfernen" Command="{Binding RemoveSelectedCommand}"
                                     IsEnabled="{Binding CanOpenEditor}"
                                     Style="{DynamicResource ToolbarButtonStyle}"/>
-                            <Button Content="🧹 Leeren" Command="{Binding ClearFilesCommand}"
+                            <Button Content="🗑️ Alle leeren" Command="{Binding ClearFilesCommand}"
                                     IsEnabled="{Binding HasFiles}"
                                     Style="{DynamicResource ToolbarButtonStyle}" Margin="0"/>
                         </StackPanel>
@@ -1246,10 +1264,10 @@
 
                 <TextBlock Grid.Column="0" Text="{Binding StatusSummary}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
 
-                <!-- Hotfolder Status Badge & Attribution -->
+                <!-- Hotfolder Status Badge -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0">
                     <!-- Live Hotfolder Badge -->
-                    <Border Background="#10B981" CornerRadius="4" Padding="8,3" Margin="0,0,12,0"
+                    <Border Background="#10B981" CornerRadius="4" Padding="8,3"
                             Visibility="{Binding IsHotfolderActive, Converter={StaticResource BoolToVis}}"
                             Cursor="Hand" ToolTip="Hotfolder ist aktiv. Klicken zum Öffnen des Hotfolder-Tabs.">
                         <Border.InputBindings>
@@ -1260,8 +1278,6 @@
                             <TextBlock Text="Hotfolder aktiv" FontSize="11" FontWeight="Bold" Foreground="White"/>
                         </StackPanel>
                     </Border>
-
-                    <TextBlock Text="Entwickelt von Pino Wackers" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0"/>
                 </StackPanel>
 
                 <ProgressBar Grid.Column="2" Value="{Binding ProgressValue}" Minimum="0" Maximum="100"

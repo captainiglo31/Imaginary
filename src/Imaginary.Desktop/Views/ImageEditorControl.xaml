@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="{DynamicResource WindowBackgroundBrush}"
              Foreground="{DynamicResource TextPrimaryBrush}"
-             FontFamily="Segoe UI"
+             FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"
              Focusable="True"
              PreviewKeyDown="OnWindowPreviewKeyDown"
              PreviewKeyUp="OnWindowPreviewKeyUp">
@@ -134,7 +134,7 @@
 
                     <Button x:Name="ButtonToggleLayers" Content="📑 Ebenen" Click="OnToggleLayersClicked"
                             Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0" ToolTip="Ebenen-Panel für platzierte Elemente ein-/ausblenden"/>
-                    <Button x:Name="ButtonToggleBgRemove" Content="🪄 Freistellen" Click="OnToggleBgRemoveClicked"
+                    <Button x:Name="ButtonToggleBgRemove" Content="✨ Freistellen" Click="OnToggleBgRemoveClicked"
                             Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0" ToolTip="Hintergrund entfernen &amp; Freistell-Panel ein-/ausblenden"/>
 
                     <Button x:Name="ButtonSwitchToProfiMode" Content="🎛️ In Profi-Modus wechseln" Click="OnSwitchToProfiModeClicked"
@@ -279,7 +279,7 @@
                         <RadioButton x:Name="ToolText" GroupName="ToolGroup" Content="🔤" ToolTip="Text einfügen"
                                      Checked="OnToolSelected" Style="{StaticResource ToolPaletteButtonStyle}"/>
                         <Separator Margin="4,4"/>
-                        <RadioButton x:Name="ToolBgRemove" GroupName="ToolGroup" Content="🪄" ToolTip="Hintergrund entfernen (Magic Wand &amp; KI)"
+                        <RadioButton x:Name="ToolBgRemove" GroupName="ToolGroup" Content="✨" ToolTip="Hintergrund entfernen (Magic Wand &amp; KI)"
                                      Checked="OnToolSelected" PreviewMouseLeftButtonDown="OnToolBgRemovePreviewMouseDown"
                                      Style="{StaticResource ToolPaletteButtonStyle}"/>
                     </StackPanel>
@@ -338,7 +338,7 @@
                             <RadioButton x:Name="TabSideLayers" Grid.Column="0" Content="📑 Ebenen"
                                          GroupName="SidePanelTabs" Style="{StaticResource SideTabRadioStyle}"
                                          IsChecked="True" Checked="OnSideTabChanged" Margin="0,0,3,0"/>
-                            <RadioButton x:Name="TabSideBgRemove" Grid.Column="1" Content="🪄 Freistellen"
+                            <RadioButton x:Name="TabSideBgRemove" Grid.Column="1" Content="✨ Freistellen"
                                          GroupName="SidePanelTabs" Style="{StaticResource SideTabRadioStyle}"
                                          Checked="OnSideTabChanged" Margin="3,0,0,0"/>
                             <Button Grid.Column="2" Content="✕" Click="OnCloseSidePanelClicked"
@@ -478,7 +478,7 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <Button x:Name="ButtonExecuteAiRemoval" Content="🧠 Mit KI freistellen" Click="OnExecuteAiRemovalClicked"
+                                        <Button x:Name="ButtonExecuteAiRemoval" Content="✨ Mit KI freistellen" Click="OnExecuteAiRemovalClicked"
                                                 FontWeight="Bold" Background="#10B981" Foreground="White" Padding="10,6" Style="{DynamicResource ToolbarButtonStyle}"/>
                                     </StackPanel>
 

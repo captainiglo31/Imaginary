@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -5,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Imaginary.Core;
 using Imaginary.Core.Models;
 using Imaginary.Core.Services;
@@ -269,6 +271,33 @@ public partial class MainWindow : Window
                 row.IsSelected = true;
                 row.Focus();
             }
+        }
+    }
+
+    private void OnWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(320))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var slideIn = new DoubleAnimation(14.0, 0.0, TimeSpan.FromMilliseconds(350))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        RootWindowGrid.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+        WindowTranslateTransform.BeginAnimation(TranslateTransform.YProperty, slideIn);
+    }
+
+    private void OnMainTabControlSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.Source is TabControl tc && ReferenceEquals(tc, MainTabControl))
+        {
+            var anim = new DoubleAnimation(0.35, 1.0, TimeSpan.FromMilliseconds(220))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            MainTabControl.BeginAnimation(UIElement.OpacityProperty, anim);
         }
     }
 }
