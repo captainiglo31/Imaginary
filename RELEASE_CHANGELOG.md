@@ -1,3 +1,37 @@
+## 🚀 Was ist neu in Version 2.4.0 (UI-Architektur 2.0: Workspace-Trennung, Einzelbild-Studio & Interface-Redesign):
+
+### 🧭 UI-Architektur 2.0: Klares 4-Workspace-Navigationskonzept
+- **Drastische Entrümpelung (> 50% weniger gleichzeitig sichtbare Schaltflächen):**
+  - Durch das kontinuierliche Wachstum der Anwendung wurden Toolbar, Header und Footer von redundanten und überladenen Buttons befreit und in vier fokussierte Arbeitsbereiche gegliedert:
+  1. **`⚡ Stapelverarbeitung`**: Reiner Fokus auf Massen-Konvertierung, Komprimierung, Skalierung und Queue-Management. Die Toolbar ist nun sauber in drei logische Gruppen unterteilt: *Import* (`➕ Dateien`, `📁 Ordner`, `📋 Einfügen`, `📸 Screenshot`), *Auswahl* (`🎨 Im Studio bearbeiten`, `🔍 Vorher / Nachher`) und *Warteschlange* (`🗑️ Entfernen`, `🧹 Leeren`).
+  2. **`🎨 Einzelbild-Studio`**: Vollwertiger, nativer Kreativ-Arbeitsbereich direkt im Hauptfenster – ganz ohne störende Warteschlangen-Listen oder Konvertierungs-Einstellungen.
+  3. **`📁 Hotfolder & Automation`**: Dedizierter Bereich für Hintergrundüberwachung, Datei-Filter und automatische Ausgaberegeln.
+  4. **`⚙️ Einstellungen`**: Zentrale Anlaufstelle für Qualitätsvorgaben, Windows-Dateizuordnungen (Standard-App) und Leistungsoptionen.
+
+---
+
+### 🎨 Integriertes Einzelbild-Studio mit Live-Submodus-Umschaltung
+- **Zwei Studios in einem Canvas:**
+  - Nahtloses Umschalten in der Kopfzeile zwischen:
+    - **`✏️ Schnell-Editor & Paint`**: Freihandzeichnen, Pfeile, Formen, Text-Tools, DSGVO-konforme Verpixelung/Weichzeichnung und KI-Hintergrundentfernung (u2netp).
+    - **`🎛️ RAW & Color-Grading`**: 60-FPS-Entwicklung per Hardware-beschleunigter SkiaSharp LUT-Pipeline, RGB-Histogramm mit Clipping-Indikatoren, Tonwertkurven, Presets und Split-Toning.
+- **Nahtlose Stapelverarbeitungs-Brücke:**
+  - Ein Klick auf ein Bild in der Batch-Warteschlange öffnet es sofort im Studio.
+  - Über die neue Schaltfläche **`✓ In Stapelverarbeitung übernehmen`** wird das bearbeitete Bild mit nur einem Klick direkt in die Batch-Liste zurückgespielt.
+- **Multi-Monitor & Pop-Out (`🗗 Ausdocken`):**
+  - Mit einem Klick auf *„Ausdocken“* kann das aktuelle Studio jederzeit in ein freies, separates Fenster ausgelagert werden.
+- **Einladender Leerer Zustand (Empty State):**
+  - Übersichtliche Drag-and-Drop-Zone, Dateiauswahldialog, 1-Klick-Import aus der Windows-Zwischenablage / Screenshot oder Schnellauswahl direkt aus der vorhandenen Batch-Warteschlange.
+
+---
+
+### 🌙 1-Klick Theme-Toggle & aufgeräumte Kopf- und Fußzeilen
+- **Sofortiger Theme-Wechsel:** Ein Klick auf das neue `[🌙 / ☀️]`-Symbol in der Titelleiste schaltet nahtlos zwischen Dark- und Light-Mode um.
+- **Kompakter Header & Footer:** Redundante Schaltflächen („Updates suchen“, „Protokoll“) wurden aus dem Hauptarbeitsbereich entfernt und als dezente Schnellzugriffe in die Status- und Titelleiste integriert.
+- **Intelligentes Windows-Routing:** Beim Öffnen von Bildern über den Windows-Explorer, „Öffnen mit...“ oder Dateiverknüpfungen startet Imaginary nun direkt im sauberen Einzelbild-Studio, ohne den Stapelverarbeitungs-Workflow zu überladen.
+
+---
+
 ## 🚀 Was ist neu in Version 2.3.0 (Profi-Modus RAW-Entwickler, Windows-Integration & Feinschliff):
 
 ### 🎛️ Neuer Profi-Modus (Kamera-RAW-Entwickler & Color-Grading Studio)
