@@ -276,17 +276,21 @@ public partial class MainWindow : Window
 
     private void OnWindowLoaded(object sender, RoutedEventArgs e)
     {
-        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(320))
+        try
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        var slideIn = new DoubleAnimation(14.0, 0.0, TimeSpan.FromMilliseconds(350))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
+            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(250))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            var slideIn = new DoubleAnimation(14.0, 0.0, TimeSpan.FromMilliseconds(280))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
 
-        RootWindowGrid.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-        WindowTranslateTransform.BeginAnimation(TranslateTransform.YProperty, slideIn);
+            RootWindowGrid?.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            WindowTranslateTransform?.BeginAnimation(TranslateTransform.YProperty, slideIn);
+        }
+        catch { }
     }
 
     private void OnMainTabControlSelectionChanged(object sender, SelectionChangedEventArgs e)

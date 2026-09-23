@@ -79,9 +79,9 @@
         </Style>
     </Window.Resources>
 
-    <Grid x:Name="RootWindowGrid" Opacity="0">
+    <Grid x:Name="RootWindowGrid">
         <Grid.RenderTransform>
-            <TranslateTransform x:Name="WindowTranslateTransform" Y="14"/>
+            <TranslateTransform x:Name="WindowTranslateTransform" Y="0"/>
         </Grid.RenderTransform>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
