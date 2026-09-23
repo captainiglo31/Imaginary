@@ -177,4 +177,49 @@ public class ImageEditorServiceTests
         var edgePixel = result.GetPixel(30, 50);
         edgePixel.Should().NotBe(SKColors.White);
     }
+
+    [Fact]
+    public void RemoveBackgroundByColor_MatchingKeyColor_ShouldBecomeTransparent()
+    {
+        using var source = CreateTestBitmap(100, 100, SKColors.Green);
+        // Paint red square in middle
+        using (var canvas = new SKCanvas(source))
+        using (var paint = new SKPaint { Color = SKColors.Red })
+        {
+            canvas.DrawRect(30, 30, 40, 40, paint);
+        }
+
+        using var result = _service.RemoveBackgroundByColor(source, SKColors.Green, tolerance: 0.15f);
+
+        result.Width.Should().Be(100);
+        result.Height.Should().Be(100);
+
+        // Corner pixel should now be transparent
+        var corner = result.GetPixel(5, 5);
+        corner.Alpha.Should().Be(0);
+
+        // Middle red pixel should be preserved and opaque
+        var center = result.GetPixel(50, 50);
+        center.Alpha.Should().Be(255);
+        center.Red.Should().Be(255);
+    }
+
+    [Theory]
+    [InlineData(1f, 12f)]
+    [InlineData(4f, 18f)]
+    [InlineData(16f, 42f)]
+    [InlineData(64f, 138f)]
+    public void DrawStepBadge_DifferentRadii_ShouldRenderProportionally(float strokeWidth, float expectedRadius)
+    {
+        float calculatedRadius = Math.Max(12f, 10f + strokeWidth * 2f);
+        calculatedRadius.Should().Be(expectedRadius);
+
+        using var source = CreateTestBitmap(300, 300, SKColors.White);
+        using var result = _service.DrawStepBadge(source, new SKPoint(150, 150), number: 5, SKColors.Blue, radius: calculatedRadius);
+
+        result.Width.Should().Be(300);
+        // Point within badge radius should have badge color and not be background white
+        int testX = 150 + (int)(calculatedRadius * 0.6f);
+        result.GetPixel(testX, 150).Should().NotBe(SKColors.White);
+    }
 }

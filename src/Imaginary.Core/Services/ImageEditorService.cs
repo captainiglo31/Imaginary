@@ -205,28 +205,41 @@ public class ImageEditorService : IImageEditorService
 
         float maxDistance = MathF.Sqrt(255f * 255f * 3f);
         float threshold = tolerance * maxDistance;
+        float softThreshold = threshold * 1.25f;
+        float softRange = threshold * 0.25f;
 
-        for (int y = 0; y < result.Height; y++)
+        unsafe
         {
-            for (int x = 0; x < result.Width; x++)
-            {
-                var pixel = result.GetPixel(x, y);
+            byte* ptr = (byte*)result.GetPixels().ToPointer();
+            int totalPixels = result.Width * result.Height;
+            int keyR = keyColor.Red;
+            int keyG = keyColor.Green;
+            int keyB = keyColor.Blue;
 
-                float dr = pixel.Red - keyColor.Red;
-                float dg = pixel.Green - keyColor.Green;
-                float db = pixel.Blue - keyColor.Blue;
+            for (int i = 0; i < totalPixels; i++, ptr += 4)
+            {
+                byte r = ptr[0];
+                byte g = ptr[1];
+                byte b = ptr[2];
+                byte a = ptr[3];
+
+                int dr = r - keyR;
+                int dg = g - keyG;
+                int db = b - keyB;
                 float distance = MathF.Sqrt(dr * dr + dg * dg + db * db);
 
                 if (distance <= threshold)
                 {
-                    result.SetPixel(x, y, SKColors.Transparent);
+                    ptr[0] = 0;
+                    ptr[1] = 0;
+                    ptr[2] = 0;
+                    ptr[3] = 0;
                 }
-                else if (distance < threshold * 1.25f)
+                else if (distance < softThreshold && softRange > 0.001f)
                 {
-                    // Soft edge blend
-                    float alphaFactor = (distance - threshold) / (threshold * 0.25f);
-                    byte newAlpha = (byte)(pixel.Alpha * alphaFactor);
-                    result.SetPixel(x, y, new SKColor(pixel.Red, pixel.Green, pixel.Blue, newAlpha));
+                    float factor = (distance - threshold) / softRange;
+                    byte newAlpha = (byte)Math.Clamp((int)(a * factor), 0, 255);
+                    ptr[3] = newAlpha;
                 }
             }
         }

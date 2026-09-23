@@ -53,18 +53,23 @@ public partial class ImageEditorControl : UserControl
 
     private class EditorHistoryState : IDisposable
     {
-        public SKBitmap BaseBitmap { get; set; } = null!;
+        public SKBitmap? BaseBitmap { get; set; }
         public List<EditorAnnotation> Annotations { get; set; } = new();
         public int StepBadgeCounter { get; set; }
 
         public void Dispose()
         {
             BaseBitmap?.Dispose();
+            BaseBitmap = null;
         }
     }
 
     private readonly Stack<EditorHistoryState> _undoStack = new();
     private readonly Stack<EditorHistoryState> _redoStack = new();
+    private const int MaxUndoHistory = 20;
+
+    private WriteableBitmap? _displayWriteableBitmap;
+    private bool _isDisplayUpdatePending;
 
     private EditorTool _currentTool = EditorTool.Pan;
     private SKColor _selectedColor = SKColors.Red;
@@ -130,17 +135,29 @@ public partial class ImageEditorControl : UserControl
     private void UpdateImageDisplay()
     {
         if (_currentBitmap == null) return;
-        TextDimensions.Text = $"{_currentBitmap.Width} × {_currentBitmap.Height} px";
+        int width = _currentBitmap.Width;
+        int height = _currentBitmap.Height;
+
+        TextDimensions.Text = $"{width} × {height} px";
 
         if (DrawingOverlayCanvas != null)
         {
-            DrawingOverlayCanvas.Width = _currentBitmap.Width;
-            DrawingOverlayCanvas.Height = _currentBitmap.Height;
+            DrawingOverlayCanvas.Width = width;
+            DrawingOverlayCanvas.Height = height;
         }
 
-        using var displayBitmap = _currentBitmap.Copy();
+        if (InteractiveStrokeCanvas != null)
+        {
+            InteractiveStrokeCanvas.Width = width;
+            InteractiveStrokeCanvas.Height = height;
+        }
+
+        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using var displayBitmap = new SKBitmap(info);
         using (var canvas = new SKCanvas(displayBitmap))
         {
+            canvas.DrawBitmap(_currentBitmap, 0, 0);
+
             foreach (var ann in _annotations)
             {
                 if (ann.IsVisible)
@@ -169,22 +186,41 @@ public partial class ImageEditorControl : UserControl
                 DrawHandle(canvas, bounds.Left - 4, bounds.Bottom + 4, handlePaint, handleBorder);
                 DrawHandle(canvas, bounds.Right + 4, bounds.Bottom + 4, handlePaint, handleBorder);
             }
+
+            canvas.Flush();
         }
 
-        using var image = SKImage.FromBitmap(displayBitmap);
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        using var stream = new MemoryStream();
-        data.SaveTo(stream);
-        stream.Position = 0;
+        if (_displayWriteableBitmap == null ||
+            _displayWriteableBitmap.PixelWidth != width ||
+            _displayWriteableBitmap.PixelHeight != height)
+        {
+            _displayWriteableBitmap = new WriteableBitmap(
+                width,
+                height,
+                96,
+                96,
+                PixelFormats.Pbgra32,
+                null);
+            BaseImage.Source = _displayWriteableBitmap;
+        }
 
-        var bitmapImage = new BitmapImage();
-        bitmapImage.BeginInit();
-        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-        bitmapImage.StreamSource = stream;
-        bitmapImage.EndInit();
-        bitmapImage.Freeze();
+        _displayWriteableBitmap.WritePixels(
+            new Int32Rect(0, 0, width, height),
+            displayBitmap.GetPixels(),
+            (int)displayBitmap.ByteCount,
+            displayBitmap.RowBytes);
+    }
 
-        BaseImage.Source = bitmapImage;
+    private void RequestDisplayUpdate()
+    {
+        if (_isDisplayUpdatePending) return;
+        _isDisplayUpdatePending = true;
+
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Render, () =>
+        {
+            _isDisplayUpdatePending = false;
+            UpdateImageDisplay();
+        });
     }
 
     private static void DrawHandle(SKCanvas canvas, float x, float y, SKPaint fill, SKPaint border)
@@ -204,18 +240,35 @@ public partial class ImageEditorControl : UserControl
         return finalBitmap;
     }
 
-    private void PushUndoState()
+    private void PushUndoState(bool bitmapModified = false)
     {
         _undoStack.Push(new EditorHistoryState
         {
-            BaseBitmap = _currentBitmap.Copy(),
+            BaseBitmap = bitmapModified ? _currentBitmap.Copy() : null,
             Annotations = _annotations.Select(a => a.Clone()).ToList(),
             StepBadgeCounter = _stepBadgeCounter
         });
+
+        if (_undoStack.Count > MaxUndoHistory)
+        {
+            var states = _undoStack.Reverse().ToList();
+            while (states.Count > MaxUndoHistory)
+            {
+                var oldest = states[0];
+                states.RemoveAt(0);
+                oldest.Dispose();
+            }
+            _undoStack.Clear();
+            foreach (var s in states)
+            {
+                _undoStack.Push(s);
+            }
+        }
+
         while (_redoStack.Count > 0)
         {
             var r = _redoStack.Pop();
-            r.BaseBitmap.Dispose();
+            r.Dispose();
         }
         HasChanges = true;
         UpdateUndoRedoButtons();
@@ -231,16 +284,20 @@ public partial class ImageEditorControl : UserControl
     {
         if (_undoStack.Count == 0) return;
 
+        var state = _undoStack.Pop();
+
         _redoStack.Push(new EditorHistoryState
         {
-            BaseBitmap = _currentBitmap.Copy(),
+            BaseBitmap = state.BaseBitmap != null ? _currentBitmap.Copy() : null,
             Annotations = _annotations.Select(a => a.Clone()).ToList(),
             StepBadgeCounter = _stepBadgeCounter
         });
 
-        var state = _undoStack.Pop();
-        _currentBitmap.Dispose();
-        _currentBitmap = state.BaseBitmap;
+        if (state.BaseBitmap != null)
+        {
+            _currentBitmap.Dispose();
+            _currentBitmap = state.BaseBitmap;
+        }
         _annotations = state.Annotations;
         _stepBadgeCounter = state.StepBadgeCounter;
         if (TextStepBadgeNumber != null) TextStepBadgeNumber.Text = _stepBadgeCounter.ToString();
@@ -258,16 +315,20 @@ public partial class ImageEditorControl : UserControl
     {
         if (_redoStack.Count == 0) return;
 
+        var state = _redoStack.Pop();
+
         _undoStack.Push(new EditorHistoryState
         {
-            BaseBitmap = _currentBitmap.Copy(),
+            BaseBitmap = state.BaseBitmap != null ? _currentBitmap.Copy() : null,
             Annotations = _annotations.Select(a => a.Clone()).ToList(),
             StepBadgeCounter = _stepBadgeCounter
         });
 
-        var state = _redoStack.Pop();
-        _currentBitmap.Dispose();
-        _currentBitmap = state.BaseBitmap;
+        if (state.BaseBitmap != null)
+        {
+            _currentBitmap.Dispose();
+            _currentBitmap = state.BaseBitmap;
+        }
         _annotations = state.Annotations;
         _stepBadgeCounter = state.StepBadgeCounter;
         if (TextStepBadgeNumber != null) TextStepBadgeNumber.Text = _stepBadgeCounter.ToString();
@@ -600,6 +661,10 @@ public partial class ImageEditorControl : UserControl
             if (target != null)
             {
                 _selectedAnnotation = target;
+                if (SliderStrokeWidth != null && target.StrokeWidth >= SliderStrokeWidth.Minimum && target.StrokeWidth <= SliderStrokeWidth.Maximum)
+                {
+                    SliderStrokeWidth.Value = target.StrokeWidth;
+                }
                 UpdateImageDisplay();
                 UpdateLayersList();
             }
@@ -747,6 +812,10 @@ public partial class ImageEditorControl : UserControl
                 _hasMovedSelectedAnnotation = false;
                 _moveStart = pos;
                 CanvasContainer.CaptureMouse();
+                if (SliderStrokeWidth != null && hit.StrokeWidth >= SliderStrokeWidth.Minimum && hit.StrokeWidth <= SliderStrokeWidth.Maximum)
+                {
+                    SliderStrokeWidth.Value = hit.StrokeWidth;
+                }
                 UpdateImageDisplay();
                 UpdateLayersList();
                 TextStatusHint.Text = "Element ausgewählt. Ziehen zum Verschieben • Entf zum Löschen.";
@@ -780,7 +849,7 @@ public partial class ImageEditorControl : UserControl
                 }
                 if (RadioBrushRestore?.IsChecked == true || RadioBrushErase?.IsChecked == true)
                 {
-                    PushUndoState();
+                    PushUndoState(bitmapModified: true);
                     _isDrawingInteractiveStroke = true;
                     ApplyMaskBrushAt(pt);
                     CanvasContainer.CaptureMouse();
@@ -815,6 +884,7 @@ public partial class ImageEditorControl : UserControl
                 Type = AnnotationType.StepBadge,
                 StartPoint = pt,
                 Color = _selectedColor,
+                StrokeWidth = _strokeWidth,
                 BadgeNumber = _stepBadgeCounter++
             };
             if (TextStepBadgeNumber != null)
@@ -896,7 +966,7 @@ public partial class ImageEditorControl : UserControl
                     }
                     _selectedAnnotation.MoveBy(dx, dy);
                     _moveStart = current;
-                    UpdateImageDisplay();
+                    RequestDisplayUpdate();
                 }
                 return;
             }
@@ -944,6 +1014,13 @@ public partial class ImageEditorControl : UserControl
 
         if (_currentTool == EditorTool.Blur)
         {
+            if (_activeBlurStrokePoints.Count > 0)
+            {
+                var last = _activeBlurStrokePoints[^1];
+                float bdx = currentPt.X - last.X;
+                float bdy = currentPt.Y - last.Y;
+                if (bdx * bdx + bdy * bdy < 2.25f) return;
+            }
             _activeBlurStrokePoints.Add(currentPt);
             PreviewPolyline.Points.Add(new WpfPoint(current.X, current.Y));
             return;
@@ -1040,6 +1117,13 @@ public partial class ImageEditorControl : UserControl
                 break;
 
             case EditorTool.Pen:
+                if (_activeFreehandPoints.Count > 0)
+                {
+                    var last = _activeFreehandPoints[^1];
+                    float pdx = currentPt.X - last.X;
+                    float pdy = currentPt.Y - last.Y;
+                    if (pdx * pdx + pdy * pdy < 2.25f) break;
+                }
                 _activeFreehandPoints.Add(currentPt);
                 PreviewPolyline.Points.Add(new WpfPoint(current.X, current.Y));
                 break;
@@ -1062,6 +1146,7 @@ public partial class ImageEditorControl : UserControl
             {
                 _isMovingAnnotation = false;
                 CanvasContainer.ReleaseMouseCapture();
+                UpdateImageDisplay();
             }
             return;
         }
@@ -1072,6 +1157,7 @@ public partial class ImageEditorControl : UserControl
             {
                 _isDrawingInteractiveStroke = false;
                 CanvasContainer.ReleaseMouseCapture();
+                UpdateImageDisplay();
             }
             return;
         }
@@ -1092,7 +1178,7 @@ public partial class ImageEditorControl : UserControl
         {
             if (_activeBlurStrokePoints.Count >= 1 && _editorService != null)
             {
-                PushUndoState();
+                PushUndoState(bitmapModified: true);
                 float r = SliderBlurRadius != null ? (float)SliderBlurRadius.Value : 24f;
                 float s = SliderBlurSigma != null ? (float)SliderBlurSigma.Value : 10f;
                 var blurUpdated = _editorService.ApplyBlurBrush(_currentBitmap, _activeBlurStrokePoints, r, s);
@@ -1166,7 +1252,8 @@ public partial class ImageEditorControl : UserControl
 
         if (w < 4 && h < 4 && _currentTool != EditorTool.Arrow && _currentTool != EditorTool.Highlighter) return;
 
-        PushUndoState();
+        bool modifiesBitmap = _currentTool == EditorTool.Pixelate || _currentTool == EditorTool.Blackout;
+        PushUndoState(bitmapModified: modifiesBitmap);
 
         switch (_currentTool)
         {
@@ -1243,7 +1330,7 @@ public partial class ImageEditorControl : UserControl
     {
         if (_activeCropRect.HasValue && _editorService != null)
         {
-            PushUndoState();
+            PushUndoState(bitmapModified: true);
             var crop = _activeCropRect.Value;
             var cropped = _editorService.Crop(_currentBitmap, crop);
             _currentBitmap.Dispose();
@@ -1377,7 +1464,7 @@ public partial class ImageEditorControl : UserControl
     private void OnExecuteColorRemovalClicked(object sender, RoutedEventArgs e)
     {
         if (_editorService == null) return;
-        PushUndoState();
+        PushUndoState(bitmapModified: true);
         float tolerance = SliderTolerance != null ? (float)(SliderTolerance.Value / 100.0) : 0.15f;
         var transparent = _editorService.RemoveBackgroundByColor(_currentBitmap, _pickedColor, tolerance);
         _currentBitmap.Dispose();
@@ -1450,7 +1537,7 @@ public partial class ImageEditorControl : UserControl
             ButtonExecuteAiRemoval.IsEnabled = false;
             TextStatusHint.Text = "🧠 KI analysiert das Bild und segmentiert den Hintergrund...";
 
-            PushUndoState();
+            PushUndoState(bitmapModified: true);
             var result = await _bgRemovalService.RemoveBackgroundAsync(_currentBitmap, BackgroundRemovalMode.AiOnnx);
 
             _currentBitmap.Dispose();
@@ -1488,8 +1575,20 @@ public partial class ImageEditorControl : UserControl
 
     private void AddInteractiveBrushPoint(SKPoint pt)
     {
-        _interactiveBrushPoints.Add(pt);
         float radius = SliderInteractiveBrushSize != null ? (float)SliderInteractiveBrushSize.Value : 32f;
+
+        if (_interactiveBrushPoints.Count > 0)
+        {
+            var last = _interactiveBrushPoints[^1];
+            float dX = pt.X - last.X;
+            float dY = pt.Y - last.Y;
+            if (dX * dX + dY * dY < (radius * 0.35f) * (radius * 0.35f))
+            {
+                return;
+            }
+        }
+
+        _interactiveBrushPoints.Add(pt);
 
         int minX = (int)Math.Floor(pt.X - radius);
         int maxX = (int)Math.Ceiling(pt.X + radius);
@@ -1523,7 +1622,7 @@ public partial class ImageEditorControl : UserControl
         bool restore = RadioBrushRestore?.IsChecked == true;
 
         _bgRemovalService.ApplyMaskBrush(_currentBitmap, _originalBitmap, pt, radius, restore);
-        UpdateImageDisplay();
+        RequestDisplayUpdate();
     }
 
     private void OnResetInteractiveStrokeClicked(object sender, RoutedEventArgs e)
@@ -1556,7 +1655,7 @@ public partial class ImageEditorControl : UserControl
             if (ButtonExecuteInteractiveAiCutout != null) ButtonExecuteInteractiveAiCutout.IsEnabled = false;
             if (TextStatusHint != null) TextStatusHint.Text = "🧠 KI isoliert das markierte Objekt und schneidet es aus...";
 
-            PushUndoState();
+            PushUndoState(bitmapModified: true);
             var cutout = await _bgRemovalService.SegmentObjectRegionAsync(
                 _currentBitmap,
                 _interactiveBoundingBox,
@@ -1755,8 +1854,16 @@ public partial class ImageEditorControl : UserControl
 
     private static void SaveBitmapToFile(SKBitmap bitmap, string path)
     {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        var format = ext switch
+        {
+            ".jpg" or ".jpeg" => SKEncodedImageFormat.Jpeg,
+            ".webp" => SKEncodedImageFormat.Webp,
+            _ => SKEncodedImageFormat.Png
+        };
+        int quality = format == SKEncodedImageFormat.Jpeg ? 92 : 100;
         using var image = SKImage.FromBitmap(bitmap);
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        using var data = image.Encode(format, quality);
         using var stream = File.Create(path);
         data.SaveTo(stream);
     }
@@ -1767,6 +1874,7 @@ public partial class ImageEditorControl : UserControl
         _originalBitmap?.Dispose();
         while (_undoStack.Count > 0) _undoStack.Pop().Dispose();
         while (_redoStack.Count > 0) _redoStack.Pop().Dispose();
+        _displayWriteableBitmap = null;
     }
 }
 
@@ -1871,6 +1979,11 @@ public class EditorAnnotation
         }
     }
 
+    public static float GetStepBadgeRadius(float strokeWidth)
+    {
+        return Math.Max(12f, 10f + strokeWidth * 2f);
+    }
+
     public SKRect GetBounds()
     {
         switch (Type)
@@ -1893,7 +2006,7 @@ public class EditorAnnotation
                                   Math.Max(Rect.Top, Rect.Bottom) + rPad);
 
             case AnnotationType.StepBadge:
-                float radius = 18f;
+                float radius = GetStepBadgeRadius(StrokeWidth);
                 return new SKRect(StartPoint.X - radius - 4, StartPoint.Y - radius - 4, StartPoint.X + radius + 4, StartPoint.Y + radius + 4);
 
             case AnnotationType.Text:
@@ -1954,9 +2067,11 @@ public class EditorAnnotation
                 return bounds.Contains(p.X, p.Y);
 
             case AnnotationType.StepBadge:
+                float radius = GetStepBadgeRadius(StrokeWidth);
                 float dx = p.X - StartPoint.X;
                 float dy = p.Y - StartPoint.Y;
-                return (dx * dx + dy * dy) <= (22f * 22f);
+                float hitR = radius + 4f;
+                return (dx * dx + dy * dy) <= (hitR * hitR);
 
             case AnnotationType.Text:
                 return bounds.Contains(p.X, p.Y);
@@ -2079,7 +2194,7 @@ public class EditorAnnotation
 
             case AnnotationType.StepBadge:
                 {
-                    float radius = 18f;
+                    float radius = GetStepBadgeRadius(StrokeWidth);
                     using (var shadowPaint = new SKPaint
                     {
                         Color = new SKColor(0, 0, 0, 100),
@@ -2105,10 +2220,11 @@ public class EditorAnnotation
                     SKColor textColor = isLight ? new SKColor(15, 23, 42) : SKColors.White;
                     SKColor borderColor = isLight ? new SKColor(15, 23, 42, 160) : SKColors.White;
 
+                    float borderW = Math.Max(1.5f, radius * 0.08f);
                     using (var borderPaint = new SKPaint
                     {
                         Color = borderColor,
-                        StrokeWidth = 2f,
+                        StrokeWidth = borderW,
                         Style = SKPaintStyle.Stroke,
                         IsAntialias = true
                     })
