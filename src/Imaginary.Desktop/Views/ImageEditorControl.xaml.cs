@@ -1572,7 +1572,11 @@ public partial class ImageEditorControl : UserControl
         try
         {
             ButtonExecuteAiRemoval.IsEnabled = false;
-            TextStatusHint.Text = "🧠 KI analysiert das Bild und segmentiert den Hintergrund...";
+            ButtonExecuteAiRemoval.Content = "⏳ Freistellung läuft...";
+            if (ProgressAiFullRemoval != null) ProgressAiFullRemoval.Visibility = Visibility.Visible;
+            if (TextAiFullRemovalLoading != null) TextAiFullRemovalLoading.Visibility = Visibility.Visible;
+            TextStatusHint.Text = "🧠 KI analysiert das Bild und segmentiert den Hintergrund... Bitte warten.";
+            CanvasContainer.Cursor = Cursors.Wait;
 
             PushUndoState(bitmapModified: true);
             var result = await _bgRemovalService.RemoveBackgroundAsync(_currentBitmap, BackgroundRemovalMode.AiOnnx);
@@ -1589,7 +1593,11 @@ public partial class ImageEditorControl : UserControl
         }
         finally
         {
+            if (ProgressAiFullRemoval != null) ProgressAiFullRemoval.Visibility = Visibility.Collapsed;
+            if (TextAiFullRemovalLoading != null) TextAiFullRemovalLoading.Visibility = Visibility.Collapsed;
+            ButtonExecuteAiRemoval.Content = "✨ Mit KI freistellen";
             ButtonExecuteAiRemoval.IsEnabled = true;
+            CanvasContainer.Cursor = Cursors.Arrow;
         }
     }
 
@@ -1710,8 +1718,16 @@ public partial class ImageEditorControl : UserControl
 
         try
         {
-            if (ButtonExecuteInteractiveAiCutout != null) ButtonExecuteInteractiveAiCutout.IsEnabled = false;
-            if (TextStatusHint != null) TextStatusHint.Text = "🧠 KI isoliert das markierte Objekt und schneidet es aus...";
+            if (ButtonExecuteInteractiveAiCutout != null)
+            {
+                ButtonExecuteInteractiveAiCutout.IsEnabled = false;
+                ButtonExecuteInteractiveAiCutout.Content = "⏳ Objekt wird isoliert...";
+            }
+            if (ButtonResetInteractiveStroke != null) ButtonResetInteractiveStroke.IsEnabled = false;
+            if (ProgressAiCutout != null) ProgressAiCutout.Visibility = Visibility.Visible;
+            if (TextAiCutoutLoading != null) TextAiCutoutLoading.Visibility = Visibility.Visible;
+            if (TextStatusHint != null) TextStatusHint.Text = "🧠 KI isoliert das markierte Objekt und schneidet es aus... Bitte warten.";
+            CanvasContainer.Cursor = Cursors.Wait;
 
             PushUndoState(bitmapModified: true);
             var cutout = await _bgRemovalService.SegmentObjectRegionAsync(
@@ -1740,7 +1756,15 @@ public partial class ImageEditorControl : UserControl
         }
         finally
         {
-            if (ButtonExecuteInteractiveAiCutout != null) ButtonExecuteInteractiveAiCutout.IsEnabled = true;
+            if (ProgressAiCutout != null) ProgressAiCutout.Visibility = Visibility.Collapsed;
+            if (TextAiCutoutLoading != null) TextAiCutoutLoading.Visibility = Visibility.Collapsed;
+            if (ButtonExecuteInteractiveAiCutout != null)
+            {
+                ButtonExecuteInteractiveAiCutout.Content = "✂️ Markiertes Objekt freistellen";
+                ButtonExecuteInteractiveAiCutout.IsEnabled = true;
+            }
+            if (ButtonResetInteractiveStroke != null) ButtonResetInteractiveStroke.IsEnabled = true;
+            CanvasContainer.Cursor = Cursors.Cross;
         }
     }
 
