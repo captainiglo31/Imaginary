@@ -19,6 +19,9 @@ public class ImaginaryMcpTools
     private readonly IWatermarkService _watermarkService;
     private readonly IIcoEncoder _icoEncoder;
     private readonly IPresetManager? _presetManager;
+    private readonly IUpscaleService _upscaleService;
+    private readonly IAutoRedactionService _autoRedactionService;
+    private readonly IIconGeneratorService _iconGeneratorService;
 
     public ImaginaryMcpTools(
         IImageEditorService editorService,
@@ -26,7 +29,10 @@ public class ImaginaryMcpTools
         IImageFormatDetector formatDetector,
         IWatermarkService? watermarkService = null,
         IIcoEncoder? icoEncoder = null,
-        IPresetManager? presetManager = null)
+        IPresetManager? presetManager = null,
+        IUpscaleService? upscaleService = null,
+        IAutoRedactionService? autoRedactionService = null,
+        IIconGeneratorService? iconGeneratorService = null)
     {
         _editorService = editorService ?? throw new ArgumentNullException(nameof(editorService));
         _bgService = bgService ?? throw new ArgumentNullException(nameof(bgService));
@@ -34,6 +40,9 @@ public class ImaginaryMcpTools
         _watermarkService = watermarkService ?? new WatermarkService();
         _icoEncoder = icoEncoder ?? new IcoEncoder();
         _presetManager = presetManager;
+        _upscaleService = upscaleService ?? new UpscaleService();
+        _autoRedactionService = autoRedactionService ?? new AutoRedactionService();
+        _iconGeneratorService = iconGeneratorService ?? new IconGeneratorService();
     }
 
     [McpTool("convert_image", "Konvertiert ein Bild in ein Zielformat (JPEG, PNG, WebP, AVIF, GIF, BMP, TIFF, ICO) mit Qualitäts- und Skalierungsoptionen.")]
@@ -384,6 +393,162 @@ public class ImaginaryMcpTools
         else
         {
             return McpToolResult.Error("Download des KI-Modells fehlgeschlagen. Bitte Internetverbindung prüfen.");
+        }
+    }
+
+    [McpTool("upscale_image", "Skaliert ein Bild mittels KI Super-Resolution (2x oder 4x) intelligent hoch mit neuronaler Kantenglättung und Detail-Rekonstruktion.")]
+    public async Task<McpToolResult> UpscaleImageAsync(
+        [McpParameter("Absoluter Pfad zum Bild", Required = true)] string inputPath,
+        [McpParameter("Skalierungsfaktor (2 oder 4)", Required = false)] int factor = 2,
+        [McpParameter("Optionaler Zielpfad")] string? outputPath = null)
+    {
+        if (!File.Exists(inputPath))
+            return McpToolResult.Error($"Eingabedatei nicht gefunden: {inputPath}");
+
+        if (factor != 2 && factor != 4)
+            return McpToolResult.Error("Skalierungsfaktor muss 2 oder 4 sein.");
+
+        using var inStream = File.OpenRead(inputPath);
+        using var original = SKBitmap.Decode(inStream);
+        if (original == null)
+            return McpToolResult.Error($"Konnte Bild '{Path.GetFileName(inputPath)}' nicht laden.");
+
+        var upscaled = await _upscaleService.UpscaleAsync(original, factor);
+        string outPath = ResolveOutputPath(inputPath, outputPath, ImageFormat.Png, $"_upscaled_{factor}x");
+        SaveBitmap(upscaled, outPath, ImageFormat.Png, 95);
+        upscaled.Dispose();
+
+        return McpToolResult.Text(
+            $"KI-Upscaling ({factor}x) erfolgreich abgeschlossen!\n" +
+            $"- Original: {original.Width} × {original.Height} px\n" +
+            $"- Neu: {original.Width * factor} × {original.Height * factor} px\n" +
+            $"- Gespeichert unter: {outPath}");
+    }
+
+    [McpTool("auto_redact_sensitive_data", "Erkennt Gesichter und Kfz-Kennzeichen vollautomatisch und macht sie DSGVO-konform unkenntlich.")]
+    public McpToolResult AutoRedactSensitiveData(
+        [McpParameter("Absoluter Pfad zum Bild", Required = true)] string inputPath,
+        [McpParameter("Gesichter erkennen und unkenntlich machen", Required = false)] bool redactFaces = true,
+        [McpParameter("Kfz-Kennzeichen erkennen und unkenntlich machen", Required = false)] bool redactLicensePlates = true,
+        [McpParameter("Stil: 'pixelate', 'blur' oder 'blackout'", Required = false)] string style = "pixelate",
+        [McpParameter("Intensität / Blockgröße (4 bis 64, Standard: 16)", Required = false)] int intensity = 16,
+        [McpParameter("Optionaler Zielpfad")] string? outputPath = null)
+    {
+        if (!File.Exists(inputPath))
+            return McpToolResult.Error($"Eingabedatei nicht gefunden: {inputPath}");
+
+        using var inStream = File.OpenRead(inputPath);
+        using var original = SKBitmap.Decode(inStream);
+        if (original == null)
+            return McpToolResult.Error($"Konnte Bild '{Path.GetFileName(inputPath)}' nicht laden.");
+
+        var redactionStyle = style.ToLowerInvariant() switch
+        {
+            "blur" => RedactionStyle.Blur,
+            "blackout" => RedactionStyle.Blackout,
+            _ => RedactionStyle.Pixelate
+        };
+
+        var detected = _autoRedactionService.DetectRegions(original, detectFaces: redactFaces, detectPlates: redactLicensePlates);
+        if (detected.Count == 0)
+        {
+            return McpToolResult.Text("Es wurden keine sensiblen Bereiche (Gesichter oder Kennzeichen) im Bild erkannt. Bild bleibt unverändert.");
+        }
+
+        using var redacted = _autoRedactionService.AutoRedact(original, detectFaces: redactFaces, detectPlates: redactLicensePlates, style: redactionStyle, intensity: intensity);
+        string outPath = ResolveOutputPath(inputPath, outputPath, ImageFormat.Png, "_anonymized");
+        SaveBitmap(redacted, outPath, ImageFormat.Png, 95);
+
+        return McpToolResult.Text(
+            $"DSGVO-Anonymisierung erfolgreich!\n" +
+            $"- Erkannte Bereiche: {detected.Count} (Gesichter: {detected.Count(d => d.Type == SensitiveRegionType.Face)}, Kennzeichen: {detected.Count(d => d.Type == SensitiveRegionType.LicensePlate)})\n" +
+            $"- Methode: {redactionStyle} (Stärke: {intensity})\n" +
+            $"- Gespeichert unter: {outPath}");
+    }
+
+    [McpTool("generate_icon_set", "Erzeugt Multi-Plattform Icon-Sets (Windows .ico, Web Favicons, Apple iOS/macOS, Android) aus einem Quellbild.")]
+    public McpToolResult GenerateIconSet(
+        [McpParameter("Absoluter Pfad zum Quellbild (mind. 256x256 px empfohlen)", Required = true)] string inputPath,
+        [McpParameter("Zielplattformen kommagetrennt: 'all', oder 'windows,web,apple,android'", Required = false)] string platforms = "all",
+        [McpParameter("Form: 'square', 'rounded', 'squircle', 'circle'", Required = false)] string shape = "rounded",
+        [McpParameter("Randabstand in Prozent (0 bis 30, Standard: 6)", Required = false)] double paddingPercent = 6.0,
+        [McpParameter("Export als ZIP-Archiv (true) oder in Zielordner (false)", Required = false)] bool asZip = true,
+        [McpParameter("Optionaler Zielpfad (ZIP-Datei oder Ausgabeordner)")] string? outputPath = null)
+    {
+        if (!File.Exists(inputPath))
+            return McpToolResult.Error($"Eingabedatei nicht gefunden: {inputPath}");
+
+        using var inStream = File.OpenRead(inputPath);
+        using var original = SKBitmap.Decode(inStream);
+        if (original == null)
+            return McpToolResult.Error($"Konnte Bild '{Path.GetFileName(inputPath)}' nicht laden.");
+
+        var iconShape = shape.ToLowerInvariant() switch
+        {
+            "square" => IconShape.Square,
+            "squircle" => IconShape.Squircle,
+            "circle" => IconShape.Circle,
+            _ => IconShape.Rounded
+        };
+
+        var allTemplates = _iconGeneratorService.GetAvailableTemplates();
+        var selectedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (platforms.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var t in allTemplates) selectedIds.Add(t.Id);
+        }
+        else
+        {
+            var parts = platforms.ToLowerInvariant().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var p in parts)
+            {
+                var targetPlat = p switch
+                {
+                    "windows" or "win" => IconTargetPlatform.Windows,
+                    "web" or "favicon" => IconTargetPlatform.WebFavicon,
+                    "apple" or "ios" or "mac" => IconTargetPlatform.AppleIosMac,
+                    "android" => IconTargetPlatform.Android,
+                    _ => (IconTargetPlatform?)null
+                };
+                if (targetPlat.HasValue)
+                {
+                    foreach (var t in allTemplates.Where(t => t.Platform == targetPlat.Value))
+                        selectedIds.Add(t.Id);
+                }
+            }
+            if (selectedIds.Count == 0)
+            {
+                foreach (var t in allTemplates) selectedIds.Add(t.Id);
+            }
+        }
+
+        var options = new IconGenerationOptions
+        {
+            SelectedItemIds = selectedIds,
+            BaseName = Path.GetFileNameWithoutExtension(inputPath),
+            Shape = iconShape,
+            PaddingPercent = (float)(paddingPercent / 100.0),
+            BackgroundColor = SKColors.Transparent
+        };
+
+        var result = _iconGeneratorService.GenerateIconPackage(original, options);
+        if (result.Files.Count == 0)
+            return McpToolResult.Error("Keine Icon-Dateien generiert.");
+
+        string target = outputPath ?? (asZip
+            ? Path.Combine(Path.GetDirectoryName(inputPath) ?? Environment.CurrentDirectory, $"{options.BaseName}_icons.zip")
+            : Path.Combine(Path.GetDirectoryName(inputPath) ?? Environment.CurrentDirectory, $"{options.BaseName}_icons"));
+
+        if (asZip)
+        {
+            result.SaveAsZip(target);
+            return McpToolResult.Text($"Icon-Set mit {result.Files.Count} Dateien erfolgreich als ZIP-Archiv generiert: {target}");
+        }
+        else
+        {
+            result.SaveToDirectory(target);
+            return McpToolResult.Text($"Icon-Set mit {result.Files.Count} Dateien erfolgreich in Ordner exportiert: {target}");
         }
     }
 

@@ -25,6 +25,9 @@ public partial class MainWindow : Window
     private readonly IImageEditorService _editorService;
     private readonly IBackgroundRemovalService _bgRemovalService;
     private readonly IProfiDeveloperService _profiDeveloperService;
+    private readonly IAutoRedactionService _autoRedactionService;
+    private readonly IUpscaleService _upscaleService;
+    private readonly IImageConverter _converter;
     private Point _dragStartPoint;
     private bool _isDraggingOut;
 
@@ -37,6 +40,7 @@ public partial class MainWindow : Window
         services.AddSingleton<ITrayService, TrayService>();
         services.AddSingleton<IScreenshotService, ScreenshotService>();
         services.AddSingleton<IClipboardMonitorService, ClipboardMonitorService>();
+        services.AddSingleton<IStatsReportingService, StatsReportingService>();
         services.AddSingleton<MainViewModel>();
         var serviceProvider = services.BuildServiceProvider();
 
@@ -46,6 +50,9 @@ public partial class MainWindow : Window
         _editorService = serviceProvider.GetRequiredService<IImageEditorService>();
         _bgRemovalService = serviceProvider.GetRequiredService<IBackgroundRemovalService>();
         _profiDeveloperService = serviceProvider.GetRequiredService<IProfiDeveloperService>();
+        _autoRedactionService = serviceProvider.GetRequiredService<IAutoRedactionService>();
+        _upscaleService = serviceProvider.GetRequiredService<IUpscaleService>();
+        _converter = serviceProvider.GetRequiredService<IImageConverter>();
 
         _clipboardMonitor.StartMonitoring(this);
 
@@ -53,7 +60,7 @@ public partial class MainWindow : Window
             mainWindow: this,
             toggleHotfolder: () => _viewModel.ToggleHotfolderCommand.Execute(null),
             isHotfolderRunning: () => _viewModel.IsHotfolderActive,
-            openSettings: () => _viewModel.SelectTabCommand.Execute(3),
+            openSettings: () => _viewModel.SelectTabCommand.Execute(4),
             captureScreenshot: () => _viewModel.TriggerNativeSnippingCommand.Execute(null));
 
         _viewModel.AttachTrayService(_trayService);
@@ -69,7 +76,7 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    StudioImageEditorControl.Initialize(filePath, _editorService, _bgRemovalService);
+                    StudioImageEditorControl.Initialize(filePath, _editorService, _bgRemovalService, _autoRedactionService, _upscaleService, _converter);
                 }
             });
         };

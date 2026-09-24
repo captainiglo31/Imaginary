@@ -8,5 +8,7 @@ public enum ResizeMode
     Fit,
     FillCrop,
     Pad,
-    MaxEdge
+    MaxEdge,
+    AiUpscale2x,
+    AiUpscale4x
 }

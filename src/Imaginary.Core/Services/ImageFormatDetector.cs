@@ -50,14 +50,21 @@ public class ImageFormatDetector : IImageFormatDetector
             return ImageFormat.Tiff;
         }
 
-        // AVIF: ISOBMFF ftyp header with avif / avis brand
+        // AVIF / HEIC: ISOBMFF ftyp header
         if (headerBytes.Length >= 12 &&
             headerBytes.Slice(4, 4).SequenceEqual("ftyp"u8))
         {
             var brand = headerBytes.Slice(8, 4);
-            if (brand.SequenceEqual("avif"u8) || brand.SequenceEqual("avis"u8) || brand.SequenceEqual("mif1"u8))
+            if (brand.SequenceEqual("avif"u8) || brand.SequenceEqual("avis"u8))
             {
                 return ImageFormat.Avif;
+            }
+
+            if (brand.SequenceEqual("heic"u8) || brand.SequenceEqual("heix"u8) || brand.SequenceEqual("hevc"u8) ||
+                brand.SequenceEqual("heim"u8) || brand.SequenceEqual("heis"u8) || brand.SequenceEqual("mif1"u8) ||
+                brand.SequenceEqual("msf1"u8))
+            {
+                return ImageFormat.Heic;
             }
         }
 
@@ -116,6 +123,7 @@ public class ImageFormatDetector : IImageFormatDetector
             ".tif" or ".tiff" => ImageFormat.Tiff,
             ".avif" => ImageFormat.Avif,
             ".ico" => ImageFormat.Ico,
+            ".heic" or ".heif" => ImageFormat.Heic,
             ".dng" or ".cr2" or ".cr3" or ".nef" or ".arw" or ".orf" or ".rw2" or ".pef" or ".raf" => ImageFormat.Raw,
             _ => ImageFormat.Unknown
         };
@@ -132,6 +140,7 @@ public class ImageFormatDetector : IImageFormatDetector
         ImageFormat.Avif => ".avif",
         ImageFormat.Ico => ".ico",
         ImageFormat.Raw => ".dng",
+        ImageFormat.Heic => ".heic",
         _ => ".jpg"
     };
 
@@ -146,12 +155,13 @@ public class ImageFormatDetector : IImageFormatDetector
         ImageFormat.Avif => "image/avif",
         ImageFormat.Ico => "image/x-icon",
         ImageFormat.Raw => "image/x-adobe-dng",
+        ImageFormat.Heic => "image/heic",
         _ => "application/octet-stream"
     };
 
     public bool IsLossy(ImageFormat format) => format switch
     {
-        ImageFormat.Jpeg or ImageFormat.Webp or ImageFormat.Avif => true,
+        ImageFormat.Jpeg or ImageFormat.Webp or ImageFormat.Avif or ImageFormat.Heic => true,
         _ => false
     };
 }

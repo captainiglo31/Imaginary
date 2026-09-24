@@ -129,7 +129,9 @@ public class McpServerTests : IDisposable
             "crop_image",
             "apply_watermark",
             "generate_icon_set",
-            "inspect_image"
+            "inspect_image",
+            "upscale_image",
+            "auto_redact_sensitive_data"
         });
     }
 
@@ -365,5 +367,104 @@ public class McpServerTests : IDisposable
         configJson.Should().Contain("\"imaginary\"");
         configJson.Should().Contain("\"--mcp\"");
         configJson.Should().Contain("C:\\\\Tools\\\\Imaginary.exe");
+    }
+
+    [Fact]
+    public async Task ToolsCall_UpscaleImage_ShouldDoubleDimensions()
+    {
+        string testFile = Path.Combine(_tempDir, "small.png");
+        byte[] pngBytes = TestImageGenerator.CreatePatternImage(40, 30, SKEncodedImageFormat.Png);
+        await File.WriteAllBytesAsync(testFile, pngBytes);
+
+        var requestJson = $$"""
+        {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "method": "tools/call",
+            "params": {
+                "name": "upscale_image",
+                "arguments": {
+                    "inputPath": {{JsonSerializer.Serialize(testFile)}},
+                    "factor": 2
+                }
+            }
+        }
+        """;
+
+        string? responseJson = await _server.ProcessLineAsync(requestJson);
+        responseJson.Should().NotBeNull();
+
+        using var doc = JsonDocument.Parse(responseJson!);
+        var result = doc.RootElement.GetProperty("result");
+        result.GetProperty("isError").GetBoolean().Should().BeFalse();
+        string text = result.GetProperty("content")[0].GetProperty("text").GetString()!;
+        text.Should().Contain("80 × 60 px");
+    }
+
+    [Fact]
+    public async Task ToolsCall_AutoRedactSensitiveData_ShouldSucceed()
+    {
+        string testFile = Path.Combine(_tempDir, "photo.png");
+        byte[] pngBytes = TestImageGenerator.CreatePatternImage(100, 100, SKEncodedImageFormat.Png);
+        await File.WriteAllBytesAsync(testFile, pngBytes);
+
+        var requestJson = $$"""
+        {
+            "jsonrpc": "2.0",
+            "id": 21,
+            "method": "tools/call",
+            "params": {
+                "name": "auto_redact_sensitive_data",
+                "arguments": {
+                    "inputPath": {{JsonSerializer.Serialize(testFile)}},
+                    "style": "pixelate"
+                }
+            }
+        }
+        """;
+
+        string? responseJson = await _server.ProcessLineAsync(requestJson);
+        responseJson.Should().NotBeNull();
+
+        using var doc = JsonDocument.Parse(responseJson!);
+        var result = doc.RootElement.GetProperty("result");
+        result.GetProperty("isError").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ToolsCall_GenerateIconSet_ShouldCreateZip()
+    {
+        string testFile = Path.Combine(_tempDir, "icon_source.png");
+        byte[] pngBytes = TestImageGenerator.CreatePatternImage(128, 128, SKEncodedImageFormat.Png);
+        await File.WriteAllBytesAsync(testFile, pngBytes);
+
+        string zipOut = Path.Combine(_tempDir, "output_icons.zip");
+
+        var requestJson = $$"""
+        {
+            "jsonrpc": "2.0",
+            "id": 22,
+            "method": "tools/call",
+            "params": {
+                "name": "generate_icon_set",
+                "arguments": {
+                    "inputPath": {{JsonSerializer.Serialize(testFile)}},
+                    "platforms": "windows,web",
+                    "shape": "rounded",
+                    "asZip": true,
+                    "outputPath": {{JsonSerializer.Serialize(zipOut)}}
+                }
+            }
+        }
+        """;
+
+        string? responseJson = await _server.ProcessLineAsync(requestJson);
+        responseJson.Should().NotBeNull();
+
+        using var doc = JsonDocument.Parse(responseJson!);
+        var result = doc.RootElement.GetProperty("result");
+        result.GetProperty("isError").GetBoolean().Should().BeFalse();
+        File.Exists(zipOut).Should().BeTrue();
+        new FileInfo(zipOut).Length.Should().BeGreaterThan(0);
     }
 }

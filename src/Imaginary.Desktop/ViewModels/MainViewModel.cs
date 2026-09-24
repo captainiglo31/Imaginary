@@ -12,8 +12,10 @@ using Imaginary.Core.Services;
 using Imaginary.Desktop.Models;
 using Imaginary.Desktop.Services;
 using Imaginary.Desktop.Views;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
+using SkiaSharp;
 using CoreResizeMode = Imaginary.Core.Models.ResizeMode;
 
 namespace Imaginary.Desktop.ViewModels;
@@ -22,6 +24,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly IBatchProcessor _batchProcessor;
     private readonly IImageFormatDetector _formatDetector;
+    private readonly IImageConverter _converter;
     private readonly IPresetManager _presetManager;
     private readonly ISettingsService _settingsService;
     private readonly IExplorerIntegration _explorerIntegration;
@@ -36,6 +39,12 @@ public partial class MainViewModel : ObservableObject
     private readonly IBackgroundRemovalService _bgRemovalService;
     private readonly IProfiDeveloperService _profiDeveloperService;
     private readonly IFileAssociationService _fileAssociationService;
+    private readonly IStatsReportingService _statsReportingService;
+    private readonly ISocialMediaTemplateService _socialMediaService;
+    private readonly IUpscaleService _upscaleService;
+    private readonly IAutoRedactionService _autoRedactionService;
+    private readonly IIconGeneratorService _iconGeneratorService;
+    private SKBitmap? _iconStudioSourceBitmap;
     private ITrayService? _trayService;
     public ITrayService? TrayService => _trayService;
 
@@ -67,7 +76,9 @@ public partial class MainViewModel : ObservableObject
         "Pixelmaße (Breite / Höhe)",
         "Einpassen mit Rand (Pad)",
         "Füllen & Beschneiden (FillCrop)",
-        "Maximale Kantenlänge (MaxEdge)"
+        "Maximale Kantenlänge (MaxEdge)",
+        "✨ KI-Upscaling 2x (Super Resolution)",
+        "✨ KI-Upscaling 4x (Super Resolution)"
     };
 
     public static string[] AvailableFallbackStrategies => new[]
@@ -159,6 +170,82 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _watermarkIncludeShadow = true;
+
+    // Social Media Templates
+    public ObservableCollection<SocialMediaTemplate> SocialMediaTemplates { get; } = new();
+
+    [ObservableProperty]
+    private SocialMediaTemplate? _selectedSocialMediaTemplate;
+
+    partial void OnSelectedSocialMediaTemplateChanged(SocialMediaTemplate? value)
+    {
+        if (value == null) return;
+        TargetWidth = value.Width;
+        TargetHeight = value.Height;
+        SelectedResizeModeIndex = 4; // Füllen & Beschneiden (FillCrop)
+    }
+
+    // Auto-DSGVO Redaction
+    [ObservableProperty]
+    private bool _enableAutoRedact;
+
+    [ObservableProperty]
+    private bool _autoRedactFaces = true;
+
+    [ObservableProperty]
+    private bool _autoRedactLicensePlates = true;
+
+    [ObservableProperty]
+    private int _selectedRedactionStyleIndex = 0; // 0 = Pixelate, 1 = Blur, 2 = Blackout
+
+    [ObservableProperty]
+    private int _redactionIntensity = 16;
+
+    // KI-Upscaling (Super Resolution)
+    [ObservableProperty]
+    private bool _isUpscale2xDownloaded;
+
+    [ObservableProperty]
+    private bool _isUpscale4xDownloaded;
+
+    [ObservableProperty]
+    private string _upscale2xStatusText = "Nicht heruntergeladen";
+
+    [ObservableProperty]
+    private string _upscale4xStatusText = "Nicht heruntergeladen";
+
+    [ObservableProperty]
+    private bool _isUpscaleDownloading;
+
+    [ObservableProperty]
+    private double _upscaleDownloadProgress;
+
+    // Icon-Studio Workspace
+    public ObservableCollection<IconTemplateItemViewModel> IconStudioItems { get; } = new();
+
+    [ObservableProperty]
+    private string _iconStudioSourcePath = string.Empty;
+
+    [ObservableProperty]
+    private ImageSource? _iconStudioPreviewImage;
+
+    [ObservableProperty]
+    private string _iconStudioBaseName = "app";
+
+    [ObservableProperty]
+    private int _iconStudioShapeIndex = 1; // 0=Square, 1=Rounded, 2=Squircle, 3=Circle
+
+    [ObservableProperty]
+    private double _iconStudioPaddingPercent = 6.0;
+
+    [ObservableProperty]
+    private int _iconStudioBgColorIndex = 0; // 0=Transparent, 1=White, 2=Black
+
+    [ObservableProperty]
+    private string _iconStudioStatusText = "Kein Bild geladen. Wähle ein Logo oder Bild.";
+
+    [ObservableProperty]
+    private bool _isIconStudioLoaded;
 
     // Presets
     [ObservableProperty]
@@ -317,7 +404,7 @@ public partial class MainViewModel : ObservableObject
         _settingsService.Save();
     }
 
-    public string AppVersionString => "v2.4.1";
+    public string AppVersionString => "v2.5.0";
 
     public string McpConfigSnippet
     {
@@ -399,6 +486,20 @@ public partial class MainViewModel : ObservableObject
         AppLogger.Info("Settings", $"AutoDetectScreenshots geändert auf: {value}");
     }
 
+    // Globale Live-Statistiken
+    [ObservableProperty]
+    private bool _shareAnonymousStats = true;
+
+    [ObservableProperty]
+    private string? _globalStatsText = "🌐 Live-Counter";
+
+    partial void OnShareAnonymousStatsChanged(bool value)
+    {
+        _settingsService.Settings.ShareAnonymousStats = value;
+        _settingsService.Save();
+        AppLogger.Info("Settings", $"ShareAnonymousStats geändert auf: {value}");
+    }
+
     public bool HasFiles => Files.Count > 0;
     public bool CanStart => HasFiles && !IsBusy;
     public bool CanCancel => IsBusy;
@@ -421,10 +522,16 @@ public partial class MainViewModel : ObservableObject
         IImageEditorService editorService,
         IBackgroundRemovalService bgRemovalService,
         IProfiDeveloperService profiDeveloperService,
-        IFileAssociationService fileAssociationService)
+        IFileAssociationService fileAssociationService,
+        IStatsReportingService statsReportingService,
+        ISocialMediaTemplateService? socialMediaService = null,
+        IUpscaleService? upscaleService = null,
+        IAutoRedactionService? autoRedactionService = null,
+        IIconGeneratorService? iconGeneratorService = null)
     {
         _batchProcessor = batchProcessor ?? throw new ArgumentNullException(nameof(batchProcessor));
         _formatDetector = formatDetector ?? throw new ArgumentNullException(nameof(formatDetector));
+        _converter = new ImageConverter(_formatDetector, new IcoEncoder());
         _presetManager = presetManager ?? throw new ArgumentNullException(nameof(presetManager));
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _explorerIntegration = explorerIntegration ?? throw new ArgumentNullException(nameof(explorerIntegration));
@@ -439,6 +546,26 @@ public partial class MainViewModel : ObservableObject
         _bgRemovalService = bgRemovalService ?? throw new ArgumentNullException(nameof(bgRemovalService));
         _profiDeveloperService = profiDeveloperService ?? throw new ArgumentNullException(nameof(profiDeveloperService));
         _fileAssociationService = fileAssociationService ?? throw new ArgumentNullException(nameof(fileAssociationService));
+        _statsReportingService = statsReportingService ?? throw new ArgumentNullException(nameof(statsReportingService));
+        _socialMediaService = socialMediaService ?? new SocialMediaTemplateService();
+        _upscaleService = upscaleService ?? new UpscaleService();
+        _autoRedactionService = autoRedactionService ?? new AutoRedactionService();
+        _iconGeneratorService = iconGeneratorService ?? new IconGeneratorService();
+
+        foreach (var t in _socialMediaService.GetAllTemplates())
+        {
+            SocialMediaTemplates.Add(t);
+        }
+
+        foreach (var itm in _iconGeneratorService.GetAvailableTemplates())
+        {
+            IconStudioItems.Add(new IconTemplateItemViewModel(itm));
+        }
+
+        _isUpscale2xDownloaded = _upscaleService.IsAiModelDownloaded(2);
+        _upscale2xStatusText = _isUpscale2xDownloaded ? "Bereit (Offline 2x)" : "Nicht heruntergeladen (ca. 16 MB)";
+        _isUpscale4xDownloaded = _upscaleService.IsAiModelDownloaded(4);
+        _upscale4xStatusText = _isUpscale4xDownloaded ? "Bereit (Offline 4x)" : "Nicht heruntergeladen (ca. 64 MB)";
 
         _clipboardMonitor.ScreenshotDetected += OnScreenshotDetected;
 
@@ -559,6 +686,20 @@ public partial class MainViewModel : ObservableObject
                 });
             });
         }
+
+        // Globale Statistiken laden
+        _shareAnonymousStats = settings.ShareAnonymousStats;
+        _ = Task.Run(async () =>
+        {
+            var counter = await _statsReportingService.GetGlobalCounterAsync();
+            if (counter.HasValue && counter.Value > 0)
+            {
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    GlobalStatsText = $"🌐 {counter.Value:N0} Bilder optimiert";
+                });
+            }
+        });
     }
 
     private void ReloadPresets()
@@ -1076,6 +1217,8 @@ public partial class MainViewModel : ObservableObject
                 _settingsService.Settings.HotfolderTodaySavedBytes = HotfolderTodaySavedBytes;
                 _settingsService.Save();
 
+                _statsReportingService.ReportConversion(1, saved);
+
                 if (ShowTrayNotifications && _trayService != null)
                 {
                     _trayService.ShowNotification(
@@ -1311,6 +1454,8 @@ public partial class MainViewModel : ObservableObject
             StatusSummary = $"✓ Bild aus Studio zur Stapelverarbeitung hinzugefügt: {Path.GetFileName(targetPath)}";
         }
 
+        _statsReportingService.ReportEdit(1);
+
         SelectedTabIndex = 0; // Return to Batch
     }
 
@@ -1345,7 +1490,7 @@ public partial class MainViewModel : ObservableObject
             }
             else
             {
-                var editorWin = new ImageEditorWindow(path, _editorService, _bgRemovalService)
+                var editorWin = new ImageEditorWindow(path, _editorService, _bgRemovalService, _autoRedactionService, _upscaleService, _converter)
                 {
                     Owner = Application.Current?.MainWindow
                 };
@@ -1440,6 +1585,299 @@ public partial class MainViewModel : ObservableObject
         {
             AppLogger.Error("AI", "Fehler beim Löschen des KI-Modells", ex);
             MessageBox.Show(Application.Current.MainWindow, $"Fehler beim Löschen: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private async Task DownloadUpscaleModelAsync(string factorStr)
+    {
+        int factor = int.TryParse(factorStr, out var f) ? f : 2;
+        if (IsUpscaleDownloading) return;
+
+        IsUpscaleDownloading = true;
+        UpscaleDownloadProgress = 0;
+
+        var progress = new Progress<double>(p =>
+        {
+            UpscaleDownloadProgress = p;
+        });
+
+        try
+        {
+            bool ok = await _upscaleService.DownloadModelAsync(factor, progress);
+            if (factor == 4)
+            {
+                IsUpscale4xDownloaded = _upscaleService.IsAiModelDownloaded(4);
+                Upscale4xStatusText = IsUpscale4xDownloaded ? "Bereit (Offline 4x)" : "Download fehlgeschlagen";
+            }
+            else
+            {
+                IsUpscale2xDownloaded = _upscaleService.IsAiModelDownloaded(2);
+                Upscale2xStatusText = IsUpscale2xDownloaded ? "Bereit (Offline 2x)" : "Download fehlgeschlagen";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Upscale", $"Fehler beim Download des {factor}x Modells", ex);
+        }
+        finally
+        {
+            IsUpscaleDownloading = false;
+        }
+    }
+
+    [RelayCommand]
+    private void DeleteUpscaleModel(string factorStr)
+    {
+        int factor = int.TryParse(factorStr, out var f) ? f : 2;
+        _upscaleService.DeleteModel(factor);
+        if (factor == 4)
+        {
+            IsUpscale4xDownloaded = false;
+            Upscale4xStatusText = "Nicht heruntergeladen (ca. 64 MB)";
+        }
+        else
+        {
+            IsUpscale2xDownloaded = false;
+            Upscale2xStatusText = "Nicht heruntergeladen (ca. 16 MB)";
+        }
+    }
+
+    partial void OnIconStudioShapeIndexChanged(int value) => UpdateIconStudioPreview();
+    partial void OnIconStudioPaddingPercentChanged(double value) => UpdateIconStudioPreview();
+    partial void OnIconStudioBgColorIndexChanged(int value) => UpdateIconStudioPreview();
+
+    [RelayCommand]
+    private void SelectIconStudioImage()
+    {
+        var ofd = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Quellbild für Icons wählen",
+            Filter = "Bilder (*.png;*.jpg;*.jpeg;*.webp;*.svg;*.bmp;*.heic)|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.heic|Alle Dateien (*.*)|*.*"
+        };
+
+        if (ofd.ShowDialog() == true)
+        {
+            LoadIconStudioImage(ofd.FileName);
+        }
+    }
+
+    public void LoadIconStudioImage(string filePath)
+    {
+        try
+        {
+            var (bmp, _) = _converter.LoadBitmap(filePath);
+            _iconStudioSourceBitmap?.Dispose();
+            _iconStudioSourceBitmap = bmp;
+            IconStudioSourcePath = filePath;
+            IconStudioBaseName = Path.GetFileNameWithoutExtension(filePath).ToLowerInvariant();
+            IsIconStudioLoaded = true;
+            IconStudioStatusText = $"{Path.GetFileName(filePath)} ({bmp.Width}×{bmp.Height} px)";
+            UpdateIconStudioPreview();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("IconStudio", "Fehler beim Laden des Icon-Quellbilds", ex);
+            MessageBox.Show(Application.Current.MainWindow, $"Bild konnte nicht geladen werden: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public void UpdateIconStudioPreview()
+    {
+        if (_iconStudioSourceBitmap == null) return;
+
+        try
+        {
+            var shape = IconStudioShapeIndex switch
+            {
+                1 => IconShape.Rounded,
+                2 => IconShape.Squircle,
+                3 => IconShape.Circle,
+                _ => IconShape.Square
+            };
+
+            var bg = IconStudioBgColorIndex switch
+            {
+                1 => SKColors.White,
+                2 => SKColors.Black,
+                _ => SKColors.Transparent
+            };
+
+            float padding = (float)IconStudioPaddingPercent / 100f;
+
+            using var rendered = _iconGeneratorService.RenderSingleIcon(
+                _iconStudioSourceBitmap,
+                256,
+                256,
+                shape,
+                padding,
+                bg);
+
+            var info = rendered.Info;
+            int stride = info.RowBytes;
+            IntPtr pixels = rendered.GetPixels();
+
+            var bs = BitmapSource.Create(
+                info.Width,
+                info.Height,
+                96,
+                96,
+                PixelFormats.Bgra32,
+                null,
+                pixels,
+                stride * info.Height,
+                stride);
+
+            bs.Freeze();
+            IconStudioPreviewImage = bs;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("IconStudio", $"Fehler bei Vorschauerstellung: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void SelectAllIconItems()
+    {
+        foreach (var itm in IconStudioItems) itm.IsSelected = true;
+    }
+
+    [RelayCommand]
+    private void DeselectAllIconItems()
+    {
+        foreach (var itm in IconStudioItems) itm.IsSelected = false;
+    }
+
+    [RelayCommand]
+    private void SelectPlatformIconItems(string platformName)
+    {
+        if (Enum.TryParse<IconTargetPlatform>(platformName, out var platform))
+        {
+            foreach (var itm in IconStudioItems)
+            {
+                if (itm.Platform == platform) itm.IsSelected = true;
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void GenerateIconPackageZip()
+    {
+        if (_iconStudioSourceBitmap == null)
+        {
+            MessageBox.Show(Application.Current.MainWindow, "Bitte zuerst ein Bild auswählen.", "Icon-Studio", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var sfd = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Icon-Paket speichern",
+            Filter = "ZIP-Archiv (*.zip)|*.zip",
+            FileName = $"{IconStudioBaseName}-icons.zip"
+        };
+
+        if (sfd.ShowDialog() != true) return;
+
+        try
+        {
+            var shape = IconStudioShapeIndex switch
+            {
+                1 => IconShape.Rounded,
+                2 => IconShape.Squircle,
+                3 => IconShape.Circle,
+                _ => IconShape.Square
+            };
+
+            var bg = IconStudioBgColorIndex switch
+            {
+                1 => SKColors.White,
+                2 => SKColors.Black,
+                _ => SKColors.Transparent
+            };
+
+            var options = new IconGenerationOptions
+            {
+                BaseName = IconStudioBaseName,
+                Shape = shape,
+                PaddingPercent = (float)IconStudioPaddingPercent / 100f,
+                BackgroundColor = bg,
+                SelectedItemIds = new HashSet<string>(IconStudioItems.Where(i => i.IsSelected).Select(i => i.Id), StringComparer.OrdinalIgnoreCase)
+            };
+
+            var result = _iconGeneratorService.GenerateIconPackage(_iconStudioSourceBitmap, options);
+            var zipBytes = result.CreateZipArchive();
+            File.WriteAllBytes(sfd.FileName, zipBytes);
+
+            MessageBox.Show(Application.Current.MainWindow,
+                $"Icon-Paket mit {result.Files.Count} Dateien erfolgreich erstellt!\nGespeichert unter: {sfd.FileName}",
+                "Icon-Studio Erfolg",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("IconStudio", "Fehler beim Erstellen des Icon-Pakets", ex);
+            MessageBox.Show(Application.Current.MainWindow, $"Fehler: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand]
+    private void ExportIconPackageDirectory()
+    {
+        if (_iconStudioSourceBitmap == null)
+        {
+            MessageBox.Show(Application.Current.MainWindow, "Bitte zuerst ein Bild auswählen.", "Icon-Studio", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        using var fbd = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Zielordner für generierte Icons wählen",
+            UseDescriptionForTitle = true
+        };
+
+        if (fbd.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+        try
+        {
+            var shape = IconStudioShapeIndex switch
+            {
+                1 => IconShape.Rounded,
+                2 => IconShape.Squircle,
+                3 => IconShape.Circle,
+                _ => IconShape.Square
+            };
+
+            var bg = IconStudioBgColorIndex switch
+            {
+                1 => SKColors.White,
+                2 => SKColors.Black,
+                _ => SKColors.Transparent
+            };
+
+            var options = new IconGenerationOptions
+            {
+                BaseName = IconStudioBaseName,
+                Shape = shape,
+                PaddingPercent = (float)IconStudioPaddingPercent / 100f,
+                BackgroundColor = bg,
+                SelectedItemIds = new HashSet<string>(IconStudioItems.Where(i => i.IsSelected).Select(i => i.Id), StringComparer.OrdinalIgnoreCase)
+            };
+
+            var result = _iconGeneratorService.GenerateIconPackage(_iconStudioSourceBitmap, options);
+            result.SaveToDirectory(fbd.SelectedPath);
+
+            MessageBox.Show(Application.Current.MainWindow,
+                $"{result.Files.Count} Icon-Dateien erfolgreich in den Ordner exportiert!\n{fbd.SelectedPath}",
+                "Icon-Studio Erfolg",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("IconStudio", "Fehler beim Exportieren der Icons", ex);
+            MessageBox.Show(Application.Current.MainWindow, $"Fehler: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -1905,8 +2343,14 @@ public partial class MainViewModel : ObservableObject
                 cancellationToken: _cts.Token);
 
             var savedMb = (batchResult.TotalOriginalSizeBytes - batchResult.TotalFinalSizeBytes) / (1024.0 * 1024.0);
+            var savedBytes = Math.Max(0, batchResult.TotalOriginalSizeBytes - batchResult.TotalFinalSizeBytes);
             StatusSummary = $"Abgeschlossen: {batchResult.SucceededCount} erfolgreich, {batchResult.FailedCount} fehlgeschlagen. " +
                             $"Ersparnis: {savedMb:N2} MB ({batchResult.OverallSavingsPercentage:N1}%) in {batchResult.Duration.TotalSeconds:N1}s";
+
+            if (batchResult.SucceededCount > 0)
+            {
+                _statsReportingService.ReportConversion(batchResult.SucceededCount, savedBytes);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -1978,6 +2422,8 @@ public partial class MainViewModel : ObservableObject
             3 => CoreResizeMode.Pad,
             4 => CoreResizeMode.FillCrop,
             5 => CoreResizeMode.MaxEdge,
+            6 => CoreResizeMode.AiUpscale2x,
+            7 => CoreResizeMode.AiUpscale4x,
             _ => CoreResizeMode.None
         };
 
@@ -1987,6 +2433,18 @@ public partial class MainViewModel : ObservableObject
         options.MaxEdgeLength = MaxEdgeLength;
         options.PadColor = PadColor;
         options.MaintainAspectRatio = MaintainAspectRatio;
+
+        // Auto-DSGVO Redaction
+        options.AutoRedact = EnableAutoRedact;
+        options.AutoRedactFaces = AutoRedactFaces;
+        options.AutoRedactLicensePlates = AutoRedactLicensePlates;
+        options.RedactionStyle = SelectedRedactionStyleIndex switch
+        {
+            1 => RedactionStyle.Blur,
+            2 => RedactionStyle.Blackout,
+            _ => RedactionStyle.Pixelate
+        };
+        options.RedactionIntensity = RedactionIntensity;
 
         // Watermark
         if (EnableWatermark)

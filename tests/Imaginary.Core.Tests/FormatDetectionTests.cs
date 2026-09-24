@@ -61,7 +61,26 @@ public class FormatDetectionTests
         _detector.DetectFromExtension("icon.webp").Should().Be(ImageFormat.Webp);
         _detector.DetectFromExtension("bitmap.bmp").Should().Be(ImageFormat.Bmp);
         _detector.DetectFromExtension("scan.tiff").Should().Be(ImageFormat.Tiff);
+        _detector.DetectFromExtension("iphone.heic").Should().Be(ImageFormat.Heic);
+        _detector.DetectFromExtension("livephoto.HEIF").Should().Be(ImageFormat.Heic);
         _detector.DetectFromExtension("document.pdf").Should().Be(ImageFormat.Unknown);
+    }
+
+    [Fact]
+    public void DetectFormat_HeicHeader_ShouldDetectHeic()
+    {
+        // 00 00 00 18 'ftyp' 'heic'
+        var heicHeader = new byte[]
+        {
+            0x00, 0x00, 0x00, 0x18,
+            (byte)'f', (byte)'t', (byte)'y', (byte)'p',
+            (byte)'h', (byte)'e', (byte)'i', (byte)'c',
+            0x00, 0x00, 0x00, 0x00
+        };
+
+        _detector.DetectFormat(heicHeader).Should().Be(ImageFormat.Heic);
+        _detector.GetDefaultExtension(ImageFormat.Heic).Should().Be(".heic");
+        _detector.GetMimeType(ImageFormat.Heic).Should().Be("image/heic");
     }
 
     [Fact]
@@ -69,6 +88,7 @@ public class FormatDetectionTests
     {
         _detector.IsLossy(ImageFormat.Jpeg).Should().BeTrue();
         _detector.IsLossy(ImageFormat.Webp).Should().BeTrue();
+        _detector.IsLossy(ImageFormat.Heic).Should().BeTrue();
         _detector.IsLossy(ImageFormat.Png).Should().BeFalse();
         _detector.IsLossy(ImageFormat.Bmp).Should().BeFalse();
         _detector.IsLossy(ImageFormat.Gif).Should().BeFalse();

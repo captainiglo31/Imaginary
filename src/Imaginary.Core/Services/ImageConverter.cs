@@ -25,6 +25,19 @@ public class ImageConverter : IImageConverter
     {
         var detectedFormat = _formatDetector.DetectFormat(data);
 
+        if (detectedFormat == ImageFormat.Heic)
+        {
+            try
+            {
+                var heicBmp = DecodeHeic(data);
+                return (heicBmp, detectedFormat);
+            }
+            catch (Exception ex)
+            {
+                Logging.AppLogger.Warn("ImageConverter", $"Fehler beim Dekodieren von HEIC via Openize.HEIC: {ex.Message}");
+            }
+        }
+
         using var skData = SKData.CreateCopy(data);
         using var codec = SKCodec.Create(skData);
 
@@ -231,5 +244,22 @@ public class ImageConverter : IImageConverter
             default:
                 return bitmap;
         }
+    }
+
+    private static SKBitmap DecodeHeic(byte[] data)
+    {
+        using var ms = new MemoryStream(data);
+        var heicImage = Openize.Heic.Decoder.HeicImage.Load(ms);
+
+        int width = (int)heicImage.Width;
+        int height = (int)heicImage.Height;
+        var pixels = heicImage.GetByteArray(Openize.Heic.Decoder.PixelFormat.Bgra32);
+
+        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
+        var bitmap = new SKBitmap(info);
+        var ptr = bitmap.GetPixels();
+        System.Runtime.InteropServices.Marshal.Copy(pixels, 0, ptr, pixels.Length);
+
+        return bitmap;
     }
 }

@@ -13,6 +13,7 @@ public class BatchProcessor : IBatchProcessor
     private readonly ISizeConstraintSolver _solver;
     private readonly IOutputPathResolver _pathResolver;
     private readonly IWatermarkService _watermarkService;
+    private readonly IAutoRedactionService _redactionService;
 
     public BatchProcessor(
         IImageFormatDetector formatDetector,
@@ -20,7 +21,8 @@ public class BatchProcessor : IBatchProcessor
         IImageResizer resizer,
         ISizeConstraintSolver solver,
         IOutputPathResolver pathResolver,
-        IWatermarkService watermarkService)
+        IWatermarkService watermarkService,
+        IAutoRedactionService? redactionService = null)
     {
         _formatDetector = formatDetector ?? throw new ArgumentNullException(nameof(formatDetector));
         _converter = converter ?? throw new ArgumentNullException(nameof(converter));
@@ -28,6 +30,7 @@ public class BatchProcessor : IBatchProcessor
         _solver = solver ?? throw new ArgumentNullException(nameof(solver));
         _pathResolver = pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
         _watermarkService = watermarkService ?? throw new ArgumentNullException(nameof(watermarkService));
+        _redactionService = redactionService ?? new AutoRedactionService();
     }
 
     public async Task<ImageJobResult> ProcessSingleAsync(
@@ -104,21 +107,44 @@ public class BatchProcessor : IBatchProcessor
                     AppLogger.Debug("BatchProcessor", $"[{input.FileName}] Skaliert auf {resizedBitmap.Width}x{resizedBitmap.Height}");
                 }
 
-                // 5b. Apply Watermark if requested
-                if (options.Watermark != null && options.Watermark.Type != WatermarkType.None)
+                // 5a. Apply Auto-DSGVO Redaction if requested
+                SKBitmap workingBitmap = resizedBitmap;
+                SKBitmap? redactedBitmap = null;
+                if (options.AutoRedact)
                 {
-                    _watermarkService.ApplyWatermark(resizedBitmap, options.Watermark);
-                    AppLogger.Debug("BatchProcessor", $"[{input.FileName}] Wasserzeichen angewendet ({options.Watermark.Type})");
+                    redactedBitmap = _redactionService.AutoRedact(
+                        resizedBitmap,
+                        options.AutoRedactFaces,
+                        options.AutoRedactLicensePlates,
+                        options.RedactionStyle,
+                        options.RedactionIntensity);
+                    workingBitmap = redactedBitmap;
+                    AppLogger.Debug("BatchProcessor", $"[{input.FileName}] Automatische DSGVO-Verpixelung angewendet ({options.RedactionStyle})");
                 }
 
-                // 6. Apply SizeConstraintSolver (quality adjustments, fallbacks, quantization)
-                var solved = _solver.Solve(resizedBitmap, targetFormat, options);
+                SizeConstraintResult solved;
+                try
+                {
+                    // 5b. Apply Watermark if requested
+                    if (options.Watermark != null && options.Watermark.Type != WatermarkType.None)
+                    {
+                        _watermarkService.ApplyWatermark(workingBitmap, options.Watermark);
+                        AppLogger.Debug("BatchProcessor", $"[{input.FileName}] Wasserzeichen angewendet ({options.Watermark.Type})");
+                    }
 
-                result.FinalDimensions = solved.FinalDimensions;
-                result.OutputData = solved.EncodedData;
-                result.FinalSizeBytes = solved.EncodedData.Length;
-                result.AppliedStrategy = solved.AppliedStrategy;
-                result.Warnings.AddRange(solved.Warnings);
+                    // 6. Apply SizeConstraintSolver (quality adjustments, fallbacks, quantization)
+                    solved = _solver.Solve(workingBitmap, targetFormat, options);
+
+                    result.FinalDimensions = solved.FinalDimensions;
+                    result.OutputData = solved.EncodedData;
+                    result.FinalSizeBytes = solved.EncodedData.Length;
+                    result.AppliedStrategy = solved.AppliedStrategy;
+                    result.Warnings.AddRange(solved.Warnings);
+                }
+                finally
+                {
+                    redactedBitmap?.Dispose();
+                }
 
                 // 7. Save to disk if requested
                 if (saveToDisk)

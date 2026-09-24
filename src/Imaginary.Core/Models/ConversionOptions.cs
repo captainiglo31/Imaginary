@@ -71,4 +71,13 @@ public class ConversionOptions
     /// Optional watermark options.
     /// </summary>
     public WatermarkOptions Watermark { get; set; } = new();
+
+    /// <summary>
+    /// Automatic DSGVO redaction for faces and license plates.
+    /// </summary>
+    public bool AutoRedact { get; set; } = false;
+    public bool AutoRedactFaces { get; set; } = true;
+    public bool AutoRedactLicensePlates { get; set; } = true;
+    public RedactionStyle RedactionStyle { get; set; } = RedactionStyle.Pixelate;
+    public int RedactionIntensity { get; set; } = 16;
 }

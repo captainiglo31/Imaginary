@@ -135,7 +135,12 @@
                     <Button x:Name="ButtonToggleLayers" Content="📑 Ebenen" Click="OnToggleLayersClicked"
                             Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0" ToolTip="Ebenen-Panel für platzierte Elemente ein-/ausblenden"/>
                     <Button x:Name="ButtonToggleBgRemove" Content="✨ Freistellen" Click="OnToggleBgRemoveClicked"
-                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0" ToolTip="Hintergrund entfernen &amp; Freistell-Panel ein-/ausblenden"/>
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0" ToolTip="Hintergrund entfernen &amp; Freistell-Panel ein-/ausblenden"/>
+
+                    <Button x:Name="ButtonAutoRedact" Content="🤖 Auto-DSGVO" Click="OnAutoRedactClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,6,0" ToolTip="Erkennt Gesichter &amp; Kfz-Kennzeichen automatisch und anonymisiert sie"/>
+                    <Button x:Name="ButtonUpscale" Content="✨ KI-Upscale" Click="OnUpscaleClicked"
+                            Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,10,0" ToolTip="Bild mit KI Super-Resolution 2x / 4x vergrößern &amp; schärfen"/>
 
                     <Button x:Name="ButtonSwitchToProfiMode" Content="🎛️ In Profi-Modus wechseln" Click="OnSwitchToProfiModeClicked"
                             Style="{DynamicResource ToolbarButtonStyle}" FontWeight="SemiBold" Foreground="#38BDF8" Margin="0,0,14,0"
@@ -191,12 +196,15 @@
                 <!-- Tool Specific Options (Crop / Background / Blur / StepBadge) -->
                 <StackPanel x:Name="PanelCropOptions" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed" Margin="10,0,0,0">
                     <TextBlock Text="Format:" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <ComboBox x:Name="ComboCropAspect" SelectedIndex="0" SelectionChanged="OnCropAspectChanged" Width="110" Padding="6,3" FontSize="11.5" Margin="0,0,10,0">
+                    <ComboBox x:Name="ComboCropAspect" SelectedIndex="0" SelectionChanged="OnCropAspectChanged" Width="185" Padding="6,3" FontSize="11.5" Margin="0,0,10,0">
                         <ComboBoxItem Content="Frei"/>
-                        <ComboBoxItem Content="1:1 (Quadrat)"/>
-                        <ComboBoxItem Content="16:9 (Display)"/>
-                        <ComboBoxItem Content="4:3 (Foto)"/>
-                        <ComboBoxItem Content="9:16 (Story)"/>
+                        <ComboBoxItem Content="1:1 (Quadrat / Insta)"/>
+                        <ComboBoxItem Content="16:9 (Display / YouTube / X)"/>
+                        <ComboBoxItem Content="4:3 (Klassisch / Foto)"/>
+                        <ComboBoxItem Content="9:16 (Story / TikTok / Reels)"/>
+                        <ComboBoxItem Content="4:5 (Instagram Porträt)"/>
+                        <ComboBoxItem Content="1.91:1 (Social Feed / LinkedIn)"/>
+                        <ComboBoxItem Content="3:1 (Header / Twitter Banner)"/>
                     </ComboBox>
                     <Button Content="✂️ Zuschnitt anwenden" Click="OnApplyCropClicked" FontWeight="Bold"
                             Background="{DynamicResource AccentBrush}" Foreground="White" Padding="12,4" Style="{DynamicResource ToolbarButtonStyle}"/>

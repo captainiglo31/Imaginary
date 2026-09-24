@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Windows;
 using Imaginary.Core.Services;
@@ -7,11 +7,17 @@ namespace Imaginary.Desktop.Views;
 
 public partial class ImageEditorWindow : Window
 {
-    public ImageEditorWindow(string filePath, IImageEditorService editorService, IBackgroundRemovalService bgRemovalService)
+    public ImageEditorWindow(
+        string filePath,
+        IImageEditorService editorService,
+        IBackgroundRemovalService bgRemovalService,
+        IAutoRedactionService? autoRedactionService = null,
+        IUpscaleService? upscaleService = null,
+        IImageConverter? converter = null)
     {
         InitializeComponent();
         ResultFilePath = filePath;
-        EditorControl.Initialize(filePath, editorService, bgRemovalService);
+        EditorControl.Initialize(filePath, editorService, bgRemovalService, autoRedactionService, upscaleService, converter);
         EditorControl.FileSaved += (s, path) =>
         {
             ResultFilePath = path ?? filePath;

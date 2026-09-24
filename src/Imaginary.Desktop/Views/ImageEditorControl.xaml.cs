@@ -33,6 +33,9 @@ public partial class ImageEditorControl : UserControl
     private string _filePath = string.Empty;
     private IImageEditorService? _editorService;
     private IBackgroundRemovalService? _bgRemovalService;
+    private IAutoRedactionService? _autoRedactionService;
+    private IUpscaleService? _upscaleService;
+    private IImageConverter? _converter;
 
     private SKBitmap _currentBitmap = null!;
     private SKBitmap? _originalBitmap;
@@ -95,19 +98,42 @@ public partial class ImageEditorControl : UserControl
         };
     }
 
-    public void Initialize(string filePath, IImageEditorService editorService, IBackgroundRemovalService bgRemovalService)
+    public void Initialize(
+        string filePath,
+        IImageEditorService editorService,
+        IBackgroundRemovalService bgRemovalService,
+        IAutoRedactionService? autoRedactionService = null,
+        IUpscaleService? upscaleService = null,
+        IImageConverter? converter = null)
     {
         _filePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
         _editorService = editorService ?? throw new ArgumentNullException(nameof(editorService));
         _bgRemovalService = bgRemovalService ?? throw new ArgumentNullException(nameof(bgRemovalService));
+        _autoRedactionService = autoRedactionService;
+        _upscaleService = upscaleService;
+        _converter = converter;
 
         ResultFilePath = filePath;
         HasChanges = false;
 
         TextFileName.Text = Path.GetFileName(filePath);
 
-        using (var stream = File.OpenRead(filePath))
+        if (_converter != null)
         {
+            try
+            {
+                var loaded = _converter.LoadBitmap(filePath);
+                _currentBitmap = loaded.Bitmap;
+            }
+            catch
+            {
+                using var stream = File.OpenRead(filePath);
+                _currentBitmap = SKBitmap.Decode(stream);
+            }
+        }
+        else
+        {
+            using var stream = File.OpenRead(filePath);
             _currentBitmap = SKBitmap.Decode(stream);
         }
 
@@ -1245,6 +1271,28 @@ public partial class ImageEditorControl : UserControl
 
         if (_currentTool == EditorTool.Crop)
         {
+            double? aspect = ComboCropAspect?.SelectedIndex switch
+            {
+                1 => 1.0,           // 1:1
+                2 => 16.0 / 9.0,    // 16:9
+                3 => 4.0 / 3.0,     // 4:3
+                4 => 9.0 / 16.0,    // 9:16
+                5 => 4.0 / 5.0,     // 4:5
+                6 => 1.91,          // 1.91:1
+                7 => 3.0,           // 3:1
+                _ => null           // Free
+            };
+
+            if (aspect.HasValue && w > 0)
+            {
+                int sideH = (int)(w / aspect.Value);
+                if (y1 + sideH <= _currentBitmap.Height)
+                {
+                    h = sideH;
+                    y2 = y1 + h;
+                }
+            }
+
             if (w >= 10 && h >= 10)
             {
                 _activeCropRect = new SKRectI(x1, y1, x2, y2);
@@ -1377,7 +1425,150 @@ public partial class ImageEditorControl : UserControl
 
     private void OnCropAspectChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Aspect ratio handling for crop
+        if (_currentBitmap == null || ComboCropAspect == null) return;
+        double? aspect = ComboCropAspect.SelectedIndex switch
+        {
+            1 => 1.0,           // 1:1
+            2 => 16.0 / 9.0,    // 16:9
+            3 => 4.0 / 3.0,     // 4:3
+            4 => 9.0 / 16.0,    // 9:16
+            5 => 4.0 / 5.0,     // 4:5
+            6 => 1.91,          // 1.91:1
+            7 => 3.0,           // 3:1
+            _ => null           // Free
+        };
+
+        if (aspect.HasValue)
+        {
+            int imgW = _currentBitmap.Width;
+            int imgH = _currentBitmap.Height;
+            int cropW, cropH;
+
+            if (imgW / (double)imgH > aspect.Value)
+            {
+                cropH = (int)(imgH * 0.9);
+                cropW = (int)(cropH * aspect.Value);
+            }
+            else
+            {
+                cropW = (int)(imgW * 0.9);
+                cropH = (int)(cropW / aspect.Value);
+            }
+
+            int x = (imgW - cropW) / 2;
+            int y = (imgH - cropH) / 2;
+
+            _activeCropRect = new SKRectI(x, y, x + cropW, y + cropH);
+            if (PreviewRect != null)
+            {
+                PreviewRect.Visibility = Visibility.Visible;
+                Canvas.SetLeft(PreviewRect, x);
+                Canvas.SetTop(PreviewRect, y);
+                PreviewRect.Width = cropW;
+                PreviewRect.Height = cropH;
+            }
+            TextStatusHint.Text = $"Seitenverhältnis gewählt: {cropW} × {cropH} px. Klicke auf '✂️ Zuschnitt anwenden'.";
+        }
+    }
+
+    private void OnAutoRedactClicked(object sender, RoutedEventArgs e)
+    {
+        if (_currentBitmap == null) return;
+        if (_autoRedactionService == null)
+        {
+            MessageBox.Show("DSGVO-Automatikdienst ist nicht verfügbar.", "Auto-DSGVO", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var menu = new ContextMenu();
+        var itemPixelate = new MenuItem { Header = "▦ Auto-Verpixeln (Mosaik, Gesichter & Kennzeichen)" };
+        itemPixelate.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Pixelate, 16);
+
+        var itemBlur = new MenuItem { Header = "💧 Auto-Weichzeichnen (Blur, Gesichter & Kennzeichen)" };
+        itemBlur.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Blur, 16);
+
+        var itemBlackout = new MenuItem { Header = "⬛ Auto-Schwärzen (DSGVO Blackout)" };
+        itemBlackout.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Blackout, 16);
+
+        menu.Items.Add(itemPixelate);
+        menu.Items.Add(itemBlur);
+        menu.Items.Add(itemBlackout);
+
+        if (sender is Button btn)
+        {
+            menu.PlacementTarget = btn;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
+    private void ApplyAutoRedaction(RedactionStyle style, int intensity)
+    {
+        if (_currentBitmap == null || _autoRedactionService == null) return;
+
+        var detected = _autoRedactionService.DetectRegions(_currentBitmap, detectFaces: true, detectPlates: true);
+        if (detected.Count == 0)
+        {
+            TextStatusHint.Text = "🤖 Auto-DSGVO: Keine Gesichter oder Kennzeichen im Bild erkannt.";
+            return;
+        }
+
+        PushUndoState(bitmapModified: true);
+        var redacted = _autoRedactionService.AutoRedact(_currentBitmap, detectFaces: true, detectPlates: true, style: style, intensity: intensity);
+        _currentBitmap.Dispose();
+        _currentBitmap = redacted;
+        HasChanges = true;
+        UpdateImageDisplay();
+        TextStatusHint.Text = $"🤖 Auto-DSGVO: {detected.Count} sensible(r) Bereich(e) erfolgreich anonymisiert.";
+    }
+
+    private void OnUpscaleClicked(object sender, RoutedEventArgs e)
+    {
+        if (_currentBitmap == null) return;
+        if (_upscaleService == null)
+        {
+            MessageBox.Show("KI-Upscaling-Dienst ist nicht verfügbar.", "KI-Upscaling", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var menu = new ContextMenu();
+        var item2x = new MenuItem { Header = "✨ 2x KI-Super-Resolution (Auflösung verdoppeln)" };
+        item2x.Click += async (s, ev) => await ExecuteUpscaleAsync(2);
+
+        var item4x = new MenuItem { Header = "✨ 4x KI-Super-Resolution (Auflösung vervierfachen)" };
+        item4x.Click += async (s, ev) => await ExecuteUpscaleAsync(4);
+
+        menu.Items.Add(item2x);
+        menu.Items.Add(item4x);
+
+        if (sender is Button btn)
+        {
+            menu.PlacementTarget = btn;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
+    private async Task ExecuteUpscaleAsync(int factor)
+    {
+        if (_currentBitmap == null || _upscaleService == null) return;
+
+        try
+        {
+            TextStatusHint.Text = $"✨ Berechne KI-Upscaling ({factor}x Super Resolution)... Bitte warten.";
+            PushUndoState(bitmapModified: true);
+            var upscaled = await _upscaleService.UpscaleAsync(_currentBitmap, factor);
+            _currentBitmap.Dispose();
+            _currentBitmap = upscaled;
+            HasChanges = true;
+            UpdateImageDisplay();
+            OnZoomFitClicked(this, new RoutedEventArgs());
+            TextStatusHint.Text = $"✨ KI-Upscaling {factor}x erfolgreich: Neue Auflösung {_currentBitmap.Width} × {_currentBitmap.Height} px.";
+        }
+        catch (Exception ex)
+        {
+            TextStatusHint.Text = $"Fehler beim KI-Upscaling: {ex.Message}";
+        }
     }
 
     private void OnCanvasMouseWheel(object sender, MouseWheelEventArgs e)

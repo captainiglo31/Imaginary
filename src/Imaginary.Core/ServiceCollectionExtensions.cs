@@ -26,6 +26,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IImageEditorService, ImageEditorService>();
         services.AddSingleton<IBackgroundRemovalService, BackgroundRemovalService>();
         services.AddSingleton<IProfiDeveloperService, ProfiDeveloperService>();
+        services.AddSingleton<ISocialMediaTemplateService, SocialMediaTemplateService>();
+        services.AddSingleton<IUpscaleService, UpscaleService>();
+        services.AddSingleton<IAutoRedactionService, AutoRedactionService>();
+        services.AddSingleton<IIconGeneratorService, IconGeneratorService>();
         if (OperatingSystem.IsWindows())
         {
             services.AddSingleton<IExplorerIntegration, ExplorerIntegration>();

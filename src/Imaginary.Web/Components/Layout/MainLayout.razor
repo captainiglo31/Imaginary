@@ -1,23 +1,168 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@using Imaginary.Web.Services
+@inject GlobalStatsService StatsService
+@implements IDisposable
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<div class="landing-page">
+    <!-- Sticky Top Navigation -->
+    <header class="navbar-header sticky-top">
+        <div class="container-xl d-flex align-items-center justify-content-between py-2">
+            <!-- Brand -->
+            <a href="/" class="brand-link d-flex align-items-center text-decoration-none flex-shrink-0">
+                <img src="images/logo.png" alt="Imaginary" class="brand-logo me-2" />
+                <span class="brand-title">IMAGINARY</span>
+            </a>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <!-- Nav Links -->
+            <nav class="nav-links d-none d-lg-flex align-items-center gap-2">
+                <a href="#web-converter" class="nav-link-custom">⚡ Web-Konverter</a>
+                <a href="#desktop-app" class="nav-link-custom">💻 Desktop-App</a>
+                <a href="#screenshots" class="nav-link-custom">📸 Screenshots</a>
+                <a href="#features" class="nav-link-custom">✨ Vergleich</a>
+                <a href="https://github.com/captainiglo31/Imaginary" target="_blank" rel="noopener noreferrer" class="nav-link-custom" title="GitHub">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -3px;">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                    </svg>
+                </a>
+            </nav>
+
+            <!-- Right Actions: Theme Toggle & Download CTA -->
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <button class="theme-toggle-btn" @onclick="ToggleThemeAsync" title="Hell / Dunkel">
+                    @(IsLightMode ? "🌙" : "☀️")
+                </button>
+                <a href="/download" class="btn btn-primary-glow btn-sm fw-semibold px-3 py-2 d-none d-sm-inline-flex">
+                    📥 Download
+                </a>
+            </div>
         </div>
+    </header>
 
-        <article class="content px-4">
-            @Body
-        </article>
+    <!-- Main Page Content -->
+    <main class="main-content">
+        @Body
     </main>
+
+    <!-- Modern Footer -->
+    <footer class="footer-modern py-5 mt-5">
+        <div class="container-xl">
+            <div class="row g-4 justify-content-between">
+                <div class="col-lg-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <img src="images/logo.png" alt="Imaginary" class="brand-logo me-2" style="width: 38px; height: 38px;" />
+                        <span class="brand-title fs-4">IMAGINARY</span>
+                    </div>
+                    <p class="text-muted small pe-lg-4">
+                        Das Schweizer Taschenmesser für deine Bilder. Entwickelt für maximale Geschwindigkeit, intuitive Bedienung und 100% Datenschutz.
+                    </p>
+                    <div class="d-flex align-items-center gap-2 mt-3">
+                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 small">
+                            🛡️ 100% DSGVO-konform
+                        </span>
+                        <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1 small">
+                            ⚡ Keine Cloud-Zwänge
+                        </span>
+                    </div>
+                </div>
+
+                <div class="col-6 col-lg-2">
+                    <h6 class="text-white fw-bold mb-3">Software</h6>
+                    <ul class="list-unstyled small d-flex flex-column gap-2 mb-0">
+                        <li><a href="#web-converter" class="footer-link">Web-Konverter</a></li>
+                        <li><a href="#desktop-app" class="footer-link">Windows Desktop-App</a></li>
+                        <li><a href="#features" class="footer-link">Feature-Vergleich</a></li>
+                        <li><a href="#stats" class="footer-link">Live-Statistiken</a></li>
+                    </ul>
+                </div>
+
+                <div class="col-6 col-lg-2">
+                    <h6 class="text-white fw-bold mb-3">Downloads</h6>
+                    <ul class="list-unstyled small d-flex flex-column gap-2 mb-0">
+                        <li><a href="/download" class="footer-link">Imaginary.exe (Standalone)</a></li>
+                        <li><a href="/download/zip" class="footer-link">Imaginary-Portable.zip</a></li>
+                        <li><a href="https://github.com/captainiglo31/Imaginary/releases" target="_blank" rel="noopener noreferrer" class="footer-link">Alle Versionen</a></li>
+                        <li><a href="https://github.com/captainiglo31/Imaginary/releases/tag/v2.5.0" target="_blank" rel="noopener noreferrer" class="footer-link">Changelog v2.5.0</a></li>
+                    </ul>
+                </div>
+
+                <div class="col-lg-3">
+                    <h6 class="text-white fw-bold mb-3">Open Source</h6>
+                    <p class="text-muted small mb-2">
+                        Imaginary ist Open Source und wird aktiv auf GitHub weiterentwickelt.
+                    </p>
+                    <a href="https://github.com/captainiglo31/Imaginary" target="_blank" rel="noopener noreferrer" class="btn btn-outline-light btn-sm w-100 mb-2">
+                        ★ Star auf GitHub
+                    </a>
+                </div>
+            </div>
+
+            <hr class="border-secondary opacity-25 my-4" />
+
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-center small text-muted">
+                <div>
+                    &copy; @DateTime.UtcNow.Year <strong>Imaginary</strong>. Alle Rechte vorbehalten. Entwickelt von <strong>Pino Wackers</strong>.
+                </div>
+                <div class="d-flex gap-3 mt-2 mt-md-0">
+                    <span>Windows 10 / 11 (64-Bit)</span>
+                    <span>•</span>
+                    <span>.NET 8 &amp; SkiaSharp</span>
+                    <span>•</span>
+                    <span class="text-emerald">🟢 Server &amp; Counter Online</span>
+                </div>
+            </div>
+        </div>
+    </footer>
 </div>
 
 <div id="blazor-error-ui">
-    An unhandled error has occurred.
-    <a href="" class="reload">Reload</a>
+    Ein unerwarteter Fehler ist aufgetreten.
+    <a href="" class="reload text-cyan fw-bold">Neu laden</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private GlobalStatsDto Stats { get; set; } = new();
+    private bool IsLightMode { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Stats = StatsService.GetStats();
+        StatsService.OnStatsChanged += OnStatsUpdated;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var theme = await JS.InvokeAsync<string>("ImaginarySite.getTheme");
+                IsLightMode = theme == "light";
+                StateHasChanged();
+            }
+            catch { /* SSR fallback */ }
+        }
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        try
+        {
+            var next = await JS.InvokeAsync<string>("ImaginarySite.toggleTheme");
+            IsLightMode = next == "light";
+        }
+        catch { /* Fallback */ }
+    }
+
+    private void OnStatsUpdated(GlobalStatsDto updated)
+    {
+        Stats = updated;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        StatsService.OnStatsChanged -= OnStatsUpdated;
+    }
+}

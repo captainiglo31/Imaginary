@@ -169,8 +169,11 @@
                                 <RadioButton Content="📁 Hotfolder &amp; Automation"
                                              IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=2, Mode=TwoWay}"
                                              Style="{StaticResource TabNavigationRadioButtonStyle}"/>
-                                <RadioButton Content="⚙️ Einstellungen"
+                                <RadioButton Content="🔮 Icon-Studio"
                                              IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=3, Mode=TwoWay}"
+                                             Style="{StaticResource TabNavigationRadioButtonStyle}"/>
+                                <RadioButton Content="⚙️ Einstellungen"
+                                             IsChecked="{Binding SelectedTabIndex, Converter={StaticResource IntToBool}, ConverterParameter=4, Mode=TwoWay}"
                                              Style="{StaticResource TabNavigationRadioButtonStyle}"/>
                             </StackPanel>
                         </Border>
@@ -276,6 +279,13 @@
                         <!-- 3. Resize & Cropping -->
                         <GroupBox Header="3. Auflösung &amp; Skalierung">
                             <StackPanel Margin="0,4,0,0">
+                                <TextBlock Text="📱 Social-Media-Vorlage (Optional):" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,3"/>
+                                <ComboBox ItemsSource="{Binding SocialMediaTemplates}"
+                                          SelectedItem="{Binding SelectedSocialMediaTemplate, Mode=TwoWay}"
+                                          DisplayMemberPath="DisplayTitle"
+                                          Padding="6,4" FontSize="12" Margin="0,0,0,8"/>
+
+                                <TextBlock Text="Skalierungs-Modus:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,3"/>
                                 <ComboBox ItemsSource="{Binding AvailableResizeModes}"
                                           SelectedIndex="{Binding SelectedResizeModeIndex, Mode=TwoWay}"
                                           Padding="6,4" FontSize="13" Margin="0,0,0,8"/>
@@ -337,6 +347,30 @@
                                 <StackPanel Visibility="{Binding SelectedResizeModeIndex, Converter={StaticResource IntToVis}, ConverterParameter=5}" Margin="0,4,0,0">
                                     <TextBlock Text="Längste Kante (px):" FontSize="11" Margin="0,0,0,2"/>
                                     <TextBox Text="{Binding MaxEdgeLength, Mode=TwoWay, TargetNullValue=''}" Padding="6,4"/>
+                                </StackPanel>
+
+                                <!-- Mode 6 & 7: AI Super Resolution -->
+                                <StackPanel Margin="0,4,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="6">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding SelectedResizeModeIndex}" Value="7">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Border Background="{DynamicResource ToolbarBackgroundBrush}" BorderBrush="{DynamicResource BrandGradientBrush}" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                                        <StackPanel>
+                                            <TextBlock Text="✨ KI-Super-Resolution aktiv" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Kleine und unscharfe Bilder werden mittels neuronaler Kantenglättung und Detail-Rekonstruktion gestochen scharf vergrößert."
+                                                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
                         </GroupBox>
@@ -403,6 +437,40 @@
                                     </DockPanel>
                                     <Slider Minimum="0.1" Maximum="1.0" Value="{Binding WatermarkOpacity, Mode=TwoWay}"
                                             TickFrequency="0.05" IsSnapToTickEnabled="False"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- 5. DSGVO-Automatik (Aufklappbar) -->
+                        <Expander Header="5. DSGVO-Automatik (Gesichter &amp; Kennzeichen)" Style="{DynamicResource ModernCardExpanderStyle}"
+                                  IsExpanded="{Binding EnableAutoRedact, Mode=TwoWay}">
+                            <StackPanel Margin="0,4,0,0">
+                                <CheckBox IsChecked="{Binding EnableAutoRedact, Mode=TwoWay}"
+                                          Content="Auto-DSGVO Anonymisierung aktivieren"
+                                          FontWeight="Normal" Margin="0,0,0,8"
+                                          ToolTip="Erkennt sensible Bereiche automatisch und macht sie unkenntlich"/>
+
+                                <StackPanel IsEnabled="{Binding EnableAutoRedact}">
+                                    <TextBlock Text="Erkennungs-Ziele:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <CheckBox Content="👤 Gesichter" IsChecked="{Binding AutoRedactFaces, Mode=TwoWay}" Margin="0,0,14,0"/>
+                                        <CheckBox Content="🚗 Kfz-Kennzeichen" IsChecked="{Binding AutoRedactLicensePlates, Mode=TwoWay}"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="Anonymisierungs-Methode:" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <RadioButton Content="Pixelate (Mosaik)" IsChecked="{Binding SelectedRedactionStyleIndex, Converter={StaticResource IntToBool}, ConverterParameter=0, Mode=TwoWay}" Margin="0,0,10,0" FontSize="11"/>
+                                        <RadioButton Content="Blur (Weichzeichnen)" IsChecked="{Binding SelectedRedactionStyleIndex, Converter={StaticResource IntToBool}, ConverterParameter=1, Mode=TwoWay}" Margin="0,0,10,0" FontSize="11"/>
+                                        <RadioButton Content="Blackout (Schwärzen)" IsChecked="{Binding SelectedRedactionStyleIndex, Converter={StaticResource IntToBool}, ConverterParameter=2, Mode=TwoWay}" FontSize="11"/>
+                                    </StackPanel>
+
+                                    <DockPanel Margin="0,2,0,0">
+                                        <TextBlock Text="Stärke:" FontSize="11"/>
+                                        <TextBlock Text="{Binding RedactionIntensity}"
+                                                   FontWeight="Bold" HorizontalAlignment="Right" FontSize="11"/>
+                                    </DockPanel>
+                                    <Slider Minimum="4" Maximum="64" Value="{Binding RedactionIntensity, Mode=TwoWay}"
+                                            TickFrequency="4" IsSnapToTickEnabled="True"/>
                                 </StackPanel>
                             </StackPanel>
                         </Expander>
@@ -495,7 +563,7 @@
                                 <TextBlock Text="📁" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBlock Text="Bilder oder Ordner hier ablegen" FontSize="18" FontWeight="SemiBold"
                                            HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                <TextBlock Text="Unterstützt RAW (CR2, CR3, NEF, ARW, DNG, ORF, RW2, PEF, RAF) sowie JPEG, PNG, WebP, AVIF, GIF, BMP und TIFF" FontSize="12"
+                                <TextBlock Text="Unterstützt iPhone (HEIC, HEIF), RAW (CR2, CR3, NEF, ARW, DNG, ORF, RW2, PEF, RAF) sowie JPEG, PNG, WebP, AVIF, GIF, BMP und TIFF" FontSize="12"
                                            Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                                 <TextBlock Text="💡 Strg+V für Zwischenablage • F10 für Screenshot • Zeilen per Drag &amp; Drop herausziehen"
                                            FontSize="11.5" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,12,0,0"/>
@@ -880,7 +948,314 @@
                 </Grid>
             </TabItem>
 
-            <!-- Tab 3: ⚙️ Einstellungen -->
+            <!-- Tab 3: 🔮 Icon-Studio -->
+            <TabItem>
+                <Grid Margin="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="460"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left Column: Controls & Configuration -->
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
+                            <StackPanel>
+                                <!-- 1. Source Graphic Card -->
+                                <GroupBox Header="1. Quellgrafik &amp; Basisname">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Text="Wähle ein hochauflösendes Logo oder Bild (mind. 512×512 px empfohlen):"
+                                                   FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,6" TextWrapping="Wrap"/>
+
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Button DockPanel.Dock="Right" Content="📂 Wählen..." Command="{Binding SelectIconStudioImageCommand}"
+                                                    Padding="12,5" Margin="6,0,0,0" Style="{DynamicResource ToolbarButtonStyle}" FontWeight="SemiBold"/>
+                                            <TextBox Text="{Binding IconStudioSourcePath, Mode=TwoWay}" Padding="6,4" FontSize="12" IsReadOnly="True"
+                                                     ToolTip="Pfad der ausgewählten Quellgrafik"/>
+                                        </DockPanel>
+
+                                        <Grid Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Dateiname (Präfix):" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBox Grid.Column="1" Text="{Binding IconStudioBaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     Padding="6,4" FontSize="12" ToolTip="Grundname für exportierte Dateien (z.B. 'app' -> 'app.ico', 'app-icon.png')"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- 2. Shape, Padding & Background -->
+                                <GroupBox Header="2. Form, Randabstand &amp; Hintergrund">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <TextBlock Text="Icon-Form &amp; Ecken:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <RadioButton Grid.Column="0" Content="Quadrat"
+                                                         IsChecked="{Binding IconStudioShapeIndex, Converter={StaticResource IntToBool}, ConverterParameter=0, Mode=TwoWay}"
+                                                         FontSize="11.5"/>
+                                            <RadioButton Grid.Column="1" Content="Abgerundet"
+                                                         IsChecked="{Binding IconStudioShapeIndex, Converter={StaticResource IntToBool}, ConverterParameter=1, Mode=TwoWay}"
+                                                         FontSize="11.5"/>
+                                            <RadioButton Grid.Column="2" Content="Squircle"
+                                                         IsChecked="{Binding IconStudioShapeIndex, Converter={StaticResource IntToBool}, ConverterParameter=2, Mode=TwoWay}"
+                                                         FontSize="11.5" ToolTip="iOS / macOS Standardform"/>
+                                            <RadioButton Grid.Column="3" Content="Kreis"
+                                                         IsChecked="{Binding IconStudioShapeIndex, Converter={StaticResource IntToBool}, ConverterParameter=3, Mode=TwoWay}"
+                                                         FontSize="11.5"/>
+                                        </Grid>
+
+                                        <DockPanel Margin="0,2,0,4">
+                                            <TextBlock Text="Innenabstand (Padding):" FontSize="11.5"/>
+                                            <TextBlock Text="{Binding IconStudioPaddingPercent, StringFormat={}{0:N0} %}"
+                                                       FontWeight="Bold" HorizontalAlignment="Right" FontSize="11.5"/>
+                                        </DockPanel>
+                                        <Slider Minimum="0" Maximum="30" Value="{Binding IconStudioPaddingPercent, Mode=TwoWay}"
+                                                TickFrequency="2" IsSnapToTickEnabled="True" Margin="0,0,0,8"/>
+
+                                        <TextBlock Text="Hintergrundfarbe:" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <RadioButton Content="Transparent"
+                                                         IsChecked="{Binding IconStudioBgColorIndex, Converter={StaticResource IntToBool}, ConverterParameter=0, Mode=TwoWay}"
+                                                         Margin="0,0,12,0" FontSize="11.5"/>
+                                            <RadioButton Content="Weiß (#FFF)"
+                                                         IsChecked="{Binding IconStudioBgColorIndex, Converter={StaticResource IntToBool}, ConverterParameter=1, Mode=TwoWay}"
+                                                         Margin="0,0,12,0" FontSize="11.5"/>
+                                            <RadioButton Content="Schwarz (#000)"
+                                                         IsChecked="{Binding IconStudioBgColorIndex, Converter={StaticResource IntToBool}, ConverterParameter=2, Mode=TwoWay}"
+                                                         FontSize="11.5"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- 3. Target Platforms & Size Selection -->
+                                <GroupBox Header="3. Zielformate &amp; Plattformen (Granulare Auswahl)">
+                                    <StackPanel Margin="0,4,0,0">
+                                        <!-- Quick filter buttons -->
+                                        <WrapPanel Margin="0,0,0,8">
+                                            <Button Content="Alle" Command="{Binding SelectAllIconStudioItemsCommand}"
+                                                    Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,4,4"/>
+                                            <Button Content="Keine" Command="{Binding DeselectAllIconStudioItemsCommand}"
+                                                    Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,8,4"/>
+                                            <Button Content="🪟 Windows" Command="{Binding SelectIconStudioPlatformCommand}" CommandParameter="Windows"
+                                                    Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,4,4"/>
+                                            <Button Content="🌐 Web / Favicon" Command="{Binding SelectIconStudioPlatformCommand}" CommandParameter="Web"
+                                                    Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,4,4"/>
+                                            <Button Content="🍎 Apple" Command="{Binding SelectIconStudioPlatformCommand}" CommandParameter="Apple"
+                                                    Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,4,4"/>
+                                            <Button Content="🤖 Android" Command="{Binding SelectIconStudioPlatformCommand}" CommandParameter="Android"
+                                                    Padding="8,3" FontSize="11" Style="{DynamicResource ToolbarButtonStyle}" Margin="0,0,0,4"/>
+                                        </WrapPanel>
+
+                                        <!-- Item Selection List -->
+                                        <Border Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="6"
+                                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" MaxHeight="220">
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding IconStudioItems}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,5">
+                                                                <DockPanel LastChildFill="True">
+                                                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                    <Border DockPanel.Dock="Right" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="3"
+                                                                            Padding="6,2" VerticalAlignment="Center">
+                                                                        <TextBlock Text="{Binding DimensionsText}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                    </Border>
+                                                                    <StackPanel VerticalAlignment="Center">
+                                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                                        <TextBlock Text="{Binding Category}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                    </StackPanel>
+                                                                </DockPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Border>
+
+                                        <TextBlock Text="{Binding SelectedIconStudioCount, StringFormat='{}{0} Formate für den Export ausgewählt'}"
+                                                   FontSize="11" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </GroupBox>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Fixed Bottom Export Buttons -->
+                        <Border Grid.Row="1" Background="{DynamicResource WindowBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,6,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="📦 Als ZIP speichern"
+                                        Command="{Binding GenerateIconPackageZipCommand}"
+                                        IsEnabled="{Binding CanGenerateIcons}"
+                                        Style="{StaticResource ActionButtonStyle}"
+                                        Background="{DynamicResource ActionButtonGradientBrush}" Foreground="White"
+                                        Height="42" Cursor="Hand" ToolTip="Erzeugt ein vollständiges .zip-Archiv aller ausgewählten Icon-Formate"/>
+                                <Button Grid.Column="2" Content="📂 In Ordner exportieren"
+                                        Command="{Binding ExportIconPackageDirectoryCommand}"
+                                        IsEnabled="{Binding CanGenerateIcons}"
+                                        Style="{StaticResource ActionButtonStyle}"
+                                        Background="{DynamicResource SecondaryButtonBackgroundBrush}"
+                                        Foreground="{DynamicResource SecondaryButtonForegroundBrush}"
+                                        Height="42" Cursor="Hand" ToolTip="Schreibt alle generierten Dateien strukturiert in einen gewählten Zielordner"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Right Column: Live Interactive Previews -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Preview Card Header -->
+                        <Border Grid.Row="0" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="8"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="14,10" Margin="0,0,0,12">
+                            <DockPanel LastChildFill="True">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                                    <Border Background="#10B981" CornerRadius="4" Padding="8,3"
+                                            Visibility="{Binding IsIconStudioLoaded, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="✔ Bereit" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                    </Border>
+                                </StackPanel>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="🔮 Echtzeit-Vorschau &amp; Multi-Plattform Mockups" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    <TextBlock Text="{Binding IconStudioStatusText}" FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Main Preview Stage & Platform Mockups -->
+                        <Border Grid.Row="1" Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="8"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="20">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <!-- Big 256px Live Preview with Transparency Checkerboard -->
+                                    <Border Width="260" Height="260" CornerRadius="16" Background="#1E293B"
+                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="2"
+                                            HorizontalAlignment="Center" Margin="0,10,0,24" ClipToBounds="True">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="24" ShadowDepth="6" Opacity="0.35" Color="#000000"/>
+                                        </Border.Effect>
+                                        <Grid>
+                                            <!-- Empty Placeholder when not loaded -->
+                                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                        Visibility="{Binding IsIconStudioLoaded, Converter={StaticResource InverseBoolToVis}}">
+                                                <TextBlock Text="🔮" FontSize="56" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                                <TextBlock Text="Icon-Vorschau" FontWeight="Bold" FontSize="15" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Lade links eine Quellgrafik" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <!-- Rendered Live Icon Image -->
+                                            <Image Source="{Binding IconStudioPreviewImage}" Stretch="Uniform"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   Visibility="{Binding IsIconStudioLoaded, Converter={StaticResource BoolToVis}}"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Mockup 1: Web Browser Tab Favicon Preview -->
+                                    <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="8"
+                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="14,10"
+                                            MaxWidth="520" Margin="0,0,0,14" HorizontalAlignment="Center">
+                                        <StackPanel>
+                                            <TextBlock Text="🌐 Browser Tab (Favicon 16×16 px):" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
+                                            <Border Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="6,6,0,0"
+                                                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,1,1,0"
+                                                    Padding="12,6" HorizontalAlignment="Left" Width="220">
+                                                <DockPanel LastChildFill="True">
+                                                    <TextBlock DockPanel.Dock="Right" Text="✕" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                                    <Image Source="{Binding IconStudioPreviewImage}" Width="16" Height="16" Margin="0,0,8,0"
+                                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                    <TextBlock Text="Meine Website" FontSize="11.5" FontWeight="SemiBold"
+                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                </DockPanel>
+                                            </Border>
+                                            <Rectangle Height="2" Fill="{DynamicResource BrandGradientBrush}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Mockup 2: Windows Taskbar & Explorer Preview -->
+                                    <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="8"
+                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="14,10"
+                                            MaxWidth="520" Margin="0,0,0,14" HorizontalAlignment="Center">
+                                        <StackPanel>
+                                            <TextBlock Text="🪟 Windows Taskbar (48×48 px) &amp; Explorer (32×32 px):" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- Taskbar Button Mockup -->
+                                                <Border Background="#0F172A" CornerRadius="6" Padding="10,6" Margin="0,0,16,0"
+                                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Image Source="{Binding IconStudioPreviewImage}" Width="32" Height="32" Margin="0,0,8,0"
+                                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                        <TextBlock Text="App Name" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="White"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Desktop Shortcut Mockup -->
+                                                <StackPanel HorizontalAlignment="Center" Width="70">
+                                                    <Image Source="{Binding IconStudioPreviewImage}" Width="48" Height="48" HorizontalAlignment="Center"
+                                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                    <TextBlock Text="App Name" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Mockup 3: Smartphone App Icon Preview -->
+                                    <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="8"
+                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="14,10"
+                                            MaxWidth="520" Margin="0,0,0,8" HorizontalAlignment="Center">
+                                        <StackPanel>
+                                            <TextBlock Text="📱 Mobile App Home-Screen (iOS / Android 180×180 px):" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                                                    <Border Width="64" Height="64" CornerRadius="14" Background="#1E293B" ClipToBounds="True"
+                                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                                        <Image Source="{Binding IconStudioPreviewImage}" Stretch="Uniform"
+                                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                    </Border>
+                                                    <TextBlock Text="App" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                </StackPanel>
+
+                                                <StackPanel Margin="12,0" HorizontalAlignment="Center">
+                                                    <Border Width="64" Height="64" CornerRadius="32" Background="#1E293B" ClipToBounds="True"
+                                                            BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                                        <Image Source="{Binding IconStudioPreviewImage}" Stretch="Uniform"
+                                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                    </Border>
+                                                    <TextBlock Text="Android Round" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 4: ⚙️ Einstellungen -->
             <TabItem>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxWidth="820" HorizontalAlignment="Left">
                     <StackPanel Margin="8,0,0,16">
@@ -1094,6 +1469,41 @@
                                 <!-- Download Progress Bar if downloading -->
                                 <ProgressBar Value="{Binding AiModelDownloadProgress}" Minimum="0" Maximum="100" Height="6" Margin="0,4,0,0"
                                              Visibility="{Binding IsAiModelDownloading, Converter={StaticResource BoolToVis}}"/>
+
+                                <!-- KI-Upscaling / Super Resolution Models -->
+                                <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,8,0,4">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                                <TextBlock Text="✨ KI-Upscaling (Super Resolution 2x &amp; 4x, ONNX):" FontWeight="SemiBold" FontSize="12"/>
+                                                <TextBlock Text="{Binding Upscale2xStatusText}" FontWeight="Bold" FontSize="12"
+                                                           Foreground="{DynamicResource AccentBrush}" Margin="8,0,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Text="Neuronales Netz zur intelligenten Vergrößerung von Bildern. Imaginary besitzt bereits einen integrierten Offline-Algorithmus (Lanczos3 + Unsharp Detail Recovery). Für maximale Rekonstruktion kann zusätzlich das ONNX-Modell heruntergeladen werden."
+                                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                                            <Button Content="⬇️ Upscale-Modell herunterladen" Command="{Binding DownloadUpscaleModelCommand}"
+                                                    Visibility="{Binding IsUpscale2xDownloaded, Converter={StaticResource InverseBoolToVis}}"
+                                                    IsEnabled="{Binding IsUpscaleDownloading, Converter={StaticResource InverseBool}}"
+                                                    Style="{DynamicResource ToolbarButtonStyle}" Padding="12,6" FontWeight="SemiBold"/>
+                                            <Button Content="🗑️ Modell löschen" Command="{Binding DeleteUpscaleModelCommand}"
+                                                    Visibility="{Binding IsUpscale2xDownloaded, Converter={StaticResource BoolToVis}}"
+                                                    Style="{DynamicResource ToolbarButtonStyle}" Padding="10,6" Foreground="#EF4444"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Download Progress Bar if upscale downloading -->
+                                <ProgressBar Value="{Binding UpscaleDownloadProgress}" Minimum="0" Maximum="100" Height="6" Margin="0,4,0,0"
+                                             Visibility="{Binding IsUpscaleDownloading, Converter={StaticResource BoolToVis}}"/>
                             </StackPanel>
                         </GroupBox>
  
@@ -1200,6 +1610,20 @@
                                                FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </DockPanel>
 
+                                <!-- Globale Live-Statistiken teilen -->
+                                <Border Background="{DynamicResource CardHeaderBackgroundBrush}" CornerRadius="6"
+                                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10" Margin="0,0,0,10">
+                                    <DockPanel LastChildFill="True">
+                                        <CheckBox DockPanel.Dock="Right" IsChecked="{Binding ShareAnonymousStats, Mode=TwoWay}"
+                                                  VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="Anonyme Nutzungsstatistik teilen" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="Erhöht den weltweiten Bild-Zähler bei Konvertierungen. Es werden keinerlei Bildinhalte oder persönliche Daten übertragen (100% DSGVO-konform)."
+                                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+
                                 <!-- Weiterempfehlen / Download-Link teilen -->
                                 <Border Background="{DynamicResource CardHeaderBackgroundBrush}" CornerRadius="6"
                                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12,10" Margin="0,0,0,10">
@@ -1264,8 +1688,17 @@
 
                 <TextBlock Grid.Column="0" Text="{Binding StatusSummary}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
 
-                <!-- Hotfolder Status Badge -->
+                <!-- Badges (Live Global Stats & Hotfolder) -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0">
+                    <!-- Live Global Stats Badge -->
+                    <Border Background="#0F172A" BorderBrush="#0284C7" BorderThickness="1" CornerRadius="4" Padding="8,3"
+                            Margin="0,0,10,0" ToolTip="Weltweiter Bild-Zähler aller Imaginary-Instanzen (Web &amp; Desktop)">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="6" Height="6" Fill="#10B981" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding GlobalStatsText}" FontSize="11" FontWeight="SemiBold" Foreground="#38BDF8"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Live Hotfolder Badge -->
                     <Border Background="#10B981" CornerRadius="4" Padding="8,3"
                             Visibility="{Binding IsHotfolderActive, Converter={StaticResource BoolToVis}}"

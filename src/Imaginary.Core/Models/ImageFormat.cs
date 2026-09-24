@@ -11,5 +11,6 @@ public enum ImageFormat
     Tiff,
     Avif,
     Ico,
-    Raw
+    Raw,
+    Heic
 }

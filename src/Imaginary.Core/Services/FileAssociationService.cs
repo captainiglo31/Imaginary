@@ -18,7 +18,7 @@ public class FileAssociationService : IFileAssociationService
     public static readonly string[] SupportedExtensions = new[]
     {
         // Standardformate
-        ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".avif", ".gif",
+        ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".avif", ".gif", ".heic", ".heif",
         // Kamera-RAW-Formate
         ".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".rw2", ".pef", ".raf"
     };

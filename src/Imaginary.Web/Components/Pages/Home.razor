@@ -7,41 +7,154 @@
 @inject IImageFormatDetector FormatDetector
 @inject TempFileStorageService TempStorage
 @inject IPresetManager PresetManager
+@inject GlobalStatsService StatsService
+@inject IJSRuntime JS
+@implements IDisposable
 
-<PageTitle>Imaginary – Bild-Konvertierung &amp; Verkleinerung</PageTitle>
+<PageTitle>Imaginary – Schneller Bild-Konverter &amp; Editor für Windows &amp; Web</PageTitle>
 
-<div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="card shadow-sm border-0 bg-dark text-white p-4" style="background: linear-gradient(135deg, #070A14 0%, #0F172A 100%) !important; border-bottom: 2px solid #38bdf8 !important;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center">
-                        <img src="images/logo.png" alt="Imaginary Logo" class="rounded-3 me-3 shadow" style="width: 54px; height: 54px; object-fit: contain; padding: 2px; background: #0A0E1A; border: 1.5px solid #38bdf8;" />
-                        <div>
-                            <h2 class="h3 mb-0 fw-bold text-white">IMAGINARY</h2>
-                            <p class="mb-0 text-white-50 small mt-1">Web-Tool zur Konvertierung, Größenbegrenzung, Skalierung &amp; Icon-Generierung</p>
-                        </div>
-                    </div>
-                    <span class="badge bg-primary px-3 py-2 fs-6">Blazor + SkiaSharp</span>
+<!-- =========================================================================
+     1. HERO SECTION
+     ========================================================================= -->
+<section class="hero-section text-center">
+    <div class="container-xl">
+        <!-- New Release Pill -->
+        <div class="mb-4">
+            <span class="hero-pill">
+                <span class="badge bg-primary text-white rounded-pill px-2 py-1 me-2 fw-bold">v2.5.0</span>
+                <span>Neu: Icon-Studio, KI-Upscaling 2x/4x, Social-Media-Vorlagen, Auto-DSGVO &amp; HEIC/HEIF</span>
+            </span>
+        </div>
+
+        <!-- Interactive Logo Experience -->
+        <div class="hero-logo-container" @onclick="TriggerLogoBurst">
+            <img id="hero-interactive-logo"
+                 src="images/logo.png"
+                 alt="Imaginary Logo"
+                 class="hero-interactive-logo" />
+            <span class="floating-pill floating-pill-left">⚡ SkiaSharp Engine</span>
+            <span class="floating-pill floating-pill-right">🛡️ 100% Offline</span>
+        </div>
+
+        <!-- Headline -->
+        <h1 class="hero-title mb-3">
+            Bilder konvertieren &amp; bearbeiten.<br />
+            <span class="gradient-text">Ohne Cloud. Ohne Limits. Blitzschnell.</span>
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="hero-subtitle">
+            Das professionelle Schweizer Taschenmesser für deine Bilder. Nutze den schnellen Web-Konverter direkt im Browser oder lade die kostenlose Windows Desktop-App für maximale Leistung, KI-Freistellung und Explorer-Integration herunter.
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="d-flex flex-wrap justify-content-center align-items-center gap-3 mb-5">
+            <a href="#web-converter" class="btn btn-emerald-glow px-4 py-3 fw-bold fs-5 rounded-3">
+                <span class="me-2">⚡</span> Web-Konverter starten
+            </a>
+            <a href="/download" class="btn btn-primary-glow px-4 py-3 fw-bold fs-5 rounded-3">
+                <span class="me-2">📥</span> Windows-App laden (v2.5.0)
+            </a>
+            <a href="/download/zip" class="btn btn-glass px-3 py-3 fw-semibold rounded-3 text-secondary" title="Als portable ZIP-Datei herunterladen">
+                📦 Portable ZIP
+            </a>
+        </div>
+
+        <!-- Trust Badges Bar -->
+        <div class="row justify-content-center g-3 pt-2">
+            <div class="col-auto">
+                <div class="d-flex align-items-center small text-secondary">
+                    <span class="text-emerald me-2 fw-bold">✓</span> 100% Offline-fähig
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="d-flex align-items-center small text-secondary">
+                    <span class="text-emerald me-2 fw-bold">✓</span> Keine Cloud-Speicherung
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="d-flex align-items-center small text-secondary">
+                    <span class="text-emerald me-2 fw-bold">✓</span> 100% DSGVO-konform
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="d-flex align-items-center small text-secondary">
+                    <span class="text-emerald me-2 fw-bold">✓</span> Kostenlos &amp; Open Source
                 </div>
             </div>
         </div>
     </div>
+</section>
 
-    <div class="row g-4">
-        <!-- Settings Column -->
-        <div class="col-lg-4">
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-header bg-white fw-bold py-3 border-bottom">
-                    ⚙️ Konvertierungs-Optionen
+<!-- =========================================================================
+     2. LIVE STATS SHOWCASE SECTION
+     ========================================================================= -->
+<section id="stats" class="py-4 anim-on-scroll">
+    <div class="container-xl">
+        <div class="row g-3">
+            <div class="col-6 col-lg-3">
+                <div class="stat-counter-card">
+                    <div class="stat-counter-number text-cyan">@Stats.ConvertedCount.ToString("N0")</div>
+                    <div class="stat-counter-label">Bilder konvertiert</div>
                 </div>
-                <div class="card-body">
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="stat-counter-card">
+                    <div class="stat-counter-number text-indigo">@Stats.EditedCount.ToString("N0")</div>
+                    <div class="stat-counter-label">Im Studio bearbeitet</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="stat-counter-card">
+                    <div class="stat-counter-number text-emerald">@Stats.SavedMegaBytes.ToString("N1") MB</div>
+                    <div class="stat-counter-label">Eingespartes Volumen</div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="stat-counter-card">
+                    <div class="stat-counter-number text-white">@Stats.TotalActions.ToString("N0")</div>
+                    <div class="stat-counter-label">Aktionen weltweit</div>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-3">
+            <small class="text-muted d-inline-flex align-items-center">
+                <span class="pulse-dot me-2"></span>
+                Echtzeit-Zähler: Aktualisiert sich automatisch bei jeder Konvertierung &amp; Bearbeitung weltweit.
+            </small>
+        </div>
+    </div>
+</section>
+
+<!-- =========================================================================
+     3. INTERACTIVE WEB CONVERTER SECTION
+     ========================================================================= -->
+<section id="web-converter" class="py-5 anim-on-scroll">
+    <div class="container-xl">
+        <!-- Section Header -->
+        <div class="text-center mb-4">
+            <span class="badge bg-primary-subtle text-cyan border border-info-subtle px-3 py-1 mb-2 fw-semibold">
+                In-Browser Engine
+            </span>
+            <h2 class="h2 fw-bold text-white mb-2">⚡ Schneller Web-Konverter</h2>
+            <p class="text-secondary small mb-0">
+                Wähle deine Bilder aus, passe Zielformat und Skalierung an und lade die optimierten Dateien einzeln oder als ZIP herunter.
+            </p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Left: Options Panel -->
+            <div class="col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <h5 class="fw-bold text-white mb-3 d-flex align-items-center">
+                        <span class="me-2">⚙️</span> Konvertierungs-Optionen
+                    </h5>
+
                     <!-- Presets -->
-                    <div class="mb-3 p-3 bg-light rounded border">
-                        <label class="form-label fw-semibold mb-1">⚡ Schnellauswahl (Profile)</label>
+                    <div class="mb-3 p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);">
+                        <label class="form-label text-cyan mb-1">⚡ Schnellauswahl (Profile)</label>
                         <select class="form-select form-select-sm" @onchange="OnPresetChanged">
-                            <option value="">-- Profil wählen --</option>
+                            <option value="">-- Eigenes Setup / Profil wählen --</option>
                             @foreach (var preset in AvailablePresets)
                             {
                                 <option value="@preset.Id">@preset.Name</option>
@@ -49,30 +162,30 @@
                         </select>
                     </div>
 
-                    <!-- 1. Zielformat & Metadaten -->
+                    <!-- Format & Metadata -->
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">1. Zielformat &amp; Metadaten</label>
+                        <label class="form-label">1. Zielformat &amp; Metadaten</label>
                         <select class="form-select mb-2" @bind="SelectedFormatString">
-                            <option value="">Original beibehalten</option>
-                            <option value="Jpeg">JPEG (.jpg)</option>
-                            <option value="Png">PNG (.png)</option>
-                            <option value="Webp">WebP (.webp)</option>
-                            <option value="Avif">AVIF (.avif)</option>
-                            <option value="Ico">Windows Icon (.ico)</option>
+                            <option value="">Originalformat beibehalten</option>
+                            <option value="Webp">WebP (.webp) – Modern &amp; klein</option>
+                            <option value="Avif">AVIF (.avif) – Maximale Kompression</option>
+                            <option value="Jpeg">JPEG (.jpg) – Standard</option>
+                            <option value="Png">PNG (.png) – Verlustfrei</option>
+                            <option value="Ico">Windows Icon (.ico) – Multi-Size</option>
                             <option value="Gif">GIF (.gif)</option>
                             <option value="Bmp">BMP (.bmp)</option>
                         </select>
-                        <div class="form-check">
+                        <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="stripMetaCheck" @bind="StripMetadata">
-                            <label class="form-check-label small" for="stripMetaCheck">EXIF &amp; GPS Metadaten entfernen</label>
+                            <label class="form-check-label small text-secondary" for="stripMetaCheck">EXIF &amp; GPS Metadaten entfernen</label>
                         </div>
                     </div>
 
-                    <!-- 2. Dateigröße begrenzen -->
-                    <div class="mb-3 p-3 bg-light rounded border">
+                    <!-- Size Limit -->
+                    <div class="mb-3 p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);">
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="sizeLimitSwitch" @bind="EnableSizeLimit">
-                            <label class="form-check-label fw-semibold" for="sizeLimitSwitch">2. Dateigröße begrenzen</label>
+                            <label class="form-check-label fw-semibold text-white" for="sizeLimitSwitch">2. Dateigröße deckeln</label>
                         </div>
 
                         @if (EnableSizeLimit)
@@ -85,7 +198,7 @@
                                 </select>
                             </div>
 
-                            <label class="form-label text-muted small mb-1">Fallback-Strategie bei verlustfreien Formaten (PNG):</label>
+                            <label class="form-label text-muted small mb-1">Fallback bei PNG (verlustfrei):</label>
                             <select class="form-select form-select-sm" @bind="SelectedFallbackStrategy">
                                 <option value="@FallbackStrategy.ResizeDown">Auflösung reduzieren (Resize)</option>
                                 <option value="@FallbackStrategy.Quantize">Farbreduktion (Quantisierung)</option>
@@ -94,9 +207,9 @@
                         }
                     </div>
 
-                    <!-- 3. Skalierung (Resize) -->
-                    <div class="mb-3 p-3 bg-light rounded border">
-                        <label class="form-label fw-semibold mb-2">3. Auflösung &amp; Skalierung</label>
+                    <!-- Resizing -->
+                    <div class="mb-3 p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);">
+                        <label class="form-label mb-2">3. Auflösung &amp; Skalierung</label>
                         <select class="form-select mb-2" @bind="SelectedResizeMode">
                             <option value="@ResizeMode.None">Keine Skalierung</option>
                             <option value="@ResizeMode.Percentage">Prozentual skalieren (z. B. 50%)</option>
@@ -104,14 +217,16 @@
                             <option value="@ResizeMode.Pad">Einpassen mit Rand (Pad)</option>
                             <option value="@ResizeMode.FillCrop">Füllen &amp; Beschneiden (FillCrop)</option>
                             <option value="@ResizeMode.MaxEdge">Maximale Kantenlänge (MaxEdge)</option>
+                            <option value="@ResizeMode.AiUpscale2x">✨ KI-Upscaling 2x (Super Resolution)</option>
+                            <option value="@ResizeMode.AiUpscale4x">✨ KI-Upscaling 4x (Super Resolution)</option>
                         </select>
 
                         @if (SelectedResizeMode == ResizeMode.Percentage)
                         {
                             <div class="mt-2">
-                                <div class="d-flex justify-content-between mb-1">
-                                    <span class="small text-muted">Skalierung:</span>
-                                    <span class="fw-bold">@ResizePercentage%</span>
+                                <div class="d-flex justify-content-between mb-1 small text-secondary">
+                                    <span>Skalierung:</span>
+                                    <span class="fw-bold text-cyan">@ResizePercentage%</span>
                                 </div>
                                 <input type="range" class="form-range" min="5" max="150" step="5" @bind="ResizePercentage" @bind:event="oninput" />
                             </div>
@@ -121,41 +236,40 @@
                             <div class="row g-2 mt-1">
                                 <div class="col-6">
                                     <label class="form-label small mb-1">Breite (px):</label>
-                                    <input type="number" class="form-control form-control-sm" @bind="TargetWidth" placeholder="z. B. 1920" />
+                                    <input type="number" class="form-control form-control-sm" @bind="TargetWidth" placeholder="1920" />
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">Höhe (px):</label>
-                                    <input type="number" class="form-control form-control-sm" @bind="TargetHeight" placeholder="z. B. 1080" />
+                                    <input type="number" class="form-control form-control-sm" @bind="TargetHeight" placeholder="1080" />
                                 </div>
                                 <div class="col-12 mt-2">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="aspectRatioCheck" @bind="MaintainAspectRatio">
-                                        <label class="form-check-label small" for="aspectRatioCheck">Seitenverhältnis beibehalten</label>
+                                        <label class="form-check-label small text-secondary" for="aspectRatioCheck">Seitenverhältnis beibehalten</label>
                                     </div>
                                 </div>
-                                @if (SelectedResizeMode == ResizeMode.Pad)
-                                {
-                                    <div class="col-12 mt-2">
-                                        <label class="form-label small mb-1">Randfarbe (Hex):</label>
-                                        <input type="text" class="form-control form-control-sm" @bind="PadColor" placeholder="#FFFFFF" style="max-width: 120px;" />
-                                    </div>
-                                }
                             </div>
                         }
                         else if (SelectedResizeMode == ResizeMode.MaxEdge)
                         {
                             <div class="mt-2">
                                 <label class="form-label small mb-1">Längste Kante (px):</label>
-                                <input type="number" class="form-control form-control-sm" @bind="MaxEdgeLength" placeholder="z. B. 1200" />
+                                <input type="number" class="form-control form-control-sm" @bind="MaxEdgeLength" placeholder="1200" />
+                            </div>
+                        }
+                        else if (SelectedResizeMode == ResizeMode.AiUpscale2x || SelectedResizeMode == ResizeMode.AiUpscale4x)
+                        {
+                            <div class="alert alert-info py-2 small mb-0 mt-2 border-0" style="background: rgba(99, 102, 241, 0.15); color: #c7d2fe;">
+                                <strong>✨ Super Resolution:</strong> Verdoppelt oder vervierfacht Auflösung und Schärfe mit Kantenglättung und Detail-Rekonstruktion.
                             </div>
                         }
                     </div>
 
-                    <!-- 4. Wasserzeichen -->
-                    <div class="mb-3 p-3 bg-light rounded border">
+                    <!-- Watermark -->
+                    <div class="mb-3 p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);">
                         <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="watermarkSwitch" @bind="EnableWatermark">
-                            <label class="form-check-label fw-semibold" for="watermarkSwitch">4. Wasserzeichen</label>
+                            <label class="form-check-label fw-semibold text-white" for="watermarkSwitch">4. Wasserzeichen</label>
                         </div>
 
                         @if (EnableWatermark)
@@ -164,7 +278,7 @@
                                 <label class="form-label small mb-1">Text:</label>
                                 <input type="text" class="form-control form-control-sm" @bind="WatermarkText" placeholder="© Imaginary" />
                             </div>
-                            <div class="row g-2 mb-2">
+                            <div class="row g-2">
                                 <div class="col-6">
                                     <label class="form-label small mb-1">Position:</label>
                                     <select class="form-select form-select-sm" @bind="SelectedWatermarkPosition">
@@ -176,7 +290,7 @@
                                     </select>
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label small mb-1">Transparenz:</label>
+                                    <label class="form-label small mb-1">Deckkraft:</label>
                                     <select class="form-select form-select-sm" @bind="WatermarkOpacityString">
                                         <option value="0.25">25%</option>
                                         <option value="0.5">50%</option>
@@ -188,182 +302,544 @@
                         }
                     </div>
 
+                    <!-- Auto-DSGVO Redaction -->
+                    <div class="mb-3 p-3 rounded-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="autoRedactSwitch" @bind="EnableAutoRedaction">
+                            <label class="form-check-label fw-semibold text-white" for="autoRedactSwitch">5. 🤖 Auto-DSGVO (Verpixeln)</label>
+                        </div>
+
+                        @if (EnableAutoRedaction)
+                        {
+                            <div class="mb-2">
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" id="redactFacesCheck" @bind="RedactFaces">
+                                    <label class="form-check-label small text-secondary" for="redactFacesCheck">👤 Gesichter automatisch verpixeln</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="redactPlatesCheck" @bind="RedactLicensePlates">
+                                    <label class="form-check-label small text-secondary" for="redactPlatesCheck">🚗 Kfz-Kennzeichen verpixeln</label>
+                                </div>
+                                <label class="form-label small mb-1 text-secondary">Anonymisierungs-Stil:</label>
+                                <select class="form-select form-select-sm" @bind="SelectedRedactionStyle">
+                                    <option value="@RedactionStyle.Pixelate">Verpixeln (Mosaik)</option>
+                                    <option value="@RedactionStyle.Blur">Weichzeichnen (Gaußscher Blur)</option>
+                                    <option value="@RedactionStyle.Blackout">Schwärzen (Volle Deckung)</option>
+                                </select>
+                            </div>
+                        }
+                    </div>
+
                     <!-- Action Buttons -->
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-primary py-2 fw-semibold"
+                    <div class="d-grid gap-2 pt-2">
+                        <button class="btn btn-emerald-glow py-3 fw-bold fs-6"
                                 @onclick="StartConversionAsync"
                                 disabled="@(Files.Count == 0 || IsBusy)">
-                            @(IsBusy ? "Konvertierung läuft..." : "🚀 Konvertierung starten")
+                            @(IsBusy ? "⚙️ Verarbeite Bilder..." : "🚀 Konvertierung starten")
                         </button>
 
                         @if (!string.IsNullOrEmpty(ZipDownloadUrl))
                         {
-                            <a class="btn btn-success py-2 fw-semibold" href="@ZipDownloadUrl" download="imaginary_all_images.zip">
+                            <a class="btn btn-primary-glow py-2 fw-semibold" href="@ZipDownloadUrl" download="imaginary_all_images.zip">
                                 📦 Alle als ZIP herunterladen
                             </a>
                         }
 
                         @if (Files.Count > 0 && !IsBusy)
                         {
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="ResetList">
-                                🔄 Liste leeren &amp; neu starten
+                            <button class="btn btn-glass btn-sm text-secondary" @onclick="ResetList">
+                                🔄 Liste leeren &amp; neu beginnen
                             </button>
                         }
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Main Area: Upload & Results -->
-        <div class="col-lg-8">
-            <!-- Upload Box -->
-            <div class="card shadow-sm border-0 mb-3">
-                <div class="card-body p-4 text-center border rounded-3 bg-white">
-                    <div class="mb-3">
-                        <span style="font-size: 3rem;">📸</span>
-                    </div>
-                    <h5 class="fw-bold mb-1">Bilder hier auswählen</h5>
-                    <p class="text-muted small mb-3">Unterstützt JPEG, PNG, GIF, BMP, WebP und TIFF (Mehrfachauswahl möglich)</p>
+            <!-- Right: Upload Dropzone & Results Table -->
+            <div class="col-lg-8">
+                <!-- Upload Dropzone -->
+                <div class="upload-dropzone mb-4">
+                    <span class="upload-icon">📸</span>
+                    <h4 class="fw-bold text-white mb-2">Bilder hierher ziehen oder auswählen</h4>
+                    <p class="text-secondary small mb-3">
+                        Unterstützt JPEG, PNG, WebP, AVIF, BMP, GIF, TIFF und Apple HEIC/HEIF (Mehrfachauswahl möglich).
+                    </p>
 
                     <div class="d-flex justify-content-center">
-                        <div style="max-width: 400px; width: 100%;">
-                            <InputFile OnChange="HandleFileSelected" multiple class="form-control" accept="image/*,.tiff,.tif,.bmp" disabled="@IsBusy" />
+                        <div style="max-width: 420px; width: 100%;">
+                            <InputFile OnChange="HandleFileSelected" multiple class="form-control" accept="image/*,.tiff,.tif,.bmp,.heic,.heif" disabled="@IsBusy" />
                         </div>
                     </div>
 
                     @if (UploadMessage != null)
                     {
-                        <div class="alert alert-info mt-3 py-2 small mb-0">@UploadMessage</div>
+                        <div class="alert alert-info mt-3 py-2 small mb-0 border-0" style="background: rgba(56, 189, 248, 0.15); color: #bae6fd;">
+                            @UploadMessage
+                        </div>
                     }
+                </div>
+
+                <!-- Progress Bar -->
+                @if (IsBusy || ProgressValue > 0)
+                {
+                    <div class="glass-card p-3 mb-4">
+                        <div class="d-flex justify-content-between small text-secondary mb-2">
+                            <span class="text-cyan fw-semibold">@StatusText</span>
+                            <span class="font-mono fw-bold text-white">@ProgressValue%</span>
+                        </div>
+                        <div class="progress" style="height: 10px; background: rgba(255,255,255,0.08); border-radius: 999px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                                 role="progressbar"
+                                 style="width: @ProgressValue%; background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%) !important;"></div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Results List -->
+                @if (Files.Count > 0)
+                {
+                    <div class="glass-card overflow-hidden">
+                        <div class="p-3 border-bottom d-flex justify-content-between align-items-center" style="border-color: var(--border-glass) !important;">
+                            <span class="fw-bold text-white">Dateien (@Files.Count)</span>
+                            @if (!string.IsNullOrEmpty(SummaryStats))
+                            {
+                                <span class="badge bg-success-subtle text-emerald border border-success-subtle px-3 py-1 font-mono">
+                                    @SummaryStats
+                                </span>
+                            }
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-dark-custom align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Dateiname</th>
+                                        <th>Original</th>
+                                        <th>Ergebnis</th>
+                                        <th>Ersparnis</th>
+                                        <th class="text-end">Aktion</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var file in Files)
+                                    {
+                                        <tr>
+                                            <td>
+                                                @if (file.IsProcessing)
+                                                {
+                                                    <span class="badge bg-warning text-dark">In Arbeit...</span>
+                                                }
+                                                else if (file.IsDone)
+                                                {
+                                                    <span class="badge bg-success text-white">✓ Fertig</span>
+                                                }
+                                                else if (file.IsFailed)
+                                                {
+                                                    <span class="badge bg-danger">Fehler</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Bereit</span>
+                                                }
+                                            </td>
+                                            <td class="fw-semibold text-white">
+                                                @file.FileName
+                                                @if (file.Warnings.Count > 0)
+                                                {
+                                                    <div class="small text-warning" title="@string.Join("; ", file.Warnings)">
+                                                        ⚠️ @string.Join("; ", file.Warnings)
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(file.ErrorMessage))
+                                                {
+                                                    <div class="small text-danger">@file.ErrorMessage</div>
+                                                }
+                                            </td>
+                                            <td class="small text-secondary font-mono">@FormatBytes(file.OriginalSizeBytes)</td>
+                                            <td class="small fw-semibold text-cyan font-mono">
+                                                @(file.FinalSizeBytes > 0 ? FormatBytes(file.FinalSizeBytes) : "-")
+                                            </td>
+                                            <td>
+                                                @if (file.SavingsPercentage > 0)
+                                                {
+                                                    <span class="badge bg-success-subtle text-emerald border border-success-subtle font-mono">
+                                                        -@file.SavingsPercentage.ToString("N1") %
+                                                    </span>
+                                                }
+                                                else if (file.IsDone)
+                                                {
+                                                    <span class="text-muted small">0 %</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">-</span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
+                                                @if (!string.IsNullOrEmpty(file.DownloadUrl))
+                                                {
+                                                    <a href="@file.DownloadUrl" class="btn btn-sm btn-outline-info" download="@file.OutputFileName">
+                                                        💾 Download
+                                                    </a>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+
+                <!-- Desktop Upsell Banner -->
+                <div class="mt-4 p-4 rounded-3 d-flex flex-column flex-md-row align-items-center justify-content-between"
+                     style="background: linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%); border: 1px solid rgba(56, 189, 248, 0.3);">
+                    <div class="mb-3 mb-md-0 pe-md-3">
+                        <h6 class="fw-bold text-white mb-1">Du möchtest ganze Ordner mit 10.000 Bildern verarbeiten?</h6>
+                        <p class="small text-secondary mb-0">
+                            Die <strong>Windows Desktop-App</strong> verarbeitet Bilder bis zu 10x schneller direkt von deiner SSD, bietet 100% Offline-KI-Freistellung und Explorer-Rechtsklick-Menü.
+                        </p>
+                    </div>
+                    <a href="/download" class="btn btn-primary-glow btn-sm fw-semibold text-nowrap px-3 py-2">
+                        📥 Desktop-App laden
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- =========================================================================
+     4. DESKTOP APP SHOWCASE & SPOTLIGHT
+     ========================================================================= -->
+<section id="desktop-app" class="py-5 anim-on-scroll" style="background: rgba(14, 20, 36, 0.4);">
+    <div class="container-xl">
+        <div class="text-center mb-5">
+            <span class="badge bg-info-subtle text-cyan border border-info-subtle px-3 py-1 mb-2 fw-semibold">
+                Windows 10 / 11 Native Power
+            </span>
+            <h2 class="h2 fw-bold text-white mb-2">Warum die Windows Desktop-App unschlagbar ist</h2>
+            <p class="text-secondary max-w-700 mx-auto small">
+                Nativ für 64-Bit Windows entwickelt. Nutzt die volle Multi-Core-Power deiner CPU &amp; GPU ohne Browser-Speicherbegrenzung und mit 100% Privatsphäre.
+            </p>
+        </div>
+
+        <div class="row g-4">
+            <!-- Feature 1: AI Cutout -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-cyan">
+                        🎯
+                    </div>
+                    <h5 class="feature-title">Offline KI-Freistellung &amp; Pinsel</h5>
+                    <p class="feature-description">
+                        Entferne Bildhintergründe mit 1 Klick oder nutze den interaktiven KI-Pinsel mit intelligenter Objektauswahl. Angetrieben von ONNX Deep Learning (u2netp) – 100% lokal ohne Cloud oder Abokosten.
+                    </p>
                 </div>
             </div>
 
-            <!-- Progress Bar -->
-            @if (IsBusy || ProgressValue > 0)
-            {
-                <div class="card shadow-sm border-0 mb-3">
-                    <div class="card-body p-3">
-                        <div class="d-flex justify-content-between small text-muted mb-1">
-                            <span>@StatusText</span>
-                            <span>@ProgressValue%</span>
-                        </div>
-                        <div class="progress" style="height: 12px;">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
-                                 role="progressbar"
-                                 style="width: @ProgressValue%"></div>
-                        </div>
+            <!-- Feature 2: RAW & Color Grading -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-indigo">
+                        🎨
                     </div>
+                    <h5 class="feature-title">60 FPS RAW &amp; Color Studio</h5>
+                    <p class="feature-description">
+                        Entwickle RAW-Bilder direkt aus deiner Kamera (Sony ARW, Canon CR2/CR3, Nikon NEF, DNG). Reguliere Belichtung, Kontrast, Schatten, Lichter, Gradationskurven und Farblooks in Echtzeit mit Split-Vergleich.
+                    </p>
                 </div>
-            }
+            </div>
 
-            <!-- Results Table -->
-            @if (Files.Count > 0)
-            {
-                <div class="card shadow-sm border-0">
-                    <div class="card-header bg-white fw-bold py-3 d-flex justify-content-between align-items-center">
-                        <span>Dateien (@Files.Count)</span>
-                        @if (!string.IsNullOrEmpty(SummaryStats))
-                        {
-                            <span class="badge bg-light text-dark fw-normal">@SummaryStats</span>
-                        }
+            <!-- Feature 3: Explorer Integration -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-emerald">
+                        📁
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Status</th>
-                                    <th>Dateiname</th>
-                                    <th>Original</th>
-                                    <th>Ergebnis</th>
-                                    <th>Ersparnis</th>
-                                    <th>Auflösung</th>
-                                    <th class="text-end">Aktion</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var file in Files)
-                                {
-                                    <tr>
-                                        <td>
-                                            @if (file.IsProcessing)
-                                            {
-                                                <span class="badge bg-warning text-dark">In Arbeit...</span>
-                                            }
-                                            else if (file.IsDone)
-                                            {
-                                                <span class="badge bg-success">Fertig</span>
-                                            }
-                                            else if (file.IsFailed)
-                                            {
-                                                <span class="badge bg-danger">Fehler</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-secondary">Bereit</span>
-                                            }
-                                        </td>
-                                        <td class="fw-semibold">
-                                            @file.FileName
-                                            @if (file.Warnings.Count > 0)
-                                            {
-                                                <div class="small text-warning" title="@string.Join("; ", file.Warnings)">
-                                                    ⚠️ @string.Join("; ", file.Warnings)
-                                                </div>
-                                            }
-                                            @if (!string.IsNullOrEmpty(file.ErrorMessage))
-                                            {
-                                                <div class="small text-danger">@file.ErrorMessage</div>
-                                            }
-                                        </td>
-                                        <td class="small text-muted">@FormatBytes(file.OriginalSizeBytes)</td>
-                                        <td class="small fw-semibold">
-                                            @(file.FinalSizeBytes > 0 ? FormatBytes(file.FinalSizeBytes) : "-")
-                                        </td>
-                                        <td>
-                                            @if (file.SavingsPercentage > 0)
-                                            {
-                                                <span class="badge bg-success-subtle text-success">
-                                                    -@file.SavingsPercentage.ToString("N1") %
-                                                </span>
-                                            }
-                                            else if (file.IsDone)
-                                            {
-                                                <span class="text-muted small">0 %</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted small">-</span>
-                                            }
-                                        </td>
-                                        <td class="small text-muted">@(file.Dimensions ?? "-")</td>
-                                        <td class="text-end">
-                                            @if (!string.IsNullOrEmpty(file.DownloadUrl))
-                                            {
-                                                <a href="@file.DownloadUrl" class="btn btn-sm btn-outline-primary" download="@file.OutputFileName">
-                                                    💾 Download
-                                                </a>
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                    <h5 class="feature-title">Windows Explorer Kontextmenü</h5>
+                    <p class="feature-description">
+                        Rechtsklick auf beliebige Bilder oder Ordner im Windows Explorer: <em>„Mit Imaginary konvertieren...“</em>. Kein manuelles App-Öffnen nötig – sofort aus dem Dateisystem heraus produktiv sein.
+                    </p>
                 </div>
-            }
+            </div>
+
+            <!-- Feature 4: Hotfolder -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-amber">
+                        ⚡
+                    </div>
+                    <h5 class="feature-title">Automatische Hotfolder-Überwachung</h5>
+                    <p class="feature-description">
+                        Hinterlege einen Überwachungsordner. Jedes Bild, das z. B. von deiner Kamera oder Downloads dort abgelegt wird, wird vollautomatisch nach deinen Regeln konvertiert und verschoben.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 5: GDPR & Privacy -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-cyan">
+                        🛡️
+                    </div>
+                    <h5 class="feature-title">DSGVO-Tools: Verpixeln &amp; Schwärzen</h5>
+                    <p class="feature-description">
+                        Schwärze oder verpixle sensible Gesichter, Kennzeichen oder Kundendaten in Screenshots und Fotos mit wenigen Pinselstrichen, bevor du Bilder per Mail oder Ticket-System teilst.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 6: Extreme Performance -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-emerald">
+                        🚀
+                    </div>
+                    <h5 class="feature-title">Extreme Multi-Core Performance</h5>
+                    <p class="feature-description">
+                        Egal ob 10 oder 10.000 Fotos: Imaginary skaliert parallel auf alle CPU-Kerne. Verarbeite riesige Gigabyte-Archive in Sekunden, ohne dass dein Arbeitsspeicher überläuft.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 7: Multi-Platform Icon Studio -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-cyan">
+                        🔮
+                    </div>
+                    <h5 class="feature-title">Multi-Plattform Icon-Studio</h5>
+                    <p class="feature-description">
+                        Erzeuge komplette Icon-Pakete für Windows (.ico 16–256px), Web (Favicons &amp; Webmanifest), Apple iOS &amp; macOS sowie Android mit Maskenformen (Squircle, Circle) und Live-Mockups.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 8: KI-Upscaling (Super Resolution) -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-indigo">
+                        ✨
+                    </div>
+                    <h5 class="feature-title">KI-Upscaling &amp; Super Resolution</h5>
+                    <p class="feature-description">
+                        Rekonstruiere feine Details und Kanten bei niedrig aufgelösten Grafiken und Fotos (2x &amp; 4x). Angetrieben von RealESRGAN Deep-Learning Modellen und Lanczos3-Recovery – 100% lokal.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Feature 9: Social Media & iPhone HEIC -->
+            <div class="col-md-6 col-lg-4">
+                <div class="glass-card p-4 h-100">
+                    <div class="feature-icon-wrapper text-amber">
+                        📱
+                    </div>
+                    <h5 class="feature-title">Social Media Vorlagen &amp; HEIC/HEIF</h5>
+                    <p class="feature-description">
+                        Fertige Bildformate für Instagram (1:1, 4:5, 9:16 Stories), YouTube, TikTok und LinkedIn mit 1 Klick. Öffne und konvertiere moderne Apple iPhone HEIC/HEIF-Fotos nativ.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
+</section>
 
-    <footer class="mt-4 py-3 text-center text-muted border-top">
-        <small><strong>Imaginary</strong> – Professionelle Bildkonvertierung &amp; Größenbegrenzung • Entwickelt von <strong>Pino Wackers</strong></small>
-    </footer>
-</div>
+<!-- =========================================================================
+     5. INTERACTIVE SCREENSHOT SHOWCASE
+     ========================================================================= -->
+<section id="screenshots" class="py-5 anim-on-scroll">
+    <div class="container-xl">
+        <div class="text-center mb-4">
+            <span class="badge bg-primary-subtle text-cyan border border-info-subtle px-3 py-1 mb-2 fw-semibold">
+                Live einblicken
+            </span>
+            <h2 class="h2 fw-bold section-heading mb-2">📸 Imaginary in Aktion</h2>
+            <p class="text-secondary small mb-0">
+                Klicke auf eine Ansicht, um dir einen Eindruck von der leistungsstarken Windows Desktop-App zu verschaffen.
+            </p>
+        </div>
+
+        <div class="screenshot-showcase-container">
+            <!-- Tab Buttons -->
+            <div class="d-flex flex-wrap justify-content-center gap-2 mb-4">
+                <button class="screenshot-tab-btn @(ActiveScreenshot == 0 ? "active" : "")" @onclick='() => ActiveScreenshot = 0'>
+                    📦 Stapelverarbeitung
+                </button>
+                <button class="screenshot-tab-btn @(ActiveScreenshot == 1 ? "active" : "")" @onclick='() => ActiveScreenshot = 1'>
+                    🎯 KI-Freistellung
+                </button>
+                <button class="screenshot-tab-btn @(ActiveScreenshot == 2 ? "active" : "")" @onclick='() => ActiveScreenshot = 2'>
+                    🎨 RAW Studio
+                </button>
+                <button class="screenshot-tab-btn @(ActiveScreenshot == 3 ? "active" : "")" @onclick='() => ActiveScreenshot = 3'>
+                    ⚡ Hotfolder
+                </button>
+            </div>
+
+            <!-- Window Mockup -->
+            <div class="window-mockup-frame">
+                <div class="window-mockup-header">
+                    <div class="window-dots">
+                        <span class="window-dot window-dot-red"></span>
+                        <span class="window-dot window-dot-yellow"></span>
+                        <span class="window-dot window-dot-green"></span>
+                    </div>
+                    <span class="window-title">Imaginary Desktop – @ScreenshotTitles[ActiveScreenshot]</span>
+                    <div style="width: 44px;"></div>
+                </div>
+                <div class="screenshot-preview-wrapper" @onclick="() => ShowLightbox = true">
+                    <img src="@ScreenshotPaths[ActiveScreenshot]"
+                         alt="@ScreenshotTitles[ActiveScreenshot]"
+                         class="screenshot-img" />
+                    <span class="screenshot-overlay-hint">🔍 Klicken zum Vergrößern</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@if (ShowLightbox)
+{
+    <div class="lightbox-backdrop" @onclick="() => ShowLightbox = false">
+        <img src="@ScreenshotPaths[ActiveScreenshot]"
+             alt="@ScreenshotTitles[ActiveScreenshot]"
+             class="lightbox-content" />
+    </div>
+}
+
+<!-- =========================================================================
+     6. FEATURE COMPARISON MATRIX (Web vs. Desktop)
+     ========================================================================= -->
+<section id="features" class="py-5">
+    <div class="container-xl">
+        <div class="text-center mb-5">
+            <h2 class="h2 fw-bold text-white mb-2">✨ Web-Konverter vs. Windows Desktop-App</h2>
+            <p class="text-secondary small">Wähle das Werkzeug, das am besten zu deinem Workflow passt.</p>
+        </div>
+
+        <div class="comparison-table-wrapper glass-card">
+            <table class="table table-dark-custom align-middle mb-0 comparison-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Funktion / Feature</th>
+                        <th style="width: 30%;" class="text-center">🌐 Web-Konverter</th>
+                        <th style="width: 30%;" class="text-center text-cyan fw-bold">💻 Windows Desktop-App</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="fw-semibold text-white">Sofortige Nutzung ohne Installation</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Direkt im Browser</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Standalone Portable (kein Setup nötig)</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Unterstützte Formate (WebP, AVIF, JPG, PNG, ICO, HEIC)</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Ja (inkl. Apple HEIC/HEIF)</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Ja (18+ Formate nativ)</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Kamera-RAW Entwicklung (Sony, Canon, Nikon, DNG)</td>
+                        <td class="text-center"><span class="badge-cross">✕</span> Nein</td>
+                        <td class="text-center"><span class="badge-check">✓</span> 60 FPS RAW-Studio</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">KI-Hintergrundentfernung &amp; KI-Pinsel</td>
+                        <td class="text-center"><span class="badge-cross">✕</span> Nein</td>
+                        <td class="text-center"><span class="badge-check">✓</span> 100% Offline Deep Learning</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">KI-Upscaling (Super Resolution 2x &amp; 4x)</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Lanczos3 Rekonstruktion</td>
+                        <td class="text-center text-cyan fw-bold"><span class="badge-check">✓</span> RealESRGAN ONNX + Lanczos3</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Multi-Plattform Icon-Studio (Favicon, Win .ico, Apple, Android)</td>
+                        <td class="text-center text-secondary">Basiskonvertierung nach .ico</td>
+                        <td class="text-center text-cyan fw-bold"><span class="badge-check">✓</span> Studio mit Formen, Mockups &amp; ZIP</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Social-Media-Vorlagen (Instagram, TikTok, YouTube, etc.)</td>
+                        <td class="text-center text-secondary">Manuelle Maße</td>
+                        <td class="text-center text-cyan fw-bold"><span class="badge-check">✓</span> 20+ Plattform-Vorlagen mit 1 Klick</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Automatische Erkennung &amp; Verpixelung (DSGVO)</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Ja (Batch Auto-DSGVO)</td>
+                        <td class="text-center text-cyan fw-bold"><span class="badge-check">✓</span> Ja (Batch + Editor mit Auto-Erkennung)</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Empfohlene Batch-Dateimenge</td>
+                        <td class="text-center text-secondary">bis zu ca. 100 Dateien</td>
+                        <td class="text-center text-emerald fw-bold">Unbegrenzt (10.000+ Fotos)</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Windows Explorer Rechtsklick-Integration</td>
+                        <td class="text-center"><span class="badge-cross">✕</span> Nicht möglich</td>
+                        <td class="text-center"><span class="badge-check">✓</span> 1-Klick Integration</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Automatische Hotfolder-Überwachung</td>
+                        <td class="text-center"><span class="badge-cross">✕</span> Nicht möglich</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Im Hintergrund mit Tray-Icon</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">DSGVO-Verpixeln, Weichzeichnen &amp; Schwärzen</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Integriert</td>
+                        <td class="text-center"><span class="badge-check">✓</span> Integriert (Batch &amp; Live-Pinsel)</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-semibold text-white">Kosten / Lizenzen</td>
+                        <td class="text-center text-white">100% Kostenlos</td>
+                        <td class="text-center text-emerald fw-bold">100% Kostenlos &amp; Open Source</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- =========================================================================
+     6. FINAL CTA & DIRECT DOWNLOAD SECTION
+     ========================================================================= -->
+<section class="py-5">
+    <div class="container-xl">
+        <div class="glass-card glass-card-featured p-5 text-center position-relative overflow-hidden">
+            <h2 class="h1 fw-bold text-white mb-3">
+                Jetzt kostenlos für Windows herunterladen
+            </h2>
+            <p class="text-secondary max-w-700 mx-auto mb-4 fs-6">
+                Keine Registrierung, keine Werbung, keine versteckten Kosten. Lade Imaginary v2.5.0 herunter und optimiere deine Bilder in Rekordzeit.
+            </p>
+
+            <div class="d-flex flex-wrap justify-content-center gap-3 mb-4">
+                <a href="/download" class="btn btn-primary-glow px-4 py-3 fw-bold fs-5 rounded-3">
+                    <span class="me-2">📥</span> Imaginary.exe (Standalone)
+                </a>
+                <a href="/download/zip" class="btn btn-glass px-4 py-3 fw-bold fs-5 rounded-3">
+                    <span class="me-2">📦</span> Imaginary-Portable.zip
+                </a>
+            </div>
+
+            <div class="small text-muted d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                <span>Version: <strong>v2.5.0</strong></span>
+                <span>•</span>
+                <span>Plattform: <strong>Windows 10 / 11 (64-Bit)</strong></span>
+                <span>•</span>
+                <span>Größe: <strong>ca. 68 MB (inkl. SkiaSharp)</strong></span>
+                <span>•</span>
+                <span>Lizenz: <strong>Open Source</strong></span>
+            </div>
+        </div>
+    </div>
+</section>
 
 @code {
+    private GlobalStatsDto Stats { get; set; } = new();
     private List<WebFileItem> Files { get; } = new();
 
     private IReadOnlyList<Preset> AvailablePresets => PresetManager.GetAllPresets();
-    private string SelectedFormatString { get; set; } = "";
+    private string SelectedFormatString { get; set; } = "Webp";
     private bool StripMetadata { get; set; } = true;
     private bool EnableSizeLimit { get; set; }
     private double SizeLimitValue { get; set; } = 500;
@@ -383,12 +859,71 @@
     private WatermarkPosition SelectedWatermarkPosition { get; set; } = WatermarkPosition.BottomRight;
     private string WatermarkOpacityString { get; set; } = "0.5";
 
+    private bool EnableAutoRedaction { get; set; }
+    private bool RedactFaces { get; set; } = true;
+    private bool RedactLicensePlates { get; set; } = true;
+    private RedactionStyle SelectedRedactionStyle { get; set; } = RedactionStyle.Pixelate;
+
     private bool IsBusy { get; set; }
     private int ProgressValue { get; set; }
     private string StatusText { get; set; } = "Bereit";
     private string? UploadMessage { get; set; }
     private string? SummaryStats { get; set; }
     private string? ZipDownloadUrl { get; set; }
+
+    // Screenshot Showcase State
+    private int ActiveScreenshot { get; set; }
+    private bool ShowLightbox { get; set; }
+    private readonly string[] ScreenshotPaths = {
+        "images/screenshots/screenshot_batch.webp",
+        "images/screenshots/screenshot_ai_cutout.webp",
+        "images/screenshots/screenshot_profi_raw.webp",
+        "images/screenshots/screenshot_hotfolder.webp"
+    };
+    private readonly string[] ScreenshotTitles = {
+        "Stapelverarbeitung",
+        "KI-Freistellung",
+        "RAW Studio",
+        "Hotfolder"
+    };
+
+    protected override void OnInitialized()
+    {
+        Stats = StatsService.GetStats();
+        StatsService.OnStatsChanged += OnStatsUpdated;
+    }
+
+    private void OnStatsUpdated(GlobalStatsDto updated)
+    {
+        Stats = updated;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        StatsService.OnStatsChanged -= OnStatsUpdated;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("ImaginarySite.initScrollAnimations");
+            }
+            catch { /* SSR fallback */ }
+        }
+    }
+
+    private async Task TriggerLogoBurst()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("ImaginarySite.triggerLogoBurst");
+        }
+        catch { /* Fallback */ }
+    }
 
     private void OnPresetChanged(ChangeEventArgs e)
     {
@@ -436,7 +971,6 @@
         {
             try
             {
-                // Max 50 MB per file
                 using var stream = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
                 using var ms = new MemoryStream();
                 await stream.CopyToAsync(ms);
@@ -533,10 +1067,17 @@
                 progress: progress);
 
             var savedMb = (batchResult.TotalOriginalSizeBytes - batchResult.TotalFinalSizeBytes) / (1024.0 * 1024.0);
+            var savedBytes = Math.Max(0, batchResult.TotalOriginalSizeBytes - batchResult.TotalFinalSizeBytes);
             SummaryStats = $"{batchResult.SucceededCount} erfolgreich, Ersparnis: {savedMb:N2} MB ({batchResult.OverallSavingsPercentage:N1}%) in {batchResult.Duration.TotalSeconds:N1}s";
             StatusText = "Konvertierung abgeschlossen!";
 
-            // If we have successful files, build ZIP archive
+            // Increment Global Stats!
+            if (batchResult.SucceededCount > 0)
+            {
+                StatsService.Increment(converted: batchResult.SucceededCount, savedBytes: savedBytes);
+            }
+
+            // Build ZIP archive
             if (convertedList.Count > 0)
             {
                 var zipItem = TempStorage.CreateZipArchive($"imaginary_converted_{DateTime.Now:yyyyMMdd_HHmmss}.zip", convertedList);
@@ -601,6 +1142,11 @@
                 Opacity = op > 0 ? op : 0.5f
             };
         }
+
+        options.AutoRedact = EnableAutoRedaction;
+        options.AutoRedactFaces = RedactFaces;
+        options.AutoRedactLicensePlates = RedactLicensePlates;
+        options.RedactionStyle = SelectedRedactionStyle;
 
         return options;
     }

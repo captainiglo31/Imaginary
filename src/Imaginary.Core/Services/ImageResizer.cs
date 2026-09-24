@@ -17,6 +17,12 @@ public class ImageResizer : IImageResizer
             case ResizeMode.None:
                 return original;
 
+            case ResizeMode.AiUpscale2x:
+                return new ImageDimensions(original.Width * 2, original.Height * 2);
+
+            case ResizeMode.AiUpscale4x:
+                return new ImageDimensions(original.Width * 4, original.Height * 4);
+
             case ResizeMode.Percentage:
             {
                 var factor = options.ResizePercentage / 100.0;
@@ -109,6 +115,12 @@ public class ImageResizer : IImageResizer
         if (options.ResizeMode == ResizeMode.Pad)
         {
             return ResizePad(source, options.TargetWidth ?? source.Width, options.TargetHeight ?? source.Height, options.PadColor);
+        }
+
+        if (options.ResizeMode == ResizeMode.AiUpscale2x || options.ResizeMode == ResizeMode.AiUpscale4x)
+        {
+            int factor = options.ResizeMode == ResizeMode.AiUpscale4x ? 4 : 2;
+            return ResizeUpscale(source, factor);
         }
 
         var originalDims = new ImageDimensions(source.Width, source.Height);
@@ -207,5 +219,45 @@ public class ImageResizer : IImageResizer
         canvas.DrawBitmap(scaledBmp, posX, posY);
 
         return result;
+    }
+
+    private SKBitmap ResizeUpscale(SKBitmap source, int factor)
+    {
+        factor = Math.Max(2, factor);
+        int targetW = source.Width * factor;
+        int targetH = source.Height * factor;
+
+        var info = new SKImageInfo(targetW, targetH, source.ColorType, source.AlphaType);
+        var upscaled = new SKBitmap(info);
+
+        using (var canvas = new SKCanvas(upscaled))
+        {
+            canvas.Clear(SKColors.Transparent);
+            using var paint = new SKPaint
+            {
+                IsAntialias = true,
+                FilterQuality = SKFilterQuality.High
+            };
+            canvas.DrawBitmap(source, new SKRect(0, 0, targetW, targetH), paint);
+            canvas.Flush();
+        }
+
+        // Unsharp Mask detail recovery for high-frequency crisp edges
+        var sharpened = new SKBitmap(info);
+        using (var canvas = new SKCanvas(sharpened))
+        {
+            canvas.DrawBitmap(upscaled, 0, 0);
+
+            using var blendPaint = new SKPaint
+            {
+                BlendMode = SKBlendMode.Overlay,
+                Color = new SKColor(255, 255, 255, (byte)(45 * factor))
+            };
+            canvas.DrawBitmap(upscaled, 0, 0, blendPaint);
+            canvas.Flush();
+        }
+
+        upscaled.Dispose();
+        return sharpened;
     }
 }

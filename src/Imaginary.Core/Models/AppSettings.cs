@@ -46,4 +46,9 @@ public class AppSettings
     // Dateizuordnungen & Standard-App
     public DefaultFileOpenAction DefaultFileOpenAction { get; set; } = DefaultFileOpenAction.AddToBatchList;
     public bool FileAssociationsRegistered { get; set; } = false;
+
+    // Globale Live-Statistiken
+    public bool ShareAnonymousStats { get; set; } = true;
+    public string StatsServerUrl { get; set; } = "http://localhost:5047";
 }
+

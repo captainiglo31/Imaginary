@@ -12,16 +12,29 @@ public static class ImaginaryMcpFactory
         IImageEditorService? editorService = null,
         IBackgroundRemovalService? bgService = null,
         IImageFormatDetector? formatDetector = null,
-        IPresetManager? presetManager = null)
+        IPresetManager? presetManager = null,
+        IUpscaleService? upscaleService = null,
+        IAutoRedactionService? autoRedactionService = null,
+        IIconGeneratorService? iconGeneratorService = null)
     {
         editorService ??= new ImageEditorService();
         bgService ??= new BackgroundRemovalService(editorService);
         formatDetector ??= new ImageFormatDetector();
+        upscaleService ??= new UpscaleService();
+        autoRedactionService ??= new AutoRedactionService();
+        iconGeneratorService ??= new IconGeneratorService();
 
         var registry = new McpRegistry();
 
         // 1. Werkzeuge registrieren
-        var tools = new ImaginaryMcpTools(editorService, bgService, formatDetector, presetManager: presetManager);
+        var tools = new ImaginaryMcpTools(
+            editorService,
+            bgService,
+            formatDetector,
+            presetManager: presetManager,
+            upscaleService: upscaleService,
+            autoRedactionService: autoRedactionService,
+            iconGeneratorService: iconGeneratorService);
         registry.RegisterTools(tools);
 
         // 2. Resources registrieren
