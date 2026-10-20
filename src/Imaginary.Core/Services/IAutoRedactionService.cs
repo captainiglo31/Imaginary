@@ -8,7 +8,8 @@ public interface IAutoRedactionService
     IReadOnlyList<DetectedSensitiveRegion> DetectRegions(
         SKBitmap bitmap,
         bool detectFaces = true,
-        bool detectPlates = true);
+        bool detectPlates = true,
+        float minConfidence = 0.45f);
 
     SKBitmap RedactRegions(
         SKBitmap bitmap,
@@ -21,5 +22,6 @@ public interface IAutoRedactionService
         bool detectFaces = true,
         bool detectPlates = true,
         RedactionStyle style = RedactionStyle.Pixelate,
-        int intensity = 16);
+        int intensity = 16,
+        float minConfidence = 0.45f);
 }

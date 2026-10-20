@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     private readonly IAutoRedactionService _autoRedactionService;
     private readonly IUpscaleService _upscaleService;
     private readonly IImageConverter _converter;
+    private readonly IScreenshotService _screenshotService;
     private Point _dragStartPoint;
     private bool _isDraggingOut;
 
@@ -53,6 +54,7 @@ public partial class MainWindow : Window
         _autoRedactionService = serviceProvider.GetRequiredService<IAutoRedactionService>();
         _upscaleService = serviceProvider.GetRequiredService<IUpscaleService>();
         _converter = serviceProvider.GetRequiredService<IImageConverter>();
+        _screenshotService = serviceProvider.GetRequiredService<IScreenshotService>();
 
         _clipboardMonitor.StartMonitoring(this);
 
@@ -76,7 +78,7 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    StudioImageEditorControl.Initialize(filePath, _editorService, _bgRemovalService, _autoRedactionService, _upscaleService, _converter);
+                    StudioImageEditorControl.Initialize(filePath, _editorService, _bgRemovalService, _autoRedactionService, _upscaleService, _converter, _screenshotService);
                 }
             });
         };

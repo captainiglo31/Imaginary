@@ -215,7 +215,7 @@ public partial class App : Application
             return;
         }
 
-        ShutdownMode = ShutdownMode.OnMainWindowClose;
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         bool startInTray = e.Args.Any(a => string.Equals(a, "--tray", StringComparison.OrdinalIgnoreCase) ||
                                            string.Equals(a, "--minimized", StringComparison.OrdinalIgnoreCase));
@@ -227,6 +227,7 @@ public partial class App : Application
                 AppLogger.Info("App", "Startparameter --tray / --minimized erkannt – Starte lautlos im Hintergrund.");
                 var mainWindow = new MainWindow();
                 MainWindow = mainWindow;
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
 
                 if (mainWindow.DataContext is ViewModels.MainViewModel vm && vm.ShowTrayNotifications)
                 {
@@ -264,6 +265,7 @@ public partial class App : Application
 
                 var mainWindowNormal = new MainWindow();
                 MainWindow = mainWindowNormal;
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
                 mainWindowNormal.Show();
 
                 if (splash != null)

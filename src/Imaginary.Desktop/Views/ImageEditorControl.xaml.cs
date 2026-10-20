@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -36,6 +37,7 @@ public partial class ImageEditorControl : UserControl
     private IAutoRedactionService? _autoRedactionService;
     private IUpscaleService? _upscaleService;
     private IImageConverter? _converter;
+    private IScreenshotService? _screenshotService;
 
     private SKBitmap _currentBitmap = null!;
     private SKBitmap? _originalBitmap;
@@ -84,6 +86,25 @@ public partial class ImageEditorControl : UserControl
     private bool _isPickingColor;
     private SKColor _pickedColor = SKColors.White;
     private SKRectI? _activeCropRect;
+    private bool _isCompareMode;
+    private bool _isDraggingSplit;
+    private bool _isHoldingOriginal;
+
+    // Canvas resizing & layer transformation fields
+    private readonly HashSet<SKBitmap> _sessionLayerBitmaps = new();
+    private enum AnnotationResizeHandle { None, TopLeft, TopCenter, TopRight, MiddleRight, BottomRight, BottomCenter, BottomLeft, MiddleLeft }
+    private enum CanvasResizeGrip { None, Right, Bottom, Corner }
+    private bool _isResizingAnnotation;
+    private AnnotationResizeHandle _activeResizeHandle = AnnotationResizeHandle.None;
+    private SKRect _resizeStartRect;
+    private WpfPoint _resizeStartPos;
+    private bool _isResizingCanvasInteractive;
+    private CanvasResizeGrip _canvasGripMode = CanvasResizeGrip.None;
+    private WpfPoint _canvasResizeStartPos;
+    private int _canvasResizeOriginalWidth;
+    private int _canvasResizeOriginalHeight;
+    private int _canvasResizeNewWidth;
+    private int _canvasResizeNewHeight;
 
     public string ResultFilePath { get; private set; } = string.Empty;
     public bool HasChanges { get; private set; }
@@ -98,20 +119,83 @@ public partial class ImageEditorControl : UserControl
         };
     }
 
+    public void ResetEditorState()
+    {
+        ExitCompareMode();
+
+        _isResizingAnnotation = false;
+        _isResizingCanvasInteractive = false;
+        if (PreviewCanvasExpandRect != null) PreviewCanvasExpandRect.Visibility = Visibility.Collapsed;
+        if (BadgeCanvasExpandDimensions != null) BadgeCanvasExpandDimensions.Visibility = Visibility.Collapsed;
+        if (PanelSelectedImageLayerOptions != null) PanelSelectedImageLayerOptions.Visibility = Visibility.Collapsed;
+
+        foreach (var bmp in _sessionLayerBitmaps)
+        {
+            bmp.Dispose();
+        }
+        _sessionLayerBitmaps.Clear();
+
+        _annotations.Clear();
+        _selectedAnnotation = null;
+        _isMovingAnnotation = false;
+        _hasMovedSelectedAnnotation = false;
+        _isPanningCanvas = false;
+
+        _stepBadgeCounter = 1;
+        if (TextStepBadgeNumber != null)
+        {
+            TextStepBadgeNumber.Text = "1";
+        }
+
+        while (_undoStack.Count > 0) _undoStack.Pop().Dispose();
+        while (_redoStack.Count > 0) _redoStack.Pop().Dispose();
+
+        _activeCropRect = null;
+        _activeFreehandPoints.Clear();
+        _activeBlurStrokePoints.Clear();
+        _interactiveBrushPoints.Clear();
+        _interactiveBoundingBox = SKRectI.Empty;
+        _isDrawingInteractiveStroke = false;
+
+        if (PreviewLine != null) PreviewLine.Visibility = Visibility.Collapsed;
+        if (PreviewArrowHead != null) PreviewArrowHead.Visibility = Visibility.Collapsed;
+        if (PreviewPolyline != null)
+        {
+            PreviewPolyline.Visibility = Visibility.Collapsed;
+            PreviewPolyline.Points.Clear();
+        }
+        if (PreviewRect != null) PreviewRect.Visibility = Visibility.Collapsed;
+        if (PreviewEllipse != null) PreviewEllipse.Visibility = Visibility.Collapsed;
+        if (BrushCursorCircle != null) BrushCursorCircle.Visibility = Visibility.Collapsed;
+        if (InteractiveStrokeCanvas != null) InteractiveStrokeCanvas.Children.Clear();
+
+        _currentBitmap?.Dispose();
+        _currentBitmap = null!;
+        _originalBitmap?.Dispose();
+        _originalBitmap = null;
+        _displayWriteableBitmap = null;
+
+        HasChanges = false;
+    }
+
     public void Initialize(
         string filePath,
         IImageEditorService editorService,
         IBackgroundRemovalService bgRemovalService,
         IAutoRedactionService? autoRedactionService = null,
         IUpscaleService? upscaleService = null,
-        IImageConverter? converter = null)
+        IImageConverter? converter = null,
+        IScreenshotService? screenshotService = null)
     {
+        ResetEditorState();
+
         _filePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
         _editorService = editorService ?? throw new ArgumentNullException(nameof(editorService));
         _bgRemovalService = bgRemovalService ?? throw new ArgumentNullException(nameof(bgRemovalService));
         _autoRedactionService = autoRedactionService;
         _upscaleService = upscaleService;
         _converter = converter;
+        _screenshotService = screenshotService;
 
         ResultFilePath = filePath;
         HasChanges = false;
@@ -207,10 +291,26 @@ public partial class ImageEditorControl : UserControl
 
                 using var handlePaint = new SKPaint { Color = SKColors.White, Style = SKPaintStyle.Fill, IsAntialias = true };
                 using var handleBorder = new SKPaint { Color = SKColor.Parse("#0284C7"), StrokeWidth = 1.5f, Style = SKPaintStyle.Stroke, IsAntialias = true };
-                DrawHandle(canvas, bounds.Left - 4, bounds.Top - 4, handlePaint, handleBorder);
-                DrawHandle(canvas, bounds.Right + 4, bounds.Top - 4, handlePaint, handleBorder);
-                DrawHandle(canvas, bounds.Left - 4, bounds.Bottom + 4, handlePaint, handleBorder);
-                DrawHandle(canvas, bounds.Right + 4, bounds.Bottom + 4, handlePaint, handleBorder);
+
+                if (_selectedAnnotation.Type == AnnotationType.Image || _selectedAnnotation.Type == AnnotationType.Rectangle)
+                {
+                    // 8 Transform Handles for Image & Rectangle layers
+                    DrawHandle(canvas, bounds.Left, bounds.Top, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.MidX, bounds.Top, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Right, bounds.Top, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Right, bounds.MidY, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Right, bounds.Bottom, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.MidX, bounds.Bottom, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Left, bounds.Bottom, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Left, bounds.MidY, handlePaint, handleBorder);
+                }
+                else
+                {
+                    DrawHandle(canvas, bounds.Left - 4, bounds.Top - 4, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Right + 4, bounds.Top - 4, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Left - 4, bounds.Bottom + 4, handlePaint, handleBorder);
+                    DrawHandle(canvas, bounds.Right + 4, bounds.Bottom + 4, handlePaint, handleBorder);
+                }
             }
 
             canvas.Flush();
@@ -235,6 +335,26 @@ public partial class ImageEditorControl : UserControl
             displayBitmap.GetPixels(),
             (int)displayBitmap.ByteCount,
             displayBitmap.RowBytes);
+
+        if (PanelSelectedImageLayerOptions != null)
+        {
+            if (_selectedAnnotation != null && _selectedAnnotation.Type == AnnotationType.Image)
+            {
+                PanelSelectedImageLayerOptions.Visibility = Visibility.Visible;
+                if (SliderLayerOpacity != null) SliderLayerOpacity.Value = _selectedAnnotation.Opacity;
+                if (TextLayerOpacityVal != null) TextLayerOpacityVal.Text = $"{(_selectedAnnotation.Opacity * 100):0}%";
+                if (ButtonToggleAspectLock != null) ButtonToggleAspectLock.Content = _selectedAnnotation.KeepAspectRatio ? "🔗 Seitenverhältnis" : "🔓 Freies Format";
+            }
+            else
+            {
+                PanelSelectedImageLayerOptions.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        if (_isCompareMode)
+        {
+            UpdateSplitGeometry();
+        }
     }
 
     private void RequestDisplayUpdate()
@@ -375,6 +495,11 @@ public partial class ImageEditorControl : UserControl
         string name = rb.Name;
         _isPickingColor = false;
 
+        if (_isCompareMode && name != "ToolPan")
+        {
+            ExitCompareMode();
+        }
+
         _currentTool = name switch
         {
             "ToolCrop" => EditorTool.Crop,
@@ -492,6 +617,16 @@ public partial class ImageEditorControl : UserControl
             return;
         }
 
+        if ((e.Key == Key.OemBackslash || e.Key == Key.Oem5 || e.Key == Key.OemPipe) && Keyboard.FocusedElement is not TextBox)
+        {
+            if (_isCompareMode && !_isHoldingOriginal)
+            {
+                SetHoldOriginal(true);
+                e.Handled = true;
+                return;
+            }
+        }
+
         if (e.Key == Key.Delete && Keyboard.FocusedElement is not TextBox)
         {
             if (_selectedAnnotation != null)
@@ -517,6 +652,32 @@ public partial class ImageEditorControl : UserControl
         if (e.Key == Key.Y && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
         {
             OnRedoClicked(sender, e);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control && Keyboard.FocusedElement is not TextBox)
+        {
+            InsertFromClipboard();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.D && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control && Keyboard.FocusedElement is not TextBox && _selectedAnnotation != null)
+        {
+            PushUndoState();
+            var clone = _selectedAnnotation.Clone();
+            clone.Id = Guid.NewGuid();
+            clone.MoveBy(24f, 24f);
+            if (clone.Type == AnnotationType.Image)
+            {
+                clone.ImageName = $"{clone.ImageName} (Kopie)";
+            }
+            _annotations.Add(clone);
+            _selectedAnnotation = clone;
+            UpdateImageDisplay();
+            UpdateLayersList();
+            if (TextStatusHint != null) TextStatusHint.Text = "Ebene dupliziert.";
             e.Handled = true;
             return;
         }
@@ -563,6 +724,14 @@ public partial class ImageEditorControl : UserControl
                 Mouse.OverrideCursor = null;
             }
             e.Handled = true;
+        }
+        else if (e.Key == Key.OemBackslash || e.Key == Key.Oem5 || e.Key == Key.OemPipe)
+        {
+            if (_isCompareMode && _isHoldingOriginal)
+            {
+                SetHoldOriginal(false);
+                e.Handled = true;
+            }
         }
     }
 
@@ -821,6 +990,16 @@ public partial class ImageEditorControl : UserControl
 
         if (e.ChangedButton != MouseButton.Left) return;
 
+        if (_isCompareMode)
+        {
+            _isDraggingSplit = true;
+            CanvasContainer.CaptureMouse();
+            var posSplit = e.GetPosition(CanvasContainer);
+            UpdateSplitFromMouse(posSplit.X);
+            e.Handled = true;
+            return;
+        }
+
         var pos = e.GetPosition(BaseImage);
         var pt = new SKPoint((float)pos.X, (float)pos.Y);
 
@@ -837,6 +1016,21 @@ public partial class ImageEditorControl : UserControl
 
         if (_currentTool == EditorTool.Pan)
         {
+            if (_selectedAnnotation != null && _selectedAnnotation.IsVisible)
+            {
+                var handle = GetAnnotationResizeHandle(pt, _selectedAnnotation);
+                if (handle != AnnotationResizeHandle.None)
+                {
+                    _activeResizeHandle = handle;
+                    _isResizingAnnotation = true;
+                    _resizeStartRect = _selectedAnnotation.Rect;
+                    _resizeStartPos = pos;
+                    _hasMovedSelectedAnnotation = false;
+                    CanvasContainer.CaptureMouse();
+                    return;
+                }
+            }
+
             // Check if user clicked an existing visible annotation to move it
             EditorAnnotation? hit = null;
             for (int i = _annotations.Count - 1; i >= 0; i--)
@@ -991,8 +1185,85 @@ public partial class ImageEditorControl : UserControl
             return;
         }
 
+        if (_isCompareMode)
+        {
+            if (_isDraggingSplit && e.LeftButton == MouseButtonState.Pressed)
+            {
+                var posSplit = e.GetPosition(CanvasContainer);
+                UpdateSplitFromMouse(posSplit.X);
+                e.Handled = true;
+                return;
+            }
+            CanvasContainer.Cursor = Cursors.SizeWE;
+            return;
+        }
+
         var current = e.GetPosition(BaseImage);
         var currentPt = new SKPoint((float)current.X, (float)current.Y);
+
+        if (_isResizingCanvasInteractive)
+        {
+            var curPos = e.GetPosition(CanvasScrollViewer);
+            double zoom = CanvasScaleTransform?.ScaleX ?? 1.0;
+            if (zoom <= 0.01) zoom = 1.0;
+
+            double deltaX = (curPos.X - _canvasResizeStartPos.X) / zoom;
+            double deltaY = (curPos.Y - _canvasResizeStartPos.Y) / zoom;
+
+            int newW = _canvasResizeOriginalWidth;
+            int newH = _canvasResizeOriginalHeight;
+
+            if (_canvasGripMode == CanvasResizeGrip.Right || _canvasGripMode == CanvasResizeGrip.Corner)
+            {
+                newW = Math.Max(16, (int)Math.Round(_canvasResizeOriginalWidth + deltaX));
+            }
+            if (_canvasGripMode == CanvasResizeGrip.Bottom || _canvasGripMode == CanvasResizeGrip.Corner)
+            {
+                newH = Math.Max(16, (int)Math.Round(_canvasResizeOriginalHeight + deltaY));
+            }
+
+            _canvasResizeNewWidth = newW;
+            _canvasResizeNewHeight = newH;
+
+            if (PreviewCanvasExpandRect != null)
+            {
+                PreviewCanvasExpandRect.Width = newW;
+                PreviewCanvasExpandRect.Height = newH;
+                Canvas.SetLeft(PreviewCanvasExpandRect, 0);
+                Canvas.SetTop(PreviewCanvasExpandRect, 0);
+                PreviewCanvasExpandRect.Visibility = Visibility.Visible;
+            }
+
+            if (BadgeCanvasExpandDimensions != null && TextCanvasExpandDimensions != null)
+            {
+                int diffW = newW - _canvasResizeOriginalWidth;
+                int diffH = newH - _canvasResizeOriginalHeight;
+                string diffStr = $"({(diffW >= 0 ? "+" : "")}{diffW}, {(diffH >= 0 ? "+" : "")}{diffH})";
+                TextCanvasExpandDimensions.Text = $"{newW} × {newH} px {diffStr}";
+
+                Canvas.SetLeft(BadgeCanvasExpandDimensions, Math.Max(10, newW - 180));
+                Canvas.SetTop(BadgeCanvasExpandDimensions, Math.Max(10, newH + 10));
+                BadgeCanvasExpandDimensions.Visibility = Visibility.Visible;
+            }
+            return;
+        }
+
+        if (_isResizingAnnotation && _selectedAnnotation != null)
+        {
+            float dx = (float)(current.X - _resizeStartPos.X);
+            float dy = (float)(current.Y - _resizeStartPos.Y);
+
+            if (!_hasMovedSelectedAnnotation && (Math.Abs(dx) > 1f || Math.Abs(dy) > 1f))
+            {
+                PushUndoState();
+                _hasMovedSelectedAnnotation = true;
+            }
+
+            var newRect = CalculateResizedRect(_resizeStartRect, _activeResizeHandle, dx, dy, _selectedAnnotation.KeepAspectRatio);
+            _selectedAnnotation.Rect = newRect;
+            RequestDisplayUpdate();
+            return;
+        }
 
         if (_currentTool == EditorTool.Pan)
         {
@@ -1015,8 +1286,18 @@ public partial class ImageEditorControl : UserControl
             }
 
             // Hover cursor indication in Pan mode
-            if (!_isDragging && !_isMovingAnnotation && !_isPanningCanvas)
+            if (!_isDragging && !_isMovingAnnotation && !_isPanningCanvas && !_isResizingAnnotation && !_isResizingCanvasInteractive)
             {
+                if (_selectedAnnotation != null)
+                {
+                    var handle = GetAnnotationResizeHandle(currentPt, _selectedAnnotation);
+                    if (handle != AnnotationResizeHandle.None)
+                    {
+                        CanvasContainer.Cursor = GetCursorForHandle(handle);
+                        return;
+                    }
+                }
+
                 bool overElement = false;
                 for (int i = _annotations.Count - 1; i >= 0; i--)
                 {
@@ -1190,6 +1471,50 @@ public partial class ImageEditorControl : UserControl
             _isPanningCanvas = false;
             CanvasContainer.ReleaseMouseCapture();
             if (!_isSpaceDown) Mouse.OverrideCursor = null;
+            return;
+        }
+
+        if (_isResizingCanvasInteractive)
+        {
+            _isResizingCanvasInteractive = false;
+            CanvasContainer.ReleaseMouseCapture();
+            if (PreviewCanvasExpandRect != null) PreviewCanvasExpandRect.Visibility = Visibility.Collapsed;
+            if (BadgeCanvasExpandDimensions != null) BadgeCanvasExpandDimensions.Visibility = Visibility.Collapsed;
+
+            if (_canvasResizeNewWidth > 0 && _canvasResizeNewHeight > 0 &&
+                (_canvasResizeNewWidth != _canvasResizeOriginalWidth || _canvasResizeNewHeight != _canvasResizeOriginalHeight) &&
+                _editorService != null)
+            {
+                PushUndoState(bitmapModified: true);
+                var oldBmp = _currentBitmap;
+                _currentBitmap = _editorService.ResizeCanvas(oldBmp, _canvasResizeNewWidth, _canvasResizeNewHeight, CanvasAnchor.TopLeft, SKColors.Transparent);
+                oldBmp.Dispose();
+                UpdateImageDisplay();
+                UpdateLayersList();
+                if (TextStatusHint != null) TextStatusHint.Text = $"Leinwand vergrößert auf {_canvasResizeNewWidth} × {_canvasResizeNewHeight} px.";
+            }
+            e.Handled = true;
+            return;
+        }
+
+        if (_isResizingAnnotation)
+        {
+            _isResizingAnnotation = false;
+            _activeResizeHandle = AnnotationResizeHandle.None;
+            CanvasContainer.ReleaseMouseCapture();
+            UpdateImageDisplay();
+            e.Handled = true;
+            return;
+        }
+
+        if (_isCompareMode)
+        {
+            if (_isDraggingSplit)
+            {
+                _isDraggingSplit = false;
+                CanvasContainer.ReleaseMouseCapture();
+                e.Handled = true;
+            }
             return;
         }
 
@@ -1481,16 +1806,25 @@ public partial class ImageEditorControl : UserControl
         }
 
         var menu = new ContextMenu();
-        var itemPixelate = new MenuItem { Header = "▦ Auto-Verpixeln (Mosaik, Gesichter & Kennzeichen)" };
-        itemPixelate.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Pixelate, 16);
+        var itemPixelateBalanced = new MenuItem { Header = "▦ Auto-Verpixeln (Ausgewogen – Standard)" };
+        itemPixelateBalanced.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Pixelate, 16, 0.45f);
 
-        var itemBlur = new MenuItem { Header = "💧 Auto-Weichzeichnen (Blur, Gesichter & Kennzeichen)" };
-        itemBlur.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Blur, 16);
+        var itemPixelatePrecise = new MenuItem { Header = "🎯 Hohe Präzision (Nur eindeutige Gesichter & Kennzeichen)" };
+        itemPixelatePrecise.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Pixelate, 16, 0.60f);
+
+        var itemPixelateSensitive = new MenuItem { Header = "🔍 Hohe Empfindlichkeit (Erkennt auch entfernte Objekte)" };
+        itemPixelateSensitive.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Pixelate, 16, 0.35f);
+
+        var itemBlur = new MenuItem { Header = "💧 Auto-Weichzeichnen (Blur)" };
+        itemBlur.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Blur, 16, 0.45f);
 
         var itemBlackout = new MenuItem { Header = "⬛ Auto-Schwärzen (DSGVO Blackout)" };
-        itemBlackout.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Blackout, 16);
+        itemBlackout.Click += (s, ev) => ApplyAutoRedaction(RedactionStyle.Blackout, 16, 0.45f);
 
-        menu.Items.Add(itemPixelate);
+        menu.Items.Add(itemPixelateBalanced);
+        menu.Items.Add(itemPixelatePrecise);
+        menu.Items.Add(itemPixelateSensitive);
+        menu.Items.Add(new Separator());
         menu.Items.Add(itemBlur);
         menu.Items.Add(itemBlackout);
 
@@ -1502,24 +1836,32 @@ public partial class ImageEditorControl : UserControl
         }
     }
 
-    private void ApplyAutoRedaction(RedactionStyle style, int intensity)
+    private void ApplyAutoRedaction(RedactionStyle style, int intensity, float minConfidence = 0.45f)
     {
         if (_currentBitmap == null || _autoRedactionService == null) return;
 
-        var detected = _autoRedactionService.DetectRegions(_currentBitmap, detectFaces: true, detectPlates: true);
+        var detected = _autoRedactionService.DetectRegions(_currentBitmap, detectFaces: true, detectPlates: true, minConfidence: minConfidence);
         if (detected.Count == 0)
         {
             TextStatusHint.Text = "🤖 Auto-DSGVO: Keine Gesichter oder Kennzeichen im Bild erkannt.";
             return;
         }
 
+        int faces = detected.Count(d => d.Type == SensitiveRegionType.Face);
+        int plates = detected.Count(d => d.Type == SensitiveRegionType.LicensePlate);
+
+        var parts = new List<string>();
+        if (plates > 0) parts.Add($"{plates} Kennzeichen");
+        if (faces > 0) parts.Add($"{faces} Gesicht(er)");
+        string summary = string.Join(" und ", parts);
+
         PushUndoState(bitmapModified: true);
-        var redacted = _autoRedactionService.AutoRedact(_currentBitmap, detectFaces: true, detectPlates: true, style: style, intensity: intensity);
+        var redacted = _autoRedactionService.AutoRedact(_currentBitmap, detectFaces: true, detectPlates: true, style: style, intensity: intensity, minConfidence: minConfidence);
         _currentBitmap.Dispose();
         _currentBitmap = redacted;
         HasChanges = true;
         UpdateImageDisplay();
-        TextStatusHint.Text = $"🤖 Auto-DSGVO: {detected.Count} sensible(r) Bereich(e) erfolgreich anonymisiert.";
+        TextStatusHint.Text = $"🤖 Auto-DSGVO: {summary} erfolgreich anonymisiert.";
     }
 
     private void OnUpscaleClicked(object sender, RoutedEventArgs e)
@@ -1532,14 +1874,55 @@ public partial class ImageEditorControl : UserControl
         }
 
         var menu = new ContextMenu();
-        var item2x = new MenuItem { Header = "✨ 2x KI-Super-Resolution (Auflösung verdoppeln)" };
+        bool is2xAi = _upscaleService.IsAiModelDownloaded(2);
+        bool is4xAi = _upscaleService.IsAiModelDownloaded(4);
+
+        var item2x = new MenuItem
+        {
+            Header = is2xAi
+                ? "✨ 2x KI-Super-Resolution (ONNX Neural Net – Höchste Qualität)"
+                : "✨ 2x Super-Resolution (Offline Lanczos3 + Detail-Recovery)"
+        };
         item2x.Click += async (s, ev) => await ExecuteUpscaleAsync(2);
 
-        var item4x = new MenuItem { Header = "✨ 4x KI-Super-Resolution (Auflösung vervierfachen)" };
+        var item4x = new MenuItem
+        {
+            Header = is4xAi
+                ? "✨ 4x KI-Super-Resolution (ONNX Neural Net – Höchste Qualität)"
+                : "✨ 4x Super-Resolution (Offline Lanczos3 + Detail-Recovery)"
+        };
         item4x.Click += async (s, ev) => await ExecuteUpscaleAsync(4);
 
         menu.Items.Add(item2x);
         menu.Items.Add(item4x);
+
+        if (!is2xAi || !is4xAi)
+        {
+            menu.Items.Add(new Separator());
+            var itemDownload = new MenuItem
+            {
+                Header = "⬇️ Echtes ONNX-KI-Modell herunterladen (einmalig ca. 67 MB)..."
+            };
+            itemDownload.Click += async (s, ev) =>
+            {
+                int targetFactor = !is2xAi ? 2 : 4;
+                TextStatusHint.Text = $"⬇️ Lade {targetFactor}x ONNX-Modell von Hugging Face herunter...";
+                var progress = new Progress<double>(pct =>
+                {
+                    TextStatusHint.Text = $"⬇️ Lade {targetFactor}x ONNX-Modell herunter: {pct:N0}%...";
+                });
+                bool ok = await _upscaleService.DownloadModelAsync(targetFactor, progress);
+                if (ok)
+                {
+                    TextStatusHint.Text = $"✔ {targetFactor}x ONNX-Modell erfolgreich heruntergeladen und einsatzbereit!";
+                }
+                else
+                {
+                    TextStatusHint.Text = $"Fehler beim Herunterladen des Modells. Der Offline-Algorithmus steht weiterhin bereit.";
+                }
+            };
+            menu.Items.Add(itemDownload);
+        }
 
         if (sender is Button btn)
         {
@@ -1555,7 +1938,9 @@ public partial class ImageEditorControl : UserControl
 
         try
         {
-            TextStatusHint.Text = $"✨ Berechne KI-Upscaling ({factor}x Super Resolution)... Bitte warten.";
+            bool hasAi = _upscaleService.IsAiModelDownloaded(factor);
+            string engineName = hasAi ? "ONNX Neural Net" : "Lanczos3 + Detail-Recovery";
+            TextStatusHint.Text = $"✨ Berechne {factor}x Super Resolution ({engineName})... Bitte warten.";
             PushUndoState(bitmapModified: true);
             var upscaled = await _upscaleService.UpscaleAsync(_currentBitmap, factor);
             _currentBitmap.Dispose();
@@ -1563,7 +1948,7 @@ public partial class ImageEditorControl : UserControl
             HasChanges = true;
             UpdateImageDisplay();
             OnZoomFitClicked(this, new RoutedEventArgs());
-            TextStatusHint.Text = $"✨ KI-Upscaling {factor}x erfolgreich: Neue Auflösung {_currentBitmap.Width} × {_currentBitmap.Height} px.";
+            TextStatusHint.Text = $"✨ {factor}x Super Resolution ({engineName}) erfolgreich: Neue Auflösung {_currentBitmap.Width} × {_currentBitmap.Height} px.";
         }
         catch (Exception ex)
         {
@@ -2267,6 +2652,13 @@ public partial class ImageEditorControl : UserControl
         }
         else if (e.Key == Key.Escape)
         {
+            if (_isCompareMode)
+            {
+                ExitCompareMode();
+                e.Handled = true;
+                return;
+            }
+
             if (_activeCropRect.HasValue)
             {
                 _activeCropRect = null;
@@ -2299,11 +2691,711 @@ public partial class ImageEditorControl : UserControl
 
     public void Cleanup()
     {
-        _currentBitmap?.Dispose();
-        _originalBitmap?.Dispose();
-        while (_undoStack.Count > 0) _undoStack.Pop().Dispose();
-        while (_redoStack.Count > 0) _redoStack.Pop().Dispose();
-        _displayWriteableBitmap = null;
+        ResetEditorState();
+    }
+
+    private void OnCompareClicked(object sender, RoutedEventArgs e)
+    {
+        if (_isCompareMode)
+        {
+            ExitCompareMode();
+        }
+        else
+        {
+            EnterCompareMode();
+        }
+    }
+
+    private void EnterCompareMode()
+    {
+        if (_currentBitmap == null || _originalBitmap == null)
+        {
+            if (TextStatusHint != null) TextStatusHint.Text = "Kein Bild zum Vergleichen vorhanden.";
+            return;
+        }
+
+        _isCompareMode = true;
+        _isDraggingSplit = false;
+        _isHoldingOriginal = false;
+
+        ToolPan.IsChecked = true;
+        _currentTool = EditorTool.Pan;
+
+        ButtonCompare.Background = (Brush)FindResource("AccentBrush");
+        ButtonCompare.Foreground = Brushes.White;
+
+        CompareOverlayGrid.Visibility = Visibility.Visible;
+        PanelCompareControls.Visibility = Visibility.Visible;
+
+        ImageOriginalCompare.Source = CreateBitmapSourceFromSKBitmap(_originalBitmap);
+
+        UpdateSplitGeometry();
+        if (TextStatusHint != null) TextStatusHint.Text = "⚖️ Vorher/Nachher-Vergleich aktiv: Ziehe die Trennlinie oder den Schieberegler.";
+    }
+
+    private void ExitCompareMode()
+    {
+        if (!_isCompareMode) return;
+
+        _isCompareMode = false;
+        _isDraggingSplit = false;
+        _isHoldingOriginal = false;
+
+        ButtonCompare?.ClearValue(Button.BackgroundProperty);
+        ButtonCompare?.ClearValue(Button.ForegroundProperty);
+
+        if (CompareOverlayGrid != null) CompareOverlayGrid.Visibility = Visibility.Collapsed;
+        if (PanelCompareControls != null) PanelCompareControls.Visibility = Visibility.Collapsed;
+        if (ImageOriginalCompare != null) ImageOriginalCompare.Source = null;
+
+        Mouse.OverrideCursor = null;
+        if (TextStatusHint != null) TextStatusHint.Text = "Vergleichsmodus beendet.";
+    }
+
+    private void UpdateSplitGeometry()
+    {
+        if (!_isCompareMode || _currentBitmap == null || CompareOverlayGrid == null) return;
+        int width = _currentBitmap.Width;
+        int height = _currentBitmap.Height;
+        if (width <= 0 || height <= 0) return;
+
+        CompareOverlayGrid.Width = width;
+        CompareOverlayGrid.Height = height;
+        ImageOriginalCompare.Width = width;
+        ImageOriginalCompare.Height = height;
+
+        if (_isHoldingOriginal)
+        {
+            OriginalClipGeometry.Rect = new Rect(0, 0, width, height);
+            SplitLine.Visibility = Visibility.Collapsed;
+            SplitHandle.Visibility = Visibility.Collapsed;
+            BadgeProcessed.Visibility = Visibility.Collapsed;
+            BadgeOriginal.Visibility = Visibility.Visible;
+            TextBadgeOriginal.Text = $"👁️ 100% ORIGINAL (VORHER: {_originalBitmap?.Width} × {_originalBitmap?.Height} px)";
+            return;
+        }
+
+        SplitLine.Visibility = Visibility.Visible;
+        SplitHandle.Visibility = Visibility.Visible;
+        BadgeProcessed.Visibility = Visibility.Visible;
+        BadgeOriginal.Visibility = Visibility.Visible;
+        TextBadgeOriginal.Text = $"📷 Vorher (Original: {_originalBitmap?.Width} × {_originalBitmap?.Height} px)";
+        TextBadgeProcessed.Text = $"✨ Nachher (Bearbeitet: {_currentBitmap.Width} × {_currentBitmap.Height} px)";
+
+        double splitX = (SliderCompareSplit.Value / 100.0) * width;
+        splitX = Math.Clamp(splitX, 0, width);
+
+        OriginalClipGeometry.Rect = new Rect(0, 0, splitX, height);
+
+        SplitLine.X1 = splitX;
+        SplitLine.X2 = splitX;
+        SplitLine.Y1 = 0;
+        SplitLine.Y2 = height;
+
+        Canvas.SetLeft(SplitHandle, splitX - 18);
+        Canvas.SetTop(SplitHandle, Math.Max(0, (height / 2.0) - 18));
+    }
+
+    private void OnCompareSliderValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        UpdateSplitGeometry();
+    }
+
+    private void UpdateSplitFromMouse(double mouseX)
+    {
+        if (_currentBitmap == null || _currentBitmap.Width <= 0 || SliderCompareSplit == null) return;
+        double pct = Math.Clamp((mouseX / _currentBitmap.Width) * 100.0, 0.0, 100.0);
+        SliderCompareSplit.Value = pct;
+    }
+
+    private void SetHoldOriginal(bool hold)
+    {
+        if (!_isCompareMode) return;
+        _isHoldingOriginal = hold;
+        UpdateSplitGeometry();
+    }
+
+    private void OnHoldOriginalMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        SetHoldOriginal(true);
+        if (sender is UIElement el) el.CaptureMouse();
+    }
+
+    private void OnHoldOriginalMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        SetHoldOriginal(false);
+        if (sender is UIElement el) el.ReleaseMouseCapture();
+    }
+
+    private void OnCloseCompareClicked(object sender, RoutedEventArgs e)
+    {
+        ExitCompareMode();
+    }
+
+    private static BitmapSource? CreateBitmapSourceFromSKBitmap(SKBitmap? bitmap)
+    {
+        if (bitmap == null) return null;
+        var info = bitmap.Info;
+        SKBitmap displayBmp;
+        bool needDispose = false;
+
+        if (bitmap.ColorType != SKColorType.Bgra8888 || bitmap.AlphaType != SKAlphaType.Premul)
+        {
+            displayBmp = new SKBitmap(info.Width, info.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using var canvas = new SKCanvas(displayBmp);
+            canvas.DrawBitmap(bitmap, 0, 0);
+            canvas.Flush();
+            needDispose = true;
+        }
+        else
+        {
+            displayBmp = bitmap;
+        }
+
+        try
+        {
+            var bs = BitmapSource.Create(
+                displayBmp.Width,
+                displayBmp.Height,
+                96,
+                96,
+                PixelFormats.Pbgra32,
+                null,
+                displayBmp.GetPixels(),
+                displayBmp.RowBytes * displayBmp.Height,
+                displayBmp.RowBytes);
+            bs.Freeze();
+            return bs;
+        }
+        finally
+        {
+            if (needDispose)
+            {
+                displayBmp.Dispose();
+            }
+        }
+    }
+
+    // ==========================================
+    // Paint-Style Canvas Resizing (Ziehpunkte)
+    // ==========================================
+
+    private void OnCanvasGripMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || _currentBitmap == null) return;
+
+        CanvasResizeGrip grip = CanvasResizeGrip.None;
+        if (sender == CanvasGripRight) grip = CanvasResizeGrip.Right;
+        else if (sender == CanvasGripBottom) grip = CanvasResizeGrip.Bottom;
+        else if (sender == CanvasGripCorner) grip = CanvasResizeGrip.Corner;
+
+        if (grip == CanvasResizeGrip.None) return;
+
+        _isResizingCanvasInteractive = true;
+        _canvasGripMode = grip;
+        _canvasResizeStartPos = e.GetPosition(CanvasScrollViewer);
+        _canvasResizeOriginalWidth = _currentBitmap.Width;
+        _canvasResizeOriginalHeight = _currentBitmap.Height;
+        _canvasResizeNewWidth = _currentBitmap.Width;
+        _canvasResizeNewHeight = _currentBitmap.Height;
+
+        if (PreviewCanvasExpandRect != null)
+        {
+            PreviewCanvasExpandRect.Width = _currentBitmap.Width;
+            PreviewCanvasExpandRect.Height = _currentBitmap.Height;
+            Canvas.SetLeft(PreviewCanvasExpandRect, 0);
+            Canvas.SetTop(PreviewCanvasExpandRect, 0);
+            PreviewCanvasExpandRect.Visibility = Visibility.Visible;
+        }
+
+        CanvasContainer.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void OnResizeCanvasClicked(object sender, RoutedEventArgs e)
+    {
+        if (_currentBitmap == null || _editorService == null) return;
+
+        var dlg = new CanvasResizeDialog(_currentBitmap.Width, _currentBitmap.Height)
+        {
+            Owner = ParentWindow
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            PushUndoState(bitmapModified: true);
+            var oldBmp = _currentBitmap;
+            _currentBitmap = _editorService.ResizeCanvas(oldBmp, dlg.NewWidth, dlg.NewHeight, dlg.Anchor, dlg.BackgroundColor);
+            oldBmp.Dispose();
+
+            if (dlg.OffsetX != 0 || dlg.OffsetY != 0)
+            {
+                foreach (var ann in _annotations)
+                {
+                    ann.MoveBy(dlg.OffsetX, dlg.OffsetY);
+                }
+            }
+
+            UpdateImageDisplay();
+            UpdateLayersList();
+            if (TextStatusHint != null) TextStatusHint.Text = $"Leinwandgröße geändert auf {dlg.NewWidth} × {dlg.NewHeight} px.";
+        }
+    }
+
+    // ==========================================
+    // 8 Transformations-Anfasser für Ebenen
+    // ==========================================
+
+    private AnnotationResizeHandle GetAnnotationResizeHandle(SKPoint pt, EditorAnnotation? ann)
+    {
+        if (ann == null || !ann.IsVisible) return AnnotationResizeHandle.None;
+        if (ann.Type != AnnotationType.Image && ann.Type != AnnotationType.Rectangle) return AnnotationResizeHandle.None;
+
+        var bounds = ann.GetBounds();
+        float hitTol = 10f;
+
+        bool Near(float x, float y) => Math.Abs(pt.X - x) <= hitTol && Math.Abs(pt.Y - y) <= hitTol;
+
+        if (Near(bounds.Left, bounds.Top)) return AnnotationResizeHandle.TopLeft;
+        if (Near(bounds.MidX, bounds.Top)) return AnnotationResizeHandle.TopCenter;
+        if (Near(bounds.Right, bounds.Top)) return AnnotationResizeHandle.TopRight;
+        if (Near(bounds.Right, bounds.MidY)) return AnnotationResizeHandle.MiddleRight;
+        if (Near(bounds.Right, bounds.Bottom)) return AnnotationResizeHandle.BottomRight;
+        if (Near(bounds.MidX, bounds.Bottom)) return AnnotationResizeHandle.BottomCenter;
+        if (Near(bounds.Left, bounds.Bottom)) return AnnotationResizeHandle.BottomLeft;
+        if (Near(bounds.Left, bounds.MidY)) return AnnotationResizeHandle.MiddleLeft;
+
+        return AnnotationResizeHandle.None;
+    }
+
+    private static Cursor GetCursorForHandle(AnnotationResizeHandle handle) => handle switch
+    {
+        AnnotationResizeHandle.TopLeft or AnnotationResizeHandle.BottomRight => Cursors.SizeNWSE,
+        AnnotationResizeHandle.TopRight or AnnotationResizeHandle.BottomLeft => Cursors.SizeNESW,
+        AnnotationResizeHandle.TopCenter or AnnotationResizeHandle.BottomCenter => Cursors.SizeNS,
+        AnnotationResizeHandle.MiddleLeft or AnnotationResizeHandle.MiddleRight => Cursors.SizeWE,
+        _ => Cursors.Arrow
+    };
+
+    private static SKRect CalculateResizedRect(SKRect orig, AnnotationResizeHandle handle, float dx, float dy, bool keepAspect)
+    {
+        float left = orig.Left;
+        float top = orig.Top;
+        float right = orig.Right;
+        float bottom = orig.Bottom;
+
+        float aspect = orig.Width / Math.Max(1f, orig.Height);
+
+        switch (handle)
+        {
+            case AnnotationResizeHandle.MiddleRight:
+                right = Math.Max(left + 16f, orig.Right + dx);
+                if (keepAspect) bottom = top + (right - left) / aspect;
+                break;
+            case AnnotationResizeHandle.BottomCenter:
+                bottom = Math.Max(top + 16f, orig.Bottom + dy);
+                if (keepAspect) right = left + (bottom - top) * aspect;
+                break;
+            case AnnotationResizeHandle.MiddleLeft:
+                left = Math.Min(right - 16f, orig.Left + dx);
+                if (keepAspect) bottom = top + (right - left) / aspect;
+                break;
+            case AnnotationResizeHandle.TopCenter:
+                top = Math.Min(bottom - 16f, orig.Top + dy);
+                if (keepAspect) right = left + (bottom - top) * aspect;
+                break;
+            case AnnotationResizeHandle.BottomRight:
+                if (keepAspect)
+                {
+                    float d = Math.Max(dx, dy * aspect);
+                    right = Math.Max(left + 16f, orig.Right + d);
+                    bottom = top + (right - left) / aspect;
+                }
+                else
+                {
+                    right = Math.Max(left + 16f, orig.Right + dx);
+                    bottom = Math.Max(top + 16f, orig.Bottom + dy);
+                }
+                break;
+            case AnnotationResizeHandle.BottomLeft:
+                if (keepAspect)
+                {
+                    float d = Math.Max(-dx, dy * aspect);
+                    left = Math.Min(right - 16f, orig.Right - (orig.Width + d));
+                    bottom = top + (right - left) / aspect;
+                }
+                else
+                {
+                    left = Math.Min(right - 16f, orig.Left + dx);
+                    bottom = Math.Max(top + 16f, orig.Bottom + dy);
+                }
+                break;
+            case AnnotationResizeHandle.TopRight:
+                if (keepAspect)
+                {
+                    float d = Math.Max(dx, -dy * aspect);
+                    right = Math.Max(left + 16f, orig.Left + (orig.Width + d));
+                    top = bottom - (right - left) / aspect;
+                }
+                else
+                {
+                    right = Math.Max(left + 16f, orig.Right + dx);
+                    top = Math.Min(bottom - 16f, orig.Top + dy);
+                }
+                break;
+            case AnnotationResizeHandle.TopLeft:
+                if (keepAspect)
+                {
+                    float d = Math.Max(-dx, -dy * aspect);
+                    left = Math.Min(right - 16f, orig.Right - (orig.Width + d));
+                    top = bottom - (right - left) / aspect;
+                }
+                else
+                {
+                    left = Math.Min(right - 16f, orig.Left + dx);
+                    top = Math.Min(bottom - 16f, orig.Top + dy);
+                }
+                break;
+        }
+
+        return new SKRect(left, top, right, bottom);
+    }
+
+    // ==========================================
+    // Multi-Image & Screenshot Ebenen-Import
+    // ==========================================
+
+    public void InsertImageFromBitmap(SKBitmap bmp, string name, float? posX = null, float? posY = null)
+    {
+        ArgumentNullException.ThrowIfNull(bmp);
+
+        _sessionLayerBitmaps.Add(bmp);
+
+        int canvasW = _currentBitmap?.Width ?? 1920;
+        int canvasH = _currentBitmap?.Height ?? 1080;
+
+        float imgW = bmp.Width;
+        float imgH = bmp.Height;
+
+        // Auto-scale down if image is larger than 85% of canvas
+        float maxAllowedW = canvasW * 0.85f;
+        float maxAllowedH = canvasH * 0.85f;
+        if (imgW > maxAllowedW || imgH > maxAllowedH)
+        {
+            float scale = Math.Min(maxAllowedW / imgW, maxAllowedH / imgH);
+            imgW = Math.Max(32f, imgW * scale);
+            imgH = Math.Max(32f, imgH * scale);
+        }
+
+        float x = posX ?? Math.Max(20f, (canvasW - imgW) / 2f);
+        float y = posY ?? Math.Max(20f, (canvasH - imgH) / 2f);
+
+        // Deselect previous
+        foreach (var a in _annotations) a.IsSelected = false;
+
+        var ann = new EditorAnnotation
+        {
+            Type = AnnotationType.Image,
+            ImageBitmap = bmp,
+            ImageName = name,
+            Rect = new SKRect(x, y, x + imgW, y + imgH),
+            IsSelected = true,
+            KeepAspectRatio = true,
+            Opacity = 1.0f
+        };
+
+        PushUndoState();
+        _annotations.Add(ann);
+        _selectedAnnotation = ann;
+
+        ToolPan.IsChecked = true;
+        _currentTool = EditorTool.Pan;
+
+        UpdateImageDisplay();
+        UpdateLayersList();
+
+        if (TextStatusHint != null)
+        {
+            TextStatusHint.Text = $"🖼️ '{name}' als neue Ebene eingefügt. Ziehe zum Verschieben oder an den Ecken zum Skalieren.";
+        }
+    }
+
+    public void InsertFromClipboard()
+    {
+        try
+        {
+            if (Clipboard.ContainsImage())
+            {
+                var wpfBmp = Clipboard.GetImage();
+                if (wpfBmp != null)
+                {
+                    var skBmp = ConvertBitmapSourceToSKBitmap(wpfBmp);
+                    if (skBmp != null)
+                    {
+                        InsertImageFromBitmap(skBmp, $"Screenshot {DateTime.Now:HH:mm:ss}");
+                        return;
+                    }
+                }
+            }
+
+            if (Clipboard.ContainsFileDropList())
+            {
+                var dropList = Clipboard.GetFileDropList();
+                foreach (var file in dropList)
+                {
+                    if (File.Exists(file) && IsSupportedImageFile(file))
+                    {
+                        InsertImageFromFile(file);
+                        return;
+                    }
+                }
+            }
+
+            if (TextStatusHint != null)
+            {
+                TextStatusHint.Text = "Kein Bild in der Zwischenablage. Drücke Win+Shift+S für einen Screenshot.";
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Editor", "Fehler beim Einfügen aus Zwischenablage", ex);
+            if (TextStatusHint != null) TextStatusHint.Text = "Fehler beim Einfügen aus der Zwischenablage.";
+        }
+    }
+
+    private static SKBitmap? ConvertBitmapSourceToSKBitmap(BitmapSource source)
+    {
+        using var memStream = new MemoryStream();
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(source));
+        encoder.Save(memStream);
+        memStream.Position = 0;
+        return SKBitmap.Decode(memStream);
+    }
+
+    private static bool IsSupportedImageFile(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext is ".png" or ".jpg" or ".jpeg" or ".webp" or ".avif" or ".bmp" or ".gif" or ".tif" or ".tiff" or ".ico";
+    }
+
+    public void InsertImageFromFile(string filePath, float? posX = null, float? posY = null)
+    {
+        try
+        {
+            SKBitmap? loaded = null;
+            if (_converter != null)
+            {
+                try
+                {
+                    loaded = _converter.LoadBitmap(filePath).Bitmap;
+                }
+                catch { }
+            }
+
+            if (loaded == null)
+            {
+                using var stream = File.OpenRead(filePath);
+                loaded = SKBitmap.Decode(stream);
+            }
+
+            if (loaded != null)
+            {
+                InsertImageFromBitmap(loaded, Path.GetFileName(filePath), posX, posY);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Editor", $"Fehler beim Laden von {filePath}", ex);
+            MessageBox.Show(ParentWindow, $"Konnte Bild nicht laden: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public async Task CaptureScreenshotAndInsertAsync()
+    {
+        try
+        {
+            if (TextStatusHint != null) TextStatusHint.Text = "📸 Windows Snipping Tool gestartet (Bereich auswählen)...";
+
+            if (_screenshotService != null)
+            {
+                _screenshotService.TriggerNativeSnipping();
+            }
+            else
+            {
+                Process.Start(new ProcessStartInfo("ms-screenclip:") { UseShellExecute = true });
+            }
+
+            // Poll clipboard for up to 15 seconds for a new screenshot
+            DateTime start = DateTime.Now;
+
+            while ((DateTime.Now - start).TotalSeconds < 15)
+            {
+                await Task.Delay(500);
+
+                if (Clipboard.ContainsImage())
+                {
+                    var wpfBmp = Clipboard.GetImage();
+                    if (wpfBmp != null)
+                    {
+                        var skBmp = ConvertBitmapSourceToSKBitmap(wpfBmp);
+                        if (skBmp != null)
+                        {
+                            InsertImageFromBitmap(skBmp, $"Screenshot {DateTime.Now:HH:mm:ss}");
+                            if (TextStatusHint != null) TextStatusHint.Text = "📸 Screenshot erfolgreich als neue Ebene eingefügt!";
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if (TextStatusHint != null) TextStatusHint.Text = "Zeitüberschreitung beim Warten auf Screenshot.";
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Editor", "Fehler bei Screenshot-Aufnahme", ex);
+        }
+    }
+
+    // ==========================================
+    // Drag & Drop auf Arbeitsfläche
+    // ==========================================
+
+    private void OnCanvasDragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void OnCanvasDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            var mousePos = e.GetPosition(BaseImage);
+            float curX = (float)mousePos.X;
+            float curY = (float)mousePos.Y;
+
+            foreach (var file in files)
+            {
+                if (File.Exists(file) && IsSupportedImageFile(file))
+                {
+                    InsertImageFromFile(file, curX, curY);
+                    curX += 30;
+                    curY += 30;
+                }
+            }
+            e.Handled = true;
+        }
+    }
+
+    // ==========================================
+    // Menü- & Toolbar-Aktionen für Bild-Import
+    // ==========================================
+
+    private void OnInsertImageButtonClicked(object sender, RoutedEventArgs e)
+    {
+        if (ButtonInsertImage?.ContextMenu != null)
+        {
+            ButtonInsertImage.ContextMenu.PlacementTarget = ButtonInsertImage;
+            ButtonInsertImage.ContextMenu.IsOpen = true;
+        }
+    }
+
+    private void OnInsertFromClipboardClicked(object sender, RoutedEventArgs e)
+    {
+        InsertFromClipboard();
+    }
+
+    private async void OnCaptureScreenshotAndInsertClicked(object sender, RoutedEventArgs e)
+    {
+        await CaptureScreenshotAndInsertAsync();
+    }
+
+    private void OnInsertFromFileClicked(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Bilddatei als Ebene einfügen",
+            Filter = "Alle unterstützten Bildformate|*.png;*.jpg;*.jpeg;*.webp;*.avif;*.bmp;*.gif;*.tif;*.tiff;*.ico|PNG (*.png)|*.png|JPEG (*.jpg;*.jpeg)|*.jpg;*.jpeg|WebP (*.webp)|*.webp|Alle Dateien (*.*)|*.*",
+            Multiselect = true
+        };
+
+        if (dlg.ShowDialog(ParentWindow) == true)
+        {
+            float? posX = null, posY = null;
+            foreach (var filename in dlg.FileNames)
+            {
+                InsertImageFromFile(filename, posX, posY);
+                posX = (posX ?? 40f) + 30f;
+                posY = (posY ?? 40f) + 30f;
+            }
+        }
+    }
+
+    // ==========================================
+    // Aktionen für ausgewählte Bild-Ebene
+    // ==========================================
+
+    private void OnLayerOpacityChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_selectedAnnotation != null && _selectedAnnotation.Type == AnnotationType.Image)
+        {
+            _selectedAnnotation.Opacity = (float)SliderLayerOpacity.Value;
+            if (TextLayerOpacityVal != null)
+            {
+                TextLayerOpacityVal.Text = $"{(_selectedAnnotation.Opacity * 100):0}%";
+            }
+            RequestDisplayUpdate();
+        }
+    }
+
+    private void OnResetSelectedImageLayerSizeClicked(object sender, RoutedEventArgs e)
+    {
+        if (_selectedAnnotation != null && _selectedAnnotation.Type == AnnotationType.Image && _selectedAnnotation.ImageBitmap != null)
+        {
+            PushUndoState();
+            var origW = _selectedAnnotation.ImageBitmap.Width;
+            var origH = _selectedAnnotation.ImageBitmap.Height;
+            _selectedAnnotation.Rect = new SKRect(_selectedAnnotation.Rect.Left, _selectedAnnotation.Rect.Top, _selectedAnnotation.Rect.Left + origW, _selectedAnnotation.Rect.Top + origH);
+            UpdateImageDisplay();
+            if (TextStatusHint != null) TextStatusHint.Text = $"Ebene auf Originalgröße ({origW} × {origH} px) zurückgesetzt.";
+        }
+    }
+
+    private void OnToggleAspectLockClicked(object sender, RoutedEventArgs e)
+    {
+        if (_selectedAnnotation != null && _selectedAnnotation.Type == AnnotationType.Image)
+        {
+            _selectedAnnotation.KeepAspectRatio = !_selectedAnnotation.KeepAspectRatio;
+            ButtonToggleAspectLock.Content = _selectedAnnotation.KeepAspectRatio ? "🔗 Seitenverhältnis" : "🔓 Freies Format";
+            if (TextStatusHint != null) TextStatusHint.Text = _selectedAnnotation.KeepAspectRatio ? "Seitenverhältnis gesperrt." : "Freies Skalieren aktiv.";
+        }
+    }
+
+    private void OnFlattenSelectedLayerClicked(object sender, RoutedEventArgs e)
+    {
+        if (_selectedAnnotation != null && _selectedAnnotation.Type == AnnotationType.Image && _selectedAnnotation.ImageBitmap != null)
+        {
+            PushUndoState(bitmapModified: true);
+            using var canvas = new SKCanvas(_currentBitmap);
+            _selectedAnnotation.Render(canvas);
+            canvas.Flush();
+
+            _annotations.Remove(_selectedAnnotation);
+            _selectedAnnotation = null;
+
+            UpdateImageDisplay();
+            UpdateLayersList();
+            if (TextStatusHint != null) TextStatusHint.Text = "Ebene fest in das Hauptbild eingebettet.";
+        }
     }
 }
 
@@ -2332,7 +3424,8 @@ public enum AnnotationType
     StepBadge,
     Freehand,
     Highlighter,
-    Text
+    Text,
+    Image
 }
 
 public class EditorAnnotation
@@ -2352,6 +3445,12 @@ public class EditorAnnotation
     public float FontSize { get; set; } = 24f;
     public SKColor BackgroundColor { get; set; } = new SKColor(15, 23, 42, 210);
 
+    // Image layer properties
+    public SKBitmap? ImageBitmap { get; set; }
+    public string ImageName { get; set; } = "Eingefügtes Bild";
+    public float Opacity { get; set; } = 1.0f;
+    public bool KeepAspectRatio { get; set; } = true;
+
     public string LayerDisplayName => Type switch
     {
         AnnotationType.Arrow => "Pfeil",
@@ -2361,12 +3460,15 @@ public class EditorAnnotation
         AnnotationType.Freehand => "Freihand-Linie",
         AnnotationType.Highlighter => "Textmarker",
         AnnotationType.Text => string.IsNullOrWhiteSpace(Text) ? "Text" : $"Text: \"{(Text.Length > 16 ? Text.Substring(0, 14) + "…" : Text)}\"",
+        AnnotationType.Image => string.IsNullOrWhiteSpace(ImageName) ? "Bild-Ebene" : $"🖼️ {ImageName}",
         _ => "Ebene"
     };
 
     public string VisibilityIcon => IsVisible ? "👁️" : "🚫";
 
-    public Brush LayerColorBrush => new SolidColorBrush(WpfColor.FromArgb(Color.Alpha, Color.Red, Color.Green, Color.Blue));
+    public Brush LayerColorBrush => Type == AnnotationType.Image
+        ? new SolidColorBrush(WpfColor.FromRgb(56, 189, 248))
+        : new SolidColorBrush(WpfColor.FromArgb(Color.Alpha, Color.Red, Color.Green, Color.Blue));
 
     public Brush LayerBgBrush => IsSelected
         ? new SolidColorBrush(WpfColor.FromArgb(40, 56, 189, 248))
@@ -2393,7 +3495,11 @@ public class EditorAnnotation
             BadgeNumber = this.BadgeNumber,
             Text = this.Text,
             FontSize = this.FontSize,
-            BackgroundColor = this.BackgroundColor
+            BackgroundColor = this.BackgroundColor,
+            ImageBitmap = this.ImageBitmap,
+            ImageName = this.ImageName,
+            Opacity = this.Opacity,
+            KeepAspectRatio = this.KeepAspectRatio
         };
     }
 
@@ -2471,6 +3577,9 @@ public class EditorAnnotation
                 }
                 float fPad = StrokeWidth + 6;
                 return new SKRect(fMinX - fPad, fMinY - fPad, fMaxX + fPad, fMaxY + fPad);
+
+            case AnnotationType.Image:
+                return Rect;
 
             default:
                 return SKRect.Empty;
@@ -2749,6 +3858,19 @@ public class EditorAnnotation
                         path.LineTo(Points[i]);
                     }
                     canvas.DrawPath(path, paint);
+                }
+                break;
+
+            case AnnotationType.Image:
+                if (ImageBitmap != null && Rect.Width > 0 && Rect.Height > 0)
+                {
+                    using var imgPaint = new SKPaint
+                    {
+                        IsAntialias = true,
+                        FilterQuality = SKFilterQuality.High,
+                        Color = new SKColor(255, 255, 255, (byte)(Math.Clamp(Opacity, 0f, 1f) * 255))
+                    };
+                    canvas.DrawBitmap(ImageBitmap, Rect, imgPaint);
                 }
                 break;
         }

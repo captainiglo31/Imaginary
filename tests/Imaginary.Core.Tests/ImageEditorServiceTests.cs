@@ -222,4 +222,46 @@ public class ImageEditorServiceTests
         int testX = 150 + (int)(calculatedRadius * 0.6f);
         result.GetPixel(testX, 150).Should().NotBe(SKColors.White);
     }
+
+    [Fact]
+    public void ResizeCanvas_TopLeftAnchor_PreservesOriginalContentAndFillsBackground()
+    {
+        using var source = CreateTestBitmap(100, 100, SKColors.Red);
+        using var result = _service.ResizeCanvas(source, 200, 150, CanvasAnchor.TopLeft, SKColors.Transparent);
+
+        result.Width.Should().Be(200);
+        result.Height.Should().Be(150);
+
+        // Top-left 100x100 should be red
+        result.GetPixel(10, 10).Red.Should().Be(255);
+        result.GetPixel(99, 99).Red.Should().Be(255);
+
+        // Expanded area to the right should be transparent
+        result.GetPixel(150, 50).Alpha.Should().Be(0);
+        // Expanded area below should be transparent
+        result.GetPixel(50, 120).Alpha.Should().Be(0);
+    }
+
+    [Fact]
+    public void ResizeCanvas_CenterAnchor_CentersOriginalContent()
+    {
+        using var source = CreateTestBitmap(100, 100, SKColors.Blue);
+        // Expand from 100x100 to 200x200 centered -> offset should be (50, 50)
+        using var result = _service.ResizeCanvas(source, 200, 200, CanvasAnchor.Center, SKColors.White);
+
+        result.Width.Should().Be(200);
+        result.Height.Should().Be(200);
+
+        // Center (100, 100) should be Blue
+        var centerPixel = result.GetPixel(100, 100);
+        centerPixel.Blue.Should().Be(255);
+        centerPixel.Red.Should().Be(0);
+
+        // Corner (10, 10) should be White
+        var cornerPixel = result.GetPixel(10, 10);
+        cornerPixel.Red.Should().Be(255);
+        cornerPixel.Green.Should().Be(255);
+        cornerPixel.Blue.Should().Be(255);
+    }
 }
+

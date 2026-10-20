@@ -13,18 +13,27 @@ public class AutoRedactionService : IAutoRedactionService
         bool detectFaces = true,
         bool detectPlates = true)
     {
+        return DetectRegions(bitmap, detectFaces, detectPlates, minConfidence: 0.45f);
+    }
+
+    public IReadOnlyList<DetectedSensitiveRegion> DetectRegions(
+        SKBitmap bitmap,
+        bool detectFaces,
+        bool detectPlates,
+        float minConfidence)
+    {
         ArgumentNullException.ThrowIfNull(bitmap);
 
         var regions = new List<DetectedSensitiveRegion>();
 
         if (detectFaces)
         {
-            regions.AddRange(DetectFaces(bitmap));
+            regions.AddRange(DetectFaces(bitmap, minConfidence));
         }
 
         if (detectPlates)
         {
-            regions.AddRange(DetectLicensePlates(bitmap));
+            regions.AddRange(DetectLicensePlates(bitmap, minConfidence));
         }
 
         return NonMaxSuppression(regions);
@@ -58,9 +67,10 @@ public class AutoRedactionService : IAutoRedactionService
         bool detectFaces = true,
         bool detectPlates = true,
         RedactionStyle style = RedactionStyle.Pixelate,
-        int intensity = 16)
+        int intensity = 16,
+        float minConfidence = 0.45f)
     {
-        var detected = DetectRegions(bitmap, detectFaces, detectPlates);
+        var detected = DetectRegions(bitmap, detectFaces, detectPlates, minConfidence);
         return RedactRegions(bitmap, detected, style, intensity);
     }
 
@@ -84,7 +94,6 @@ public class AutoRedactionService : IAutoRedactionService
         }
         else if (style == RedactionStyle.Blur)
         {
-            // Extract patch, blur and draw back
             using var patch = new SKBitmap(bounds.Width, bounds.Height);
             targetBitmap.ExtractSubset(patch, bounds);
 
@@ -115,149 +124,306 @@ public class AutoRedactionService : IAutoRedactionService
         }
     }
 
-    private static List<DetectedSensitiveRegion> DetectFaces(SKBitmap source)
+    private static List<DetectedSensitiveRegion> DetectFaces(SKBitmap source, float minConfidence = 0.45f)
     {
         var results = new List<DetectedSensitiveRegion>();
 
-        // Downscale to max 320 for high performance scanning
-        float scale = Math.Min(320f / source.Width, 320f / source.Height);
-        if (scale > 1.0f) scale = 1.0f;
-
-        int scanW = Math.Max(1, (int)(source.Width * scale));
-        int scanH = Math.Max(1, (int)(source.Height * scale));
-
-        using var small = source.Resize(new SKImageInfo(scanW, scanH, SKColorType.Bgra8888), SKFilterQuality.Low);
-        if (small == null) return results;
-
-        // Binary skin mask
-        bool[,] skinMask = new bool[scanW, scanH];
-        for (int y = 0; y < scanH; y++)
-        {
-            for (int x = 0; x < scanW; x++)
-            {
-                var c = small.GetPixel(x, y);
-                skinMask[x, y] = IsSkinColor(c);
-            }
-        }
-
-        // Multi-scale sliding window face detector
-        int[] windowSizes = { (int)(scanH * 0.15f), (int)(scanH * 0.25f), (int)(scanH * 0.38f) };
-
-        foreach (var winSize in windowSizes)
-        {
-            if (winSize < 16) continue;
-            int winH = (int)(winSize * 1.25f); // Faces are roughly 1:1.25
-            int step = Math.Max(4, winSize / 4);
-
-            for (int y = 0; y <= scanH - winH; y += step)
-            {
-                for (int x = 0; x <= scanW - winSize; x += step)
-                {
-                    int skinPixels = 0;
-                    int total = winSize * winH;
-
-                    for (int dy = 0; dy < winH; dy += 2)
-                    {
-                        for (int dx = 0; dx < winSize; dx += 2)
-                        {
-                            if (skinMask[x + dx, y + dy]) skinPixels += 4;
-                        }
-                    }
-
-                    float ratio = (float)skinPixels / total;
-                    if (ratio >= 0.42f && ratio <= 0.88f)
-                    {
-                        // Map back to original coordinate system with safety padding
-                        int origX = (int)(x / scale);
-                        int origY = (int)(y / scale);
-                        int origW = (int)(winSize / scale);
-                        int origH = (int)(winH / scale);
-
-                        int padX = (int)(origW * 0.12f);
-                        int padY = (int)(origH * 0.12f);
-
-                        var bounds = new SKRectI(
-                            Math.Max(0, origX - padX),
-                            Math.Max(0, origY - padY),
-                            Math.Min(source.Width, origX + origW + padX),
-                            Math.Min(source.Height, origY + origH + padY));
-
-                        results.Add(new DetectedSensitiveRegion(bounds, SensitiveRegionType.Face, ratio));
-                    }
-                }
-            }
-        }
-
-        return results;
-    }
-
-    private static List<DetectedSensitiveRegion> DetectLicensePlates(SKBitmap source)
-    {
-        var results = new List<DetectedSensitiveRegion>();
-
+        // Scale image for high-accuracy analysis (max 400px maintains eye-socket details)
         float scale = Math.Min(400f / source.Width, 400f / source.Height);
         if (scale > 1.0f) scale = 1.0f;
 
         int scanW = Math.Max(1, (int)(source.Width * scale));
         int scanH = Math.Max(1, (int)(source.Height * scale));
 
-        using var small = source.Resize(new SKImageInfo(scanW, scanH, SKColorType.Bgra8888), SKFilterQuality.Low);
+        using var small = source.Resize(new SKImageInfo(scanW, scanH, SKColorType.Bgra8888), SKFilterQuality.Medium);
         if (small == null) return results;
 
-        // Grayscale & horizontal edge density
-        byte[,] edges = new byte[scanW, scanH];
-        for (int y = 1; y < scanH - 1; y++)
+        // Precompute luminance and skin mask
+        byte[,] gray = new byte[scanW, scanH];
+        bool[,] skinMask = new bool[scanW, scanH];
+
+        for (int y = 0; y < scanH; y++)
         {
-            for (int x = 1; x < scanW - 1; x++)
+            for (int x = 0; x < scanW; x++)
             {
-                var left = small.GetPixel(x - 1, y);
-                var right = small.GetPixel(x + 1, y);
-                int grayL = (left.Red + left.Green + left.Blue) / 3;
-                int grayR = (right.Red + right.Green + right.Blue) / 3;
-                edges[x, y] = (byte)Math.Clamp(Math.Abs(grayL - grayR), 0, 255);
+                var c = small.GetPixel(x, y);
+                gray[x, y] = (byte)(0.299f * c.Red + 0.587f * c.Green + 0.114f * c.Blue);
+                skinMask[x, y] = IsHumanSkinColor(c);
             }
         }
 
-        // License plates: typical aspect ratio ~3.5:1 (width:height)
-        int[] plateHeights = { Math.Max(8, (int)(scanH * 0.05f)), Math.Max(12, (int)(scanH * 0.09f)), Math.Max(16, (int)(scanH * 0.14f)) };
+        // Multi-scale sliding window face detector with anthropometric face ratio (1 : 1.25)
+        int[] windowSizes = {
+            Math.Max(18, (int)(scanH * 0.12f)),
+            Math.Max(26, (int)(scanH * 0.20f)),
+            Math.Max(38, (int)(scanH * 0.32f)),
+            Math.Max(54, (int)(scanH * 0.45f))
+        };
 
-        foreach (var pH in plateHeights)
+        foreach (var winW in windowSizes)
         {
-            int pW = (int)(pH * 3.6f);
-            if (pW >= scanW) continue;
-            int step = Math.Max(4, pH / 2);
+            int winH = (int)(winW * 1.25f);
+            if (winW >= scanW || winH >= scanH) continue;
+            int step = Math.Max(4, winW / 5);
 
-            for (int y = (int)(scanH * 0.25f); y <= scanH - pH - 4; y += step) // Plates are rarely in the top 25% of an image
+            for (int y = 0; y <= scanH - winH; y += step)
             {
-                for (int x = 4; x <= scanW - pW - 4; x += step)
+                for (int x = 0; x <= scanW - winW; x += step)
                 {
-                    int highEdgeCount = 0;
-                    int samples = 0;
+                    int skinCount = 0;
+                    int totalSamples = 0;
 
-                    for (int dy = 0; dy < pH; dy += 2)
+                    for (int dy = 0; dy < winH; dy += 2)
                     {
-                        for (int dx = 0; dx < pW; dx += 2)
+                        for (int dx = 0; dx < winW; dx += 2)
                         {
-                            samples++;
-                            if (edges[x + dx, y + dy] > 32)
+                            totalSamples++;
+                            if (skinMask[x + dx, y + dy]) skinCount++;
+                        }
+                    }
+
+                    float skinRatio = (float)skinCount / Math.Max(1, totalSamples);
+                    if (skinRatio < 0.35f || skinRatio > 0.88f) continue;
+
+                    // Anthropometric Face Verification:
+                    // Zone 0: Forehead (y: 10% - 28%)
+                    // Zone 1: Eyes / Brow ridge (y: 28% - 50%) - Must have darker features (pupils/sockets)
+                    // Zone 2: Cheeks / Nose (y: 50% - 75%)
+                    int foreheadSum = 0, foreheadCount = 0;
+                    int eyesSum = 0, eyesCount = 0;
+                    int cheeksSum = 0, cheeksCount = 0;
+
+                    for (int dy = 0; dy < winH; dy++)
+                    {
+                        float yRel = (float)dy / winH;
+                        for (int dx = (int)(winW * 0.15f); dx < (int)(winW * 0.85f); dx++)
+                        {
+                            byte lum = gray[x + dx, y + dy];
+                            if (yRel >= 0.10f && yRel < 0.28f)
                             {
-                                highEdgeCount++;
+                                foreheadSum += lum;
+                                foreheadCount++;
+                            }
+                            else if (yRel >= 0.28f && yRel < 0.50f)
+                            {
+                                eyesSum += lum;
+                                eyesCount++;
+                            }
+                            else if (yRel >= 0.50f && yRel < 0.75f)
+                            {
+                                cheeksSum += lum;
+                                cheeksCount++;
                             }
                         }
                     }
 
-                    float edgeDensity = (float)highEdgeCount / Math.Max(1, samples);
+                    if (foreheadCount == 0 || eyesCount == 0 || cheeksCount == 0) continue;
 
-                    // High frequency horizontal edge density characteristic of alphanumeric characters on plates
-                    if (edgeDensity > 0.38f && edgeDensity < 0.85f)
+                    float avgForehead = (float)foreheadSum / foreheadCount;
+                    float avgEyes = (float)eyesSum / eyesCount;
+                    float avgCheeks = (float)cheeksSum / cheeksCount;
+
+                    // Eye socket luminance depression test (filters out uniform reflections and car seat leather)
+                    float eyeDepression = Math.Max(avgForehead - avgEyes, avgCheeks - avgEyes);
+                    if (eyeDepression < 3.5f) continue;
+
+                    // Bilateral eye symmetry test in the eye band
+                    int leftEyeSum = 0, leftEyeCount = 0;
+                    int rightEyeSum = 0, rightEyeCount = 0;
+                    int eyeYStart = y + (int)(winH * 0.30f);
+                    int eyeYEnd = y + (int)(winH * 0.48f);
+
+                    for (int cy = eyeYStart; cy < eyeYEnd; cy++)
                     {
+                        for (int dx = (int)(winW * 0.15f); dx < (int)(winW * 0.42f); dx++)
+                        {
+                            leftEyeSum += gray[x + dx, cy];
+                            leftEyeCount++;
+                        }
+                        for (int dx = (int)(winW * 0.58f); dx < (int)(winW * 0.85f); dx++)
+                        {
+                            rightEyeSum += gray[x + dx, cy];
+                            rightEyeCount++;
+                        }
+                    }
+
+                    float avgLeftEye = leftEyeCount > 0 ? (float)leftEyeSum / leftEyeCount : avgEyes;
+                    float avgRightEye = rightEyeCount > 0 ? (float)rightEyeSum / rightEyeCount : avgEyes;
+                    float eyeSymmetryDiff = Math.Abs(avgLeftEye - avgRightEye);
+
+                    // If left and right eyes have wildly asymmetric brightness, reject (e.g. diagonal car reflection)
+                    if (eyeSymmetryDiff > 35f) continue;
+
+                    // Calculate confidence score
+                    float confidence = Math.Clamp(skinRatio * 0.4f + (eyeDepression / 25f) * 0.4f + (1f - eyeSymmetryDiff / 35f) * 0.2f, 0.1f, 0.98f);
+                    if (confidence < minConfidence) continue;
+
+                    int origX = (int)(x / scale);
+                    int origY = (int)(y / scale);
+                    int origW = (int)(winW / scale);
+                    int origH = (int)(winH / scale);
+
+                    int padX = (int)(origW * 0.10f);
+                    int padY = (int)(origH * 0.12f);
+
+                    var bounds = new SKRectI(
+                        Math.Max(0, origX - padX),
+                        Math.Max(0, origY - padY),
+                        Math.Min(source.Width, origX + origW + padX),
+                        Math.Min(source.Height, origY + origH + padY));
+
+                    results.Add(new DetectedSensitiveRegion(bounds, SensitiveRegionType.Face, confidence));
+                }
+            }
+        }
+
+        return results;
+    }
+
+    private static List<DetectedSensitiveRegion> DetectLicensePlates(SKBitmap source, float minConfidence = 0.45f)
+    {
+        var results = new List<DetectedSensitiveRegion>();
+
+        float scale = Math.Min(600f / source.Width, 600f / source.Height);
+        if (scale > 1.0f) scale = 1.0f;
+
+        int scanW = Math.Max(1, (int)(source.Width * scale));
+        int scanH = Math.Max(1, (int)(source.Height * scale));
+
+        using var small = source.Resize(new SKImageInfo(scanW, scanH, SKColorType.Bgra8888), SKFilterQuality.Medium);
+        if (small == null) return results;
+
+        // Grayscale conversion
+        byte[,] gray = new byte[scanW, scanH];
+        for (int y = 0; y < scanH; y++)
+        {
+            for (int x = 0; x < scanW; x++)
+            {
+                var c = small.GetPixel(x, y);
+                gray[x, y] = (byte)(0.299f * c.Red + 0.587f * c.Green + 0.114f * c.Blue);
+            }
+        }
+
+        // Search dimensions:
+        // Standard EU / International single-line plates: aspect ratio ~4.7 : 1 (width 3.6 - 5.2x height)
+        // Two-line / motorcycle / US plates: aspect ratio ~2.0 : 1
+        (float aspect, float minH, float maxH)[] plateProfiles =
+        {
+            (4.7f, 0.035f, 0.13f), // Standard Euro / German single-line plate
+            (2.1f, 0.05f, 0.16f)   // Two-line / US / square plate
+        };
+
+        foreach (var (aspectRatio, minRelH, maxRelH) in plateProfiles)
+        {
+            int hMin = Math.Max(7, (int)(scanH * minRelH));
+            int hMax = Math.Min(scanH / 3, (int)(scanH * maxRelH));
+            int hStep = Math.Max(4, (hMax - hMin) / 3);
+
+            for (int pH = hMin; pH <= hMax; pH += hStep)
+            {
+                int pW = (int)(pH * aspectRatio);
+                if (pW >= scanW - 4) continue;
+                int stepX = Math.Max(4, pW / 12);
+                int stepY = Math.Max(4, pH / 2);
+
+                // Plates are on vehicles, almost exclusively in the lower 75% of an image
+                int startY = (int)(scanH * 0.25f);
+                int endY = scanH - pH - 2;
+
+                for (int y = startY; y <= endY; y += stepY)
+                {
+                    for (int x = 2; x <= scanW - pW - 2; x += stepX)
+                    {
+                        // 1. Background Luminance & Character Contrast (Bimodal distribution)
+                        // A plate has a bright white/yellow reflective background and dark printed characters.
+                        int brightCount = 0;
+                        int darkCount = 0;
+                        int totalPixels = 0;
+                        int lumSum = 0;
+                        int maxLum = 0;
+
+                        for (int dy = 1; dy < pH - 1; dy += 2)
+                        {
+                            for (int dx = 1; dx < pW - 1; dx += 2)
+                            {
+                                byte l = gray[x + dx, y + dy];
+                                totalPixels++;
+                                lumSum += l;
+                                if (l > maxLum) maxLum = l;
+                                if (l >= 135) brightCount++;
+                                if (l <= 105) darkCount++;
+                            }
+                        }
+
+                        if (totalPixels == 0) continue;
+
+                        float avgLum = (float)lumSum / totalPixels;
+                        float brightRatio = (float)brightCount / totalPixels;
+                        float darkRatio = (float)darkCount / totalPixels;
+
+                        // Plates MUST have a predominantly light background (white/yellow/silver plate)
+                        // Wheels/tires/bumpers fail here: avgLum is low (< 95) and brightRatio is low (< 0.25)
+                        if (avgLum < 118f || brightRatio < 0.38f) continue;
+
+                        // Plates MUST contain dark characters: between 9% and 42% dark pixels
+                        // Blank white surfaces, headlights, and glossy reflections fail here (darkRatio < 0.08)
+                        if (darkRatio < 0.09f || darkRatio > 0.42f) continue;
+
+                        // Reject blown-out pure specular glare (hotspots of headlights where center > 250 with no dark glyphs)
+                        if (maxLum > 250 && darkRatio < 0.12f) continue;
+
+                        // 2. Horizontal Alphanumeric Character Rhythm & Stroke Transitions
+                        // License plates have distinct alphanumeric characters ("ERK SY 44")
+                        // Horizontal scanlines through the plate middle exhibit multiple alternating dark/light transitions!
+                        int transitionScore = 0;
+                        int[] sampleYOffsets = { (int)(pH * 0.38f), (int)(pH * 0.50f), (int)(pH * 0.62f) };
+
+                        foreach (var yOff in sampleYOffsets)
+                        {
+                            int scanY = y + yOff;
+                            if (scanY >= scanH) continue;
+
+                            int lineTransitions = 0;
+                            bool isCurrentlyDark = gray[x + 1, scanY] <= 110;
+
+                            for (int dx = 2; dx < pW - 1; dx++)
+                            {
+                                bool isDark = gray[x + dx, scanY] <= 110;
+                                bool isBright = gray[x + dx, scanY] >= 135;
+
+                                if (isCurrentlyDark && isBright)
+                                {
+                                    lineTransitions++;
+                                    isCurrentlyDark = false;
+                                }
+                                else if (!isCurrentlyDark && isDark)
+                                {
+                                    lineTransitions++;
+                                    isCurrentlyDark = true;
+                                }
+                            }
+
+                            if (lineTransitions >= 5)
+                            {
+                                transitionScore += lineTransitions;
+                            }
+                        }
+
+                        // A plate with text produces at least 12 transitions across the 3 sampled horizontal lines!
+                        // Wheels have ~2-4 (spokes), headlights have 0-2 (smooth lens glass).
+                        if (transitionScore < 10) continue;
+
+                        // Calculate confidence score
+                        float confidence = Math.Clamp(0.50f + (transitionScore / 40f) * 0.35f + (brightRatio * 0.15f), 0.50f, 0.98f);
+                        if (confidence < minConfidence) continue;
+
                         int origX = (int)(x / scale);
                         int origY = (int)(y / scale);
                         int origW = (int)(pW / scale);
                         int origH = (int)(pH / scale);
 
-                        int padX = (int)(origW * 0.08f);
-                        int padY = (int)(origH * 0.15f);
+                        int padX = (int)(origW * 0.06f);
+                        int padY = (int)(origH * 0.10f);
 
                         var bounds = new SKRectI(
                             Math.Max(0, origX - padX),
@@ -265,7 +431,7 @@ public class AutoRedactionService : IAutoRedactionService
                             Math.Min(source.Width, origX + origW + padX),
                             Math.Min(source.Height, origY + origH + padY));
 
-                        results.Add(new DetectedSensitiveRegion(bounds, SensitiveRegionType.LicensePlate, edgeDensity));
+                        results.Add(new DetectedSensitiveRegion(bounds, SensitiveRegionType.LicensePlate, confidence));
                     }
                 }
             }
@@ -274,18 +440,38 @@ public class AutoRedactionService : IAutoRedactionService
         return results;
     }
 
-    private static bool IsSkinColor(SKColor c)
+    private static bool IsHumanSkinColor(SKColor c)
     {
-        // Standard normalized RGB and HSV skin tone heuristic
+        // 1. Normalized RGB & YCbCr model
+        // Y in [50, 240], Cb in [77, 130], Cr in [132, 178]
         int r = c.Red;
         int g = c.Green;
         int b = c.Blue;
 
-        bool rule1 = r > 95 && g > 40 && b > 20 &&
-                     (Math.Max(r, Math.Max(g, b)) - Math.Min(r, Math.Min(g, b))) > 15 &&
-                     Math.Abs(r - g) > 15 && r > g && r > b;
+        float y = 0.299f * r + 0.587f * g + 0.114f * b;
+        if (y < 45f || y > 240f) return false;
 
-        return rule1;
+        float cb = 128f - 0.168736f * r - 0.331264f * g + 0.5f * b;
+        float cr = 128f + 0.5f * r - 0.418688f * g - 0.081312f * b;
+
+        if (cb < 77f || cb > 130f || cr < 132f || cr > 180f) return false;
+
+        float crDiffCb = cr - cb;
+        if (crDiffCb < 10f || crDiffCb > 65f) return false;
+
+        // 2. HSV Hue and Saturation limits
+        c.ToHsv(out float h, out float s, out float v);
+        bool hueOk = (h >= 0f && h <= 45f) || (h >= 335f && h <= 360f);
+        if (!hueOk) return false;
+
+        // Saturation check: Exclude high-saturation amber lights/turn signals and car paint (s > 0.70)
+        // and desaturated grays/metals (s < 0.12)
+        if (s < 0.12f || s > 0.70f) return false;
+
+        // Value check: Exclude dark shadows or blown-out highlights
+        if (v < 0.20f || v > 0.95f) return false;
+
+        return true;
     }
 
     private static List<DetectedSensitiveRegion> NonMaxSuppression(List<DetectedSensitiveRegion> boxes, float iouThreshold = 0.35f)

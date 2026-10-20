@@ -1,3 +1,67 @@
+## 🚀 Was ist neu in Version 2.5.0 (KI-Upscaling, Leinwand-Erweiterung, Multi-Bild-Ebenen, Vorher/Nachher-Vergleich & Icon-Studio):
+
+### 📐 Interaktive Leinwand-Vergrößerung (Paint-Style Canvas Resize)
+- **Anfasser-Griffe direkt auf der Leinwand:**
+  - Wie in MS Paint kann die Arbeitsfläche interaktiv per Maus vergrößert werden: Rechter Rand (`↔`), unterer Rand (`↕`) oder Ecke rechts unten (`⤡`).
+  - **Live-Vorschau:** Gestrichelter Umriss und pixelgenaues Dimensions-Badge (z. B. `1920 × 1080 px (+400 × +200 px)`) beim Aufziehen.
+- **Umfassender Dialog „📐 Leinwand“:**
+  - Exakte Eingabe in Pixel oder Prozent mit Sperre für das Seitenverhältnis.
+  - **3×3 Verankerungsraster (Anchor Grid):** Positionierung des vorhandenen Bildes (Oben-Links, Mitte, Unten-Rechts etc.) – alle bestehenden Annotationen und Ebenen werden automatisch passend mitverschoben!
+  - **Padding / Ränder hinzufügen:** Getrennte Ränder für Oben, Rechts, Unten und Links.
+  - Wählbare Hintergrundfarbe: Transparent, Weiß, Schwarz oder benutzerdefinierte Farbe.
+  - Schnellauswahl-Presets: `+25%`, `+50%`, `+100%`, `16:9`, `4:3`, `1:1`, `Instagram Post`, `4K UHD`.
+- Volle Rückgängig- und Wiederholen-Unterstützung (`Strg + Z` / `Strg + Y`).
+
+---
+
+### 🖼️ Mehrere Bilder & Screenshots einbinden (Vollwertiges Ebenen-System)
+- **Flexible Importmöglichkeiten:**
+  - **Zwischenablage:** `Strg + V` fügt Screenshots oder kopierte Bilder sofort als neue Ebene ein.
+  - **Menü „➕ Bild einfügen ▾“:** Bilddatei auswählen (PNG, JPG, WEBP, BMP, GIF, AVIF), aus Zwischenablage einfügen oder direkt per Windows Snipping Tool (`Win + Shift + S`) Ausschnitt erfassen und einbetten.
+  - **Drag & Drop:** Beliebig viele Bilddateien aus dem Windows-Explorer direkt auf die Leinwand ziehen.
+- **8-Punkt-Transformation & Ebenen-Steuerung:**
+  - Jede eingefügte Bildebene bietet 8 Transformationsgriffe zum freien Skalieren (mit `Shift` für festes Seitenverhältnis) und Verschieben.
+  - Duplizieren mit `Strg + D`, Löschen mit `Entf`.
+  - Im Bedienfeld **`📑 Ebenen`**:
+    - Sichtbarkeit umschalten (Auge-Symbol).
+    - Z-Reihenfolge mit Pfeil-Buttons anpassen (Vordergrund / Hintergrund).
+    - Deckkraft-Regler (0–100 % Transparenz).
+    - „Originalgröße (1:1)“-Button zum Wiederherstellen nativer Pixelmaße.
+    - „In Basisebene einbetten (Flatten)“ zum dauerhaften Verschmelzen mit dem Hintergrund.
+
+---
+
+### ⚖️ Interaktiver Vorher/Nachher-Vergleich im Studio
+- **Split-Slider direkt auf dem Canvas:**
+  - Verschiebbarer Split-Divider mit Anfasser (`↔`) zum direkten Vergleichen des Originals mit dem bearbeiteten Bild.
+- **Hold-to-Compare:**
+  - Taste `\` oder Klick & Halten auf `👁️ Original halten` zeigt vorübergehend das unberührte Originalbild.
+- **Auflösungsunabhängiges Alignment:**
+  - Funktioniert nahtlos auch bei veränderten Bildauflösungen (z. B. nach KI-Upscaling).
+
+---
+
+### 🤖 KI-Upscaling & Apple HEIC/HEIF-Support
+- **Super-Resolution Upscaling:**
+  - 2x und 4x Hochskalierung für gestochen scharfe Details mit bicubic/lanczos Fallback und Schärfefilter.
+  - Robuste SkiaSharp-Speicherallokation und Farbraum-Handhabung.
+- **HEIC/HEIF-Formatunterstützung:**
+  - Direkte Konvertierung und Öffnen von Apple iPhone / iPad HEIC- und HEIF-Aufnahmen.
+
+---
+
+### 🛡️ Auto-DSGVO & Icon-Studio Optimierungen
+- **Austarierte Erkennungs-Sensitivität:**
+  - Verfeinerte Heuristik für Gesichter und KFZ-Kennzeichen verhindert Über-Zensur von Texturen und erkennt EU-Nummernschilder zuverlässig.
+- **Bereinigtes Icon-Studio:**
+  - Zuverlässige Plattformfilter (Web, iOS, Android, Windows) per Klick.
+  - Anzeige aller Bildmaße und Plattform-Kategorien ohne redundante Listeneinträge.
+  - Zip-Paket-Generierung für alle Zielplattformen.
+- **Sauberer Bildwechsel im Studio:**
+  - `ResetEditorState()` stellt sicher, dass Pfeile, Formen und Notizen nicht auf nachfolgend geöffnete Bilder übertragen werden.
+
+---
+
 ## 🚀 Was ist neu in Version 2.4.1 (Performance-Boost bei großen Bildern, KI-Pinsel Usability & Skalierbare Schritt-Badges):
 
 ### ⚡ Massiver Performance-Boost im Schnell-Editor

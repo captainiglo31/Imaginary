@@ -63,4 +63,24 @@ public interface IImageEditorService
     /// Draws text with optional background container box.
     /// </summary>
     SKBitmap DrawText(SKBitmap source, string text, SKPoint position, SKColor textColor, float fontSize = 20f, SKColor? backgroundColor = null);
+
+    /// <summary>
+    /// Resizes or expands the canvas dimensions, placing the original image according to the specified anchor.
+    /// New areas are filled with the specified background color (default transparent).
+    /// </summary>
+    SKBitmap ResizeCanvas(SKBitmap source, int newWidth, int newHeight, CanvasAnchor anchor = CanvasAnchor.TopLeft, SKColor? backgroundColor = null);
 }
+
+public enum CanvasAnchor
+{
+    TopLeft,
+    TopCenter,
+    TopRight,
+    MiddleLeft,
+    Center,
+    MiddleRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight
+}
+

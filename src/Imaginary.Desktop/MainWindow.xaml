@@ -1066,16 +1066,21 @@
                                                 <ItemsControl ItemsSource="{Binding IconStudioItems}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,5">
+                                                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,6">
                                                                 <DockPanel LastChildFill="True">
-                                                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                                    <Border DockPanel.Dock="Right" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="3"
-                                                                            Padding="6,2" VerticalAlignment="Center">
-                                                                        <TextBlock Text="{Binding DimensionsText}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                                    <Border DockPanel.Dock="Right" Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="4"
+                                                                            Padding="7,3" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                                        <TextBlock Text="{Binding BadgeText}" FontSize="10.5" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                                     </Border>
                                                                     <StackPanel VerticalAlignment="Center">
-                                                                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                                        <TextBlock Text="{Binding Category}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                                            <Border Background="{DynamicResource CardHeaderBackgroundBrush}" CornerRadius="3" Padding="4,1" Margin="0,0,6,0">
+                                                                                <TextBlock Text="{Binding PlatformBadge}" FontSize="10" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                            </Border>
+                                                                            <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                                        </StackPanel>
+                                                                        <TextBlock Text="{Binding PathAndDescription}" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                                     </StackPanel>
                                                                 </DockPanel>
                                                             </Border>
@@ -1473,37 +1478,54 @@
                                 <!-- KI-Upscaling / Super Resolution Models -->
                                 <Border Background="{DynamicResource ToolbarBackgroundBrush}" CornerRadius="6"
                                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,8,0,4">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="✨ KI-Upscaling (Super Resolution 2x &amp; 4x, ONNX):" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4"/>
+                                        <TextBlock Text="Neuronales Netz (Real-ESRGAN) zur intelligenten Rekonstruktion feiner Kanten und Texturen. Imaginary besitzt bereits einen integrierten Offline-Algorithmus (Lanczos3 + Detail-Recovery). Für maximale KI-Rekonstruktion können hier die ONNX-Modelle heruntergeladen werden."
+                                                   FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
 
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
-                                                <TextBlock Text="✨ KI-Upscaling (Super Resolution 2x &amp; 4x, ONNX):" FontWeight="SemiBold" FontSize="12"/>
-                                                <TextBlock Text="{Binding Upscale2xStatusText}" FontWeight="Bold" FontSize="12"
-                                                           Foreground="{DynamicResource AccentBrush}" Margin="8,0,0,0"/>
-                                            </StackPanel>
-                                            <TextBlock Text="Neuronales Netz zur intelligenten Vergrößerung von Bildern. Imaginary besitzt bereits einen integrierten Offline-Algorithmus (Lanczos3 + Unsharp Detail Recovery). Für maximale Rekonstruktion kann zusätzlich das ONNX-Modell heruntergeladen werden."
-                                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
-                                        </StackPanel>
+                                        <!-- 2x Model Row -->
+                                        <Border Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,6">
+                                            <DockPanel LastChildFill="True">
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Content="⬇️ 2x Modell laden (ca. 67 MB)" Command="{Binding DownloadUpscale2xModelCommand}"
+                                                            Visibility="{Binding IsUpscale2xDownloaded, Converter={StaticResource InverseBoolToVis}}"
+                                                            IsEnabled="{Binding IsUpscaleDownloading, Converter={StaticResource InverseBool}}"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" Padding="10,5" FontWeight="SemiBold"/>
+                                                    <Button Content="🗑️ Löschen" Command="{Binding DeleteUpscale2xModelCommand}"
+                                                            Visibility="{Binding IsUpscale2xDownloaded, Converter={StaticResource BoolToVis}}"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" Padding="8,4" Foreground="#EF4444"/>
+                                                </StackPanel>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="2x Super-Resolution Modell" FontWeight="SemiBold" FontSize="11.5"/>
+                                                    <TextBlock Text="{Binding Upscale2xStatusText}" FontSize="11" Foreground="{DynamicResource AccentBrush}"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
 
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                                            <Button Content="⬇️ Upscale-Modell herunterladen" Command="{Binding DownloadUpscaleModelCommand}"
-                                                    Visibility="{Binding IsUpscale2xDownloaded, Converter={StaticResource InverseBoolToVis}}"
-                                                    IsEnabled="{Binding IsUpscaleDownloading, Converter={StaticResource InverseBool}}"
-                                                    Style="{DynamicResource ToolbarButtonStyle}" Padding="12,6" FontWeight="SemiBold"/>
-                                            <Button Content="🗑️ Modell löschen" Command="{Binding DeleteUpscaleModelCommand}"
-                                                    Visibility="{Binding IsUpscale2xDownloaded, Converter={StaticResource BoolToVis}}"
-                                                    Style="{DynamicResource ToolbarButtonStyle}" Padding="10,6" Foreground="#EF4444"/>
-                                        </StackPanel>
-                                    </Grid>
+                                        <!-- 4x Model Row -->
+                                        <Border Background="{DynamicResource SurfaceBackgroundBrush}" CornerRadius="4" Padding="10,6" Margin="0,0,0,4">
+                                            <DockPanel LastChildFill="True">
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Content="⬇️ 4x Modell laden (ca. 67 MB)" Command="{Binding DownloadUpscale4xModelCommand}"
+                                                            Visibility="{Binding IsUpscale4xDownloaded, Converter={StaticResource InverseBoolToVis}}"
+                                                            IsEnabled="{Binding IsUpscaleDownloading, Converter={StaticResource InverseBool}}"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" Padding="10,5" FontWeight="SemiBold"/>
+                                                    <Button Content="🗑️ Löschen" Command="{Binding DeleteUpscale4xModelCommand}"
+                                                            Visibility="{Binding IsUpscale4xDownloaded, Converter={StaticResource BoolToVis}}"
+                                                            Style="{DynamicResource ToolbarButtonStyle}" Padding="8,4" Foreground="#EF4444"/>
+                                                </StackPanel>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="4x Super-Resolution Modell" FontWeight="SemiBold" FontSize="11.5"/>
+                                                    <TextBlock Text="{Binding Upscale4xStatusText}" FontSize="11" Foreground="{DynamicResource AccentBrush}"/>
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+
+                                        <!-- Download Progress Bar if upscale downloading -->
+                                        <ProgressBar Value="{Binding UpscaleDownloadProgress}" Minimum="0" Maximum="100" Height="6" Margin="0,6,0,0"
+                                                     Visibility="{Binding IsUpscaleDownloading, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
                                 </Border>
-
-                                <!-- Download Progress Bar if upscale downloading -->
-                                <ProgressBar Value="{Binding UpscaleDownloadProgress}" Minimum="0" Maximum="100" Height="6" Margin="0,4,0,0"
-                                             Visibility="{Binding IsUpscaleDownloading, Converter={StaticResource BoolToVis}}"/>
                             </StackPanel>
                         </GroupBox>
  

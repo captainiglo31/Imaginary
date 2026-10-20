@@ -222,6 +222,8 @@ public partial class MainViewModel : ObservableObject
 
     // Icon-Studio Workspace
     public ObservableCollection<IconTemplateItemViewModel> IconStudioItems { get; } = new();
+    public int SelectedIconStudioCount => IconStudioItems.Count(i => i.IsSelected);
+
 
     [ObservableProperty]
     private string _iconStudioSourcePath = string.Empty;
@@ -559,7 +561,9 @@ public partial class MainViewModel : ObservableObject
 
         foreach (var itm in _iconGeneratorService.GetAvailableTemplates())
         {
-            IconStudioItems.Add(new IconTemplateItemViewModel(itm));
+            var vm = new IconTemplateItemViewModel(itm);
+            vm.SelectionChanged += () => OnPropertyChanged(nameof(SelectedIconStudioCount));
+            IconStudioItems.Add(vm);
         }
 
         _isUpscale2xDownloaded = _upscaleService.IsAiModelDownloaded(2);
@@ -1627,21 +1631,35 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void DeleteUpscaleModel(string factorStr)
+    private async Task DownloadUpscale2xModelAsync() => await DownloadUpscaleModelAsync("2");
+
+    [RelayCommand]
+    private async Task DownloadUpscale4xModelAsync() => await DownloadUpscaleModelAsync("4");
+
+    [RelayCommand]
+    private void DeleteUpscaleModel(string? factorStr)
     {
         int factor = int.TryParse(factorStr, out var f) ? f : 2;
         _upscaleService.DeleteModel(factor);
         if (factor == 4)
         {
             IsUpscale4xDownloaded = false;
-            Upscale4xStatusText = "Nicht heruntergeladen (ca. 64 MB)";
+            Upscale4xStatusText = "Nicht heruntergeladen (ca. 67 MB)";
         }
         else
         {
             IsUpscale2xDownloaded = false;
-            Upscale2xStatusText = "Nicht heruntergeladen (ca. 16 MB)";
+            Upscale2xStatusText = "Nicht heruntergeladen (ca. 67 MB)";
         }
     }
+
+    [RelayCommand]
+    private void DeleteUpscale2xModel() => DeleteUpscaleModel("2");
+
+    [RelayCommand]
+    private void DeleteUpscale4xModel() => DeleteUpscaleModel("4");
+
+
 
     partial void OnIconStudioShapeIndexChanged(int value) => UpdateIconStudioPreview();
     partial void OnIconStudioPaddingPercentChanged(double value) => UpdateIconStudioPreview();
@@ -1738,28 +1756,56 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SelectAllIconItems()
+    private void SelectAllIconStudioItems()
     {
         foreach (var itm in IconStudioItems) itm.IsSelected = true;
+        OnPropertyChanged(nameof(SelectedIconStudioCount));
     }
 
     [RelayCommand]
-    private void DeselectAllIconItems()
+    private void DeselectAllIconStudioItems()
     {
         foreach (var itm in IconStudioItems) itm.IsSelected = false;
+        OnPropertyChanged(nameof(SelectedIconStudioCount));
     }
 
     [RelayCommand]
-    private void SelectPlatformIconItems(string platformName)
+    private void SelectIconStudioPlatform(string platformName)
     {
-        if (Enum.TryParse<IconTargetPlatform>(platformName, out var platform))
+        IconTargetPlatform? platform = platformName.ToLowerInvariant() switch
         {
-            foreach (var itm in IconStudioItems)
-            {
-                if (itm.Platform == platform) itm.IsSelected = true;
-            }
+            "windows" => IconTargetPlatform.Windows,
+            "web" or "webfavicon" => IconTargetPlatform.WebFavicon,
+            "apple" or "appleiosmac" => IconTargetPlatform.AppleIosMac,
+            "android" => IconTargetPlatform.Android,
+            _ => Enum.TryParse<IconTargetPlatform>(platformName, true, out var p) ? p : null
+        };
+
+        if (platform == null) return;
+
+        var targetItems = IconStudioItems.Where(i => i.Platform == platform.Value).ToList();
+        if (targetItems.Count == 0) return;
+
+        bool allSelected = targetItems.All(i => i.IsSelected);
+        bool newState = !allSelected;
+
+        foreach (var itm in targetItems)
+        {
+            itm.IsSelected = newState;
         }
+
+        OnPropertyChanged(nameof(SelectedIconStudioCount));
     }
+
+    [RelayCommand]
+    private void SelectAllIconItems() => SelectAllIconStudioItems();
+
+    [RelayCommand]
+    private void DeselectAllIconItems() => DeselectAllIconStudioItems();
+
+    [RelayCommand]
+    private void SelectPlatformIconItems(string platformName) => SelectIconStudioPlatform(platformName);
+
 
     [RelayCommand]
     private void GenerateIconPackageZip()

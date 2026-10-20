@@ -484,4 +484,39 @@ public class ImageEditorService : IImageEditorService
 
         return result;
     }
+
+    public SKBitmap ResizeCanvas(SKBitmap source, int newWidth, int newHeight, CanvasAnchor anchor = CanvasAnchor.TopLeft, SKColor? backgroundColor = null)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        newWidth = Math.Max(1, newWidth);
+        newHeight = Math.Max(1, newHeight);
+
+        int offsetX = anchor switch
+        {
+            CanvasAnchor.TopLeft or CanvasAnchor.MiddleLeft or CanvasAnchor.BottomLeft => 0,
+            CanvasAnchor.TopCenter or CanvasAnchor.Center or CanvasAnchor.BottomCenter => (newWidth - source.Width) / 2,
+            CanvasAnchor.TopRight or CanvasAnchor.MiddleRight or CanvasAnchor.BottomRight => newWidth - source.Width,
+            _ => 0
+        };
+
+        int offsetY = anchor switch
+        {
+            CanvasAnchor.TopLeft or CanvasAnchor.TopCenter or CanvasAnchor.TopRight => 0,
+            CanvasAnchor.MiddleLeft or CanvasAnchor.Center or CanvasAnchor.MiddleRight => (newHeight - source.Height) / 2,
+            CanvasAnchor.BottomLeft or CanvasAnchor.BottomCenter or CanvasAnchor.BottomRight => newHeight - source.Height,
+            _ => 0
+        };
+
+        var result = new SKBitmap(newWidth, newHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(result);
+
+        var bg = backgroundColor ?? SKColors.Transparent;
+        canvas.Clear(bg);
+
+        canvas.DrawBitmap(source, offsetX, offsetY);
+        canvas.Flush();
+
+        return result;
+    }
 }

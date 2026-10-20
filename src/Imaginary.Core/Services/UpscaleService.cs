@@ -17,8 +17,8 @@ public class UpscaleService : IUpscaleService
     private const string Model2xFileName = "realesrgan_x2.onnx";
     private const string Model4xFileName = "realesrgan_x4.onnx";
 
-    private const string Model2xUrl = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x2plus.onnx";
-    private const string Model4xUrl = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.onnx";
+    private const string Model2xUrl = "https://huggingface.co/tidus2102/Real-ESRGAN/resolve/main/Real-ESRGAN_x2plus.onnx";
+    private const string Model4xUrl = "https://huggingface.co/skillsafe-ai/realesrgan-x4plus/resolve/main/model.onnx";
 
     private readonly HttpClient _httpClient;
 
@@ -71,7 +71,7 @@ public class UpscaleService : IUpscaleService
             using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
-            var totalBytes = response.Content.Headers.ContentLength ?? 17_000_000L;
+            var totalBytes = response.Content.Headers.ContentLength ?? 67_000_000L;
             long totalRead = 0;
 
             await using (var contentStream = await response.Content.ReadAsStreamAsync(ct))
@@ -167,9 +167,8 @@ public class UpscaleService : IUpscaleService
         int targetWidth = source.Width * factor;
         int targetHeight = source.Height * factor;
 
-        // 1. High-Quality Lanczos Resampling
-        var info = new SKImageInfo(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
-        var upscaled = new SKBitmap(info);
+        // 1. High-Quality Lanczos3 Resampling
+        var upscaled = new SKBitmap(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
 
         using (var canvas = new SKCanvas(upscaled))
         {
@@ -183,27 +182,57 @@ public class UpscaleService : IUpscaleService
             canvas.Flush();
         }
 
-        // 2. Unsharp Masking Detail Enhancement for crisp edges without noise
-        var sharpened = new SKBitmap(info);
-        using (var canvas = new SKCanvas(sharpened))
+        // 2. High-Frequency Detail Extraction & Edge-Preserving Sharpening
+        // Render a Gaussian blurred copy of the upscaled image
+        using var blurred = new SKBitmap(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using (var canvas = new SKCanvas(blurred))
         {
             using var blurPaint = new SKPaint
             {
                 IsAntialias = true,
-                ImageFilter = SKImageFilter.CreateBlur(1.5f * factor, 1.5f * factor)
+                ImageFilter = SKImageFilter.CreateBlur(1.1f * factor, 1.1f * factor)
             };
-
-            // Draw base
-            canvas.DrawBitmap(upscaled, 0, 0);
-
-            // Blend edges with high-pass contrast
-            using var blendPaint = new SKPaint
-            {
-                BlendMode = SKBlendMode.Overlay,
-                Color = new SKColor(255, 255, 255, (byte)(50 * factor))
-            };
-            canvas.DrawBitmap(upscaled, 0, 0, blendPaint);
+            canvas.DrawBitmap(upscaled, 0, 0, blurPaint);
             canvas.Flush();
+        }
+
+        // 3. Pixel-level Unsharp Masking & Detail Gain
+        var sharpened = new SKBitmap(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+        var origSpan = upscaled.GetPixelSpan();
+        var blurSpan = blurred.GetPixelSpan();
+
+        unsafe
+        {
+            byte* dst = (byte*)sharpened.GetPixels().ToPointer();
+            int length = origSpan.Length;
+            float gain = 1.35f;
+
+            for (int i = 0; i < length; i += 4)
+            {
+                // BGRA format
+                int bOrig = origSpan[i];
+                int gOrig = origSpan[i + 1];
+                int rOrig = origSpan[i + 2];
+                byte a = origSpan[i + 3];
+
+                int bBlur = blurSpan[i];
+                int gBlur = blurSpan[i + 1];
+                int rBlur = blurSpan[i + 2];
+
+                int deltaB = bOrig - bBlur;
+                int deltaG = gOrig - gBlur;
+                int deltaR = rOrig - rBlur;
+
+                // Small threshold of 2 to suppress noise/grain in flat areas
+                int bSharp = Math.Abs(deltaB) > 2 ? Math.Clamp((int)(bOrig + gain * deltaB), 0, 255) : bOrig;
+                int gSharp = Math.Abs(deltaG) > 2 ? Math.Clamp((int)(gOrig + gain * deltaG), 0, 255) : gOrig;
+                int rSharp = Math.Abs(deltaR) > 2 ? Math.Clamp((int)(rOrig + gain * deltaR), 0, 255) : rOrig;
+
+                dst[i] = (byte)bSharp;
+                dst[i + 1] = (byte)gSharp;
+                dst[i + 2] = (byte)rSharp;
+                dst[i + 3] = a;
+            }
         }
 
         upscaled.Dispose();
@@ -222,14 +251,38 @@ public class UpscaleService : IUpscaleService
         // Tensor [1, 3, height, width] with values in [0, 1]
         var tensor = new DenseTensor<float>(new[] { 1, 3, height, width });
 
-        for (int y = 0; y < height; y++)
+        // Ensure 32-bit BGRA format for direct span access
+        bool needsDispose = source.ColorType != SKColorType.Bgra8888;
+        var normalized = needsDispose
+            ? source.Copy(SKColorType.Bgra8888)
+            : source;
+
+        try
         {
-            for (int x = 0; x < width; x++)
+            var span = normalized.GetPixelSpan();
+            int rowBytes = normalized.RowBytes;
+
+            for (int y = 0; y < height; y++)
             {
-                var color = source.GetPixel(x, y);
-                tensor[0, 0, y, x] = color.Red / 255.0f;
-                tensor[0, 1, y, x] = color.Green / 255.0f;
-                tensor[0, 2, y, x] = color.Blue / 255.0f;
+                int rowStart = y * rowBytes;
+                for (int x = 0; x < width; x++)
+                {
+                    int idx = rowStart + (x * 4);
+                    byte b = span[idx];
+                    byte g = span[idx + 1];
+                    byte r = span[idx + 2];
+
+                    tensor[0, 0, y, x] = r / 255.0f;
+                    tensor[0, 1, y, x] = g / 255.0f;
+                    tensor[0, 2, y, x] = b / 255.0f;
+                }
+            }
+        }
+        finally
+        {
+            if (needsDispose)
+            {
+                normalized.Dispose();
             }
         }
 
@@ -245,16 +298,26 @@ public class UpscaleService : IUpscaleService
         int outWidth = outputTensor.Dimensions[3];
 
         var result = new SKBitmap(outWidth, outHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
-
-        for (int y = 0; y < outHeight; y++)
+        unsafe
         {
-            for (int x = 0; x < outWidth; x++)
-            {
-                byte r = (byte)Math.Clamp((int)(outputTensor[0, 0, y, x] * 255.0f), 0, 255);
-                byte g = (byte)Math.Clamp((int)(outputTensor[0, 1, y, x] * 255.0f), 0, 255);
-                byte b = (byte)Math.Clamp((int)(outputTensor[0, 2, y, x] * 255.0f), 0, 255);
+            byte* dst = (byte*)result.GetPixels().ToPointer();
+            int resRowBytes = result.RowBytes;
 
-                result.SetPixel(x, y, new SKColor(r, g, b, 255));
+            for (int y = 0; y < outHeight; y++)
+            {
+                int rowStart = y * resRowBytes;
+                for (int x = 0; x < outWidth; x++)
+                {
+                    byte r = (byte)Math.Clamp((int)(outputTensor[0, 0, y, x] * 255.0f), 0, 255);
+                    byte g = (byte)Math.Clamp((int)(outputTensor[0, 1, y, x] * 255.0f), 0, 255);
+                    byte b = (byte)Math.Clamp((int)(outputTensor[0, 2, y, x] * 255.0f), 0, 255);
+
+                    int idx = rowStart + (x * 4);
+                    dst[idx] = b;
+                    dst[idx + 1] = g;
+                    dst[idx + 2] = r;
+                    dst[idx + 3] = 255;
+                }
             }
         }
 
